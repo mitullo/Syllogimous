@@ -1,4 +1,4 @@
-# Syllogimous +
+# Syllogimous v3
 
 Modified version of Syllogimous-v3, created to support new theories and experiments on relational reasoning training.
 
