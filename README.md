@@ -1,8 +1,8 @@
-# Syllogimous v3
+# Syllogimous +
 
 Modified version of Syllogimous-v3, created to support new theories and experiments on relational reasoning training.
 
-[Try it](https://soamsy.github.io/Syllogimous-v3/)
+[Try it](https://mitullo.github.io/Syllogimous-/)
 
 # Contribution
 
