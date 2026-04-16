@@ -2641,7 +2641,7 @@ button:not(:disabled):hover::after {
 
 .formatted-conclusion {
     font-weight: 600;
-    color: var(--bracket-color, #4aa39a);
+    color: var(--conclusion-color, #ffffff);
 }
 
 
@@ -4000,6 +4000,33 @@ html {
     border-bottom: 2px solid var(--bracket-color, #1798B0);
 }
 
+/* Conclusion styles */
+.conclusion-minimal .formatted-conclusion {
+    padding: var(--premise-padding-y) var(--premise-padding-x);
+    border: none;
+    background: transparent;
+}
+
+.conclusion-boxed .formatted-conclusion {
+    padding: calc(var(--premise-padding-y) + 0.25rem) calc(var(--premise-padding-x) + 0.75rem);
+    border: 1px solid var(--conclusion-color, #ffffff);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.conclusion-card .formatted-conclusion {
+    padding: calc(var(--premise-padding-y) + 0.5rem) calc(var(--premise-padding-x) + 0.75rem);
+    border: 1px solid var(--conclusion-color, #ffffff);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.conclusion-underline .formatted-conclusion {
+    padding: calc(var(--premise-padding-y) + 0.25rem) var(--premise-padding-x);
+    border-bottom: 2px solid var(--conclusion-color, #ffffff);
+}
+
 /* Premise container gap */
 .premises-container {
     gap: var(--premise-gap);
@@ -4009,6 +4036,14 @@ html {
 .btn-contrast .confirmation-buttons button {
     background: rgba(var(--accent-rgb), 0.3);
     border: none;
+}
+
+.btn-solid .confirmation-buttons button:first-child {
+    background: linear-gradient(135deg, rgba(77, 168, 133, 0.6), rgba(58, 138, 106, 0.6));
+}
+
+.btn-solid .confirmation-buttons button:last-child {
+    background: linear-gradient(135deg, rgba(168, 95, 112, 0.6), rgba(138, 79, 92, 0.6));
 }
 
 /* Bracket color override - brackets use background-color not border-color */
@@ -4035,8 +4070,8 @@ html {
     background: var(--background-color, #FFF);
 }
 
-/* Colored words option - only affects subject words */
-.colored-words .subject {
+/* Colored words option - only affects subject words, not in conclusion */
+.colored-words .subject:not(.formatted-conclusion .subject) {
     color: var(--bracket-color, var(--theme-color, #1798B0)) !important;
 }
 

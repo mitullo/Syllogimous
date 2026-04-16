@@ -214,6 +214,8 @@ function displayInit() {
     // Handle Anchor Space v2 pattern display
     if (q.pattern && q.type === 'anchor-space-v2') {
         displayText.innerHTML = renderPatternDisplay(q.pattern, q.premises, q.operations, q.conclusion, easy, halfMinimal);
+        // Hide TRUE/FALSE buttons during pattern memorization
+        disableConfirmationButtons();
         // Pause timer during pattern memorization if setting enabled
         if (savedata.anchorSpaceV2PauseTimer && timerRunning) {
             stopCountDown();
@@ -345,32 +347,47 @@ function renderPatternDisplay(pattern, premises, operations, conclusion, easy, h
 
 function createShapeSVG(shape, color, x, y, size) {
     const halfSize = size / 2;
+    // Leave some padding so stroke doesn't get cut off
+    const padding = 3;
+    const r = halfSize - padding;
+    // Use a darker stroke for better contrast
+    const strokeColor = color.stroke || '#000000';
+    const svgAttrs = `shape-rendering="geometricPrecision"`;
     switch(shape) {
         case 'circle':
-            return `<circle cx="${x}" cy="${y}" r="${halfSize}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+            return `<circle cx="${x}" cy="${y}" r="${r}" fill="${color.fill}" stroke="${strokeColor}" stroke-width="2.5" ${svgAttrs}/>`;
         case 'square':
-            return `<rect x="${x - halfSize}" y="${y - halfSize}" width="${size}" height="${size}" rx="4" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+            return `<rect x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" rx="2" fill="${color.fill}" stroke="${strokeColor}" stroke-width="2.5" ${svgAttrs}/>`;
         case 'triangle':
-            return `<polygon points="${x},${y - halfSize} ${x + halfSize},${y + halfSize} ${x - halfSize},${y + halfSize}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+            // Equilateral triangle pointing up
+            const triHeight = r * 1.5;
+            const triHalfBase = r * 0.866;
+            return `<polygon points="${x},${y - triHeight * 0.6} ${x + triHalfBase},${y + triHeight * 0.4} ${x - triHalfBase},${y + triHeight * 0.4}" fill="${color.fill}" stroke="${strokeColor}" stroke-width="2.5" stroke-linejoin="miter" stroke-linecap="butt" ${svgAttrs}/>`;
         case 'diamond':
-            return `<polygon points="${x},${y - halfSize} ${x + halfSize},${y} ${x},${y + halfSize} ${x - halfSize},${y}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+            // Perfect diamond (square rotated 45°)
+            const dOffset = r * 0.707;
+            return `<polygon points="${x},${y - dOffset} ${x + dOffset},${y} ${x},${y + dOffset} ${x - dOffset},${y}" fill="${color.fill}" stroke="${strokeColor}" stroke-width="2.5" stroke-linejoin="miter" stroke-linecap="butt" ${svgAttrs}/>`;
         case 'hexagon':
+            // Regular hexagon
             const hexPoints = [];
             for (let i = 0; i < 6; i++) {
                 const angle = (Math.PI / 3) * i - Math.PI / 2;
-                hexPoints.push(`${x + halfSize * Math.cos(angle)},${y + halfSize * Math.sin(angle)}`);
+                hexPoints.push(`${x + r * Math.cos(angle)},${y + r * Math.sin(angle)}`);
             }
-            return `<polygon points="${hexPoints.join(' ')}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+            return `<polygon points="${hexPoints.join(' ')}" fill="${color.fill}" stroke="${strokeColor}" stroke-width="2.5" stroke-linejoin="miter" stroke-linecap="butt" ${svgAttrs}/>`;
         case 'star':
+            // 5-pointed star with proper proportions
             const starPoints = [];
+            const outerRadius = r;
+            const innerRadius = r * 0.4;
             for (let i = 0; i < 10; i++) {
                 const angle = (Math.PI / 5) * i - Math.PI / 2;
-                const radius = i % 2 === 0 ? halfSize : halfSize * 0.4;
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
                 starPoints.push(`${x + radius * Math.cos(angle)},${y + radius * Math.sin(angle)}`);
             }
-            return `<polygon points="${starPoints.join(' ')}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+            return `<polygon points="${starPoints.join(' ')}" fill="${color.fill}" stroke="${strokeColor}" stroke-width="2.5" stroke-linejoin="miter" stroke-linecap="butt" ${svgAttrs}/>`;
         default:
-            return `<circle cx="${x}" cy="${y}" r="${halfSize}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+            return `<circle cx="${x}" cy="${y}" r="${r}" fill="${color.fill}" stroke="${strokeColor}" stroke-width="2.5" ${svgAttrs}/>`;
     }
 }
 
@@ -383,6 +400,8 @@ function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMi
     if (premisesPhase) {
         premisesPhase.style.display = 'block';
     }
+    // Show TRUE/FALSE buttons now that premises are visible
+    enableConfirmationButtons();
     // Resume timer if it was paused during pattern memorization
     if (savedata.anchorSpaceV2PauseTimer && timerToggled && !timerRunning) {
         startCountDown();
@@ -440,6 +459,9 @@ function populateAppearanceSettings() {
     document.getElementById('p-timer-height').value = appState.timerHeight;
     document.getElementById('p-border-radius').value = appState.borderRadius;
     document.getElementById('p-premise-style').value = appState.premiseStyle;
+    document.getElementById('p-conclusion-style').value = appState.conclusionStyle || 'minimal';
+    document.getElementById('p-conclusion-color').value = appState.conclusionColor || '#ffffff';
+    document.getElementById('p-conclusion-color-picker').value = appState.conclusionColor || '#ffffff';
     document.getElementById('p-button-style').value = appState.buttonStyle;
     applyAppearanceSettings();
 }
@@ -553,6 +575,37 @@ function handleButtonStyleChange(event) {
     save();
 }
 
+function handleConclusionStyleChange(event) {
+    appState.conclusionStyle = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleConclusionPresetColorClick(button) {
+    const color = button.getAttribute('data-color');
+    document.getElementById('p-conclusion-color').value = color;
+    document.getElementById('p-conclusion-color-picker').value = color;
+    appState.conclusionColor = color;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleConclusionColorChange(event) {
+    const color = event.target.value;
+    appState.conclusionColor = color;
+    document.getElementById('p-conclusion-color-picker').value = color;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleConclusionColorPickerChange(event) {
+    const color = event.target.value;
+    appState.conclusionColor = color;
+    document.getElementById('p-conclusion-color').value = color;
+    applyAppearanceSettings();
+    save();
+}
+
 function applyAppearanceSettings() {
     const root = document.documentElement;
     const timerBar = document.querySelector('.timer__bar');
@@ -620,7 +673,15 @@ function applyAppearanceSettings() {
     // Premise style - add/remove classes
     document.body.classList.remove('premise-minimal', 'premise-boxed', 'premise-card', 'premise-underline');
     document.body.classList.add('premise-' + appState.premiseStyle);
-    
+
+    // Conclusion style - add/remove classes
+    document.body.classList.remove('conclusion-minimal', 'conclusion-boxed', 'conclusion-card', 'conclusion-underline');
+    document.body.classList.add('conclusion-' + appState.conclusionStyle);
+
+    // Conclusion color
+    const conclusionColor = appState.conclusionColor || '#ffffff';
+    root.style.setProperty('--conclusion-color', conclusionColor);
+
     // Button style - only Contrast and Solid now
     document.body.classList.remove('btn-solid', 'btn-contrast');
     document.body.classList.add('btn-' + appState.buttonStyle);

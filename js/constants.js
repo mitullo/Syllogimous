@@ -25,7 +25,9 @@ let appState = {
     "timerHeight": "normal",
     "borderRadius": "rounded",
     "premiseStyle": "minimal",
-    "buttonStyle": "solid",
+    "conclusionStyle": "minimal",
+    "conclusionColor": "#ffffff",
+    "buttonStyle": "contrast",
 };
 
 let savedata = {

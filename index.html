@@ -803,10 +803,42 @@
 								</div>
 								<div class="mb-2">
 									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Conclusion Style</span>
+										<select id="p-conclusion-style" class='select-item' onchange="handleConclusionStyleChange(event)">
+										    <option value="minimal" selected>Minimal</option>
+										    <option value="boxed">Boxed</option>
+										    <option value="card">Card</option>
+										    <option value="underline">Underline</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+										<span>Conclusion Color</span>
+										<div class="color-presets" style="display: flex; gap: 0.5rem; flex-wrap: wrap; width: 100%;">
+											<button type="button" class="color-preset-conclusion" data-color="#ffffff" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ffffff; background: #ffffff; cursor: pointer;" title="White"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#1798B0" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #1798B0; background: #1798B0; cursor: pointer;" title="Cyan Blue"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#ff0000" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ff0000; background: #ff0000; cursor: pointer;" title="Red"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#ffa500" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ffa500; background: #ffa500; cursor: pointer;" title="Orange"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#ffff00" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ffff00; background: #ffff00; cursor: pointer;" title="Yellow"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#00ff00" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #00ff00; background: #00ff00; cursor: pointer;" title="Green"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#0000ff" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #0000ff; background: #0000ff; cursor: pointer;" title="Blue"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#9400d3" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #9400d3; background: #9400d3; cursor: pointer;" title="Violet"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#ff1493" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ff1493; background: #ff1493; cursor: pointer;" title="Pink"></button>
+										</div>
+										<div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+											<span style="font-size: 0.85rem; opacity: 0.7;">Custom:</span>
+											<input type="color" id="p-conclusion-color-picker" value="#ffffff" onchange="handleConclusionColorPickerChange(event)" style="width: 32px; height: 28px; border: none; border-radius: 4px; cursor: pointer; padding: 0; background: transparent;">
+											<input type="text" id="p-conclusion-color" class="select-item" placeholder="#ffffff" value="#ffffff" onchange="handleConclusionColorChange(event)" style="width: 8ch; text-align: center; flex: 1;">
+										</div>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
 										<span>Button Style</span>
 										<select id="p-button-style" class='select-item' onchange="handleButtonStyleChange(event)">
-										    <option value="solid" selected>Solid</option>
-										    <option value="contrast">Contrast</option>
+										    <option value="solid">Solid</option>
+										    <option value="contrast" selected>Contrast</option>
 										</select>
 									</div>
 								</div>
@@ -1360,6 +1392,47 @@
 								<p class="keyboard-shortcut"><span>h</span><span>Open History</span></p>
 								<p class="keyboard-shortcut"><span>a</span><span>Prev (Carousel)</span></p>
 								<p class="keyboard-shortcut"><span>d</span><span>Next (Carousel)</span></p>
+								</div>
+							</div>
+						</div>
+						<hr class="divider"/>
+						<div class="mb-2">
+							<div class="explainer">
+								<h4>Minimal Mode Symbols:</h4>
+								<div class="symbol-guide">
+									<div class="symbol-category">
+										<h5>2D Arrows (Direction)</h5>
+										<p><i class="ci-Arrow_Left_MD"></i> Left</p>
+										<p><i class="ci-Arrow_Right_LG"></i> Right</p>
+										<p><i class="ci-Arrow_Up_LG"></i> Up</p>
+										<p><i class="ci-Arrow_Down_LG"></i> Down</p>
+										<p><i class="ci-Arrow_Down_Left_MD"></i> Down-Left</p>
+										<p><i class="ci-Arrow_Down_Right_LG"></i> Down-Right</p>
+										<p><i class="ci-Arrow_Up_Left_MD"></i> Up-Left</p>
+										<p><i class="ci-Arrow_Up_Right_LG"></i> Up-Right</p>
+									</div>
+									<div class="symbol-category">
+										<h5>3D Triangle (Height)</h5>
+										<p>▼ Below</p>
+										<p>▲ Above</p>
+									</div>
+									<div class="symbol-category">
+										<h5>4D Arrow (Time)</h5>
+										<p>◀ Was (past)</p>
+										<p>▶ Will be (future)</p>
+									</div>
+									<div class="symbol-category">
+										<h5>5D Temporal</h5>
+										<p>←t Was before</p>
+										<p>=t Simultaneous</p>
+										<p>t→ Will be after</p>
+									</div>
+									<div class="symbol-category">
+										<h5>6D Quantity</h5>
+										<p>&gt; More than</p>
+										<p>=q Equal to</p>
+										<p>&lt; Less than</p>
+									</div>
 								</div>
 							</div>
 						</div>
