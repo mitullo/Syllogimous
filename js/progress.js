@@ -5,8 +5,10 @@ const TYPE_TO_OVERRIDES = {
     "binary"       : [ "overrideBinaryPremises"     , "overrideBinaryTime" ],
     "space-two-d"  : [ "overrideDirectionPremises"  , "overrideDirectionTime" ],
     "space-three-d": [ "overrideDirection3DPremises", "overrideDirection3DTime" ],
-    "space-time"   : [ "overrideDirection4DPremises", "overrideDirection4DTime" ],
+    "space-4d"     : [ "overrideDirection4DPremises", "overrideDirection4DTime" ],
     "anchor-space" : [ "overrideAnchorSpacePremises", "overrideAnchorSpaceTime" ],
+    "space-five-d" : [ "overrideMultiDim5DPremises" , "overrideMultiDim5DTime" ],
+    "space-six-d"  : [ "overrideMultiDim6DPremises" , "overrideMultiDim6DTime" ],
 };
 
 const COMMON_TYPES = [
@@ -62,6 +64,7 @@ class ProgressStore {
         if (savedata.autoProgressionGrouping === 'simple') {
             return COMMON_TYPES_TABLE[question.type] || [question.type];
         } else {
+            // 'separate', 'space-separate', 'all-separate' - everything separate
             return [question.type];
         }
     }
@@ -105,23 +108,31 @@ class ProgressStore {
 
     success(q, trailingProgress, successes, type) {
         const [overridePremiseSetting, overrideTimerSetting] = TYPE_TO_OVERRIDES[type];
-        let newTimerValue;
-        if (savedata.autoProgressionChange === 'auto') {
-            const minUpgrade = q.countdown - 1;
-            const left = successes[successes.length - 3].timeElapsed / 1000;
-            const right = successes[successes.length - 2].timeElapsed / 1000;
-            const percentile90ish = Math.floor((left + right) / 2) + 1;
-            newTimerValue = Math.min(minUpgrade, percentile90ish);
-        } else {
-            newTimerValue = q.countdown - savedata.autoProgressionTimeDrop;
-        }
-        newTimerValue = Math.max(1, newTimerValue);
+        const goal = savedata.autoProgressionGoal;
+        
+        // Only level up premises if current timer is already at/below goal
+        // AND average time is also at/below goal (completed a round at goal time)
         const averageTime = successes.map(s => s.timeElapsed / 1000).reduce((a, b) => a + b) / successes.length;
-        if (averageTime <= savedata.autoProgressionGoal || newTimerValue <= savedata.autoProgressionGoal) {
+        const isAtGoalTime = q.countdown <= goal && averageTime <= goal;
+        
+        if (isAtGoalTime) {
+            // Level up: increase premises, reset timer to goal + 20 buffer
             savedata[overridePremiseSetting] = q.premises + 1;
-            savedata[overrideTimerSetting] = savedata.autoProgressionGoal + 15;
+            savedata[overrideTimerSetting] = goal + 20;
         } else {
-            savedata[overrideTimerSetting] = newTimerValue;
+            // Just drop timer
+            let newTimerValue;
+            if (savedata.autoProgressionChange === 'auto') {
+                const minUpgrade = q.countdown - 1;
+                const left = successes[successes.length - 3].timeElapsed / 1000;
+                const right = successes[successes.length - 2].timeElapsed / 1000;
+                const percentile90ish = Math.floor((left + right) / 2) + 1;
+                newTimerValue = Math.min(minUpgrade, percentile90ish);
+            } else {
+                newTimerValue = q.countdown - savedata.autoProgressionTimeDrop;
+            }
+            newTimerValue = Math.max(1, newTimerValue);
+            savedata[overrideTimerSetting] = Math.max(newTimerValue, goal);
         }
     }
 

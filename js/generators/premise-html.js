@@ -1,17 +1,20 @@
-function createPremiseHTML(premise, allowReversal=true) {
+function createPremiseHTML(premise, allowReversal=true, index=null) {
     if (typeof premise === 'string') {
         return premise;
     }
+    // For half-minimal mode, odd indices (0, 2, 4...) use minimal text
+    const forceMinimal = (index !== null && savedata.halfMinimalMode) ? (index % 2 === 0) : null;
     if (savedata.widePremises && Array.isArray(premise)) {
-        return createWidePremiseHTML(premise, allowReversal);
+        return createWidePremiseHTML(premise, allowReversal, forceMinimal);
     } else {
-        return createBasicPremiseHTML(premise, allowReversal);
+        return createBasicPremiseHTML(premise, allowReversal, forceMinimal);
     }
 }
 
-function createBasicPremiseHTML(premise, allowReversal=true) {
-    const relation = savedata.minimalMode ? premise.relationMinimal : premise.relation;
-    const reverse = savedata.minimalMode ? premise.reverseMinimal : premise.reverse;
+function createBasicPremiseHTML(premise, allowReversal=true, forceMinimal=null) {
+    const useMinimal = forceMinimal !== null ? forceMinimal : savedata.minimalMode;
+    const relation = useMinimal ? premise.relationMinimal : premise.relation;
+    const reverse = useMinimal ? premise.reverseMinimal : premise.reverse;
     let ps;
     if (!allowReversal || coinFlip()) {
       ps = [
@@ -27,19 +30,20 @@ function createBasicPremiseHTML(premise, allowReversal=true) {
     return pickNegatable(ps);
 }
 
-function createWidePremiseHTML(premise, allowReversal=true) {
+function createWidePremiseHTML(premise, allowReversal=true, forceMinimal=null) {
+    const useMinimal = forceMinimal !== null ? forceMinimal : savedata.minimalMode;
     if (premise.length === 1) {
-        return createBasicPremiseHTML(premise[0], allowReversal);
+        return createBasicPremiseHTML(premise[0], allowReversal, forceMinimal);
     }
 
     let [left, right] = premise;
     if (right.end === left.start) {
         [left, right] = [right, left];
     }
-    const leftRelation = savedata.minimalMode ? left.relationMinimal : left.relation;
-    const leftReverse = savedata.minimalMode ? left.reverseMinimal : left.reverse;
-    const rightRelation = savedata.minimalMode ? right.relationMinimal : right.relation;
-    const rightReverse = savedata.minimalMode ? right.reverseMinimal : right.reverse;
+    const leftRelation = useMinimal ? left.relationMinimal : left.relation;
+    const leftReverse = useMinimal ? left.reverseMinimal : left.reverse;
+    const rightRelation = useMinimal ? right.relationMinimal : right.relation;
+    const rightReverse = useMinimal ? right.reverseMinimal : right.reverse;
     let a, b, c, ab, bc, abRev, bcRev;
     if (left.end === right.start) {
         a = left.start;
@@ -67,16 +71,40 @@ function createWidePremiseHTML(premise, allowReversal=true) {
         bcRev = allowReversal ? rightRelation : rightReverse;
     }
 
-    if (savedata.enableNegation && coinFlip()) {
-        ab, abRev = `<span class="is-negated">${abRev}</span>`, `<span class="is-negated">${ab}</span>`;
-    }
-    if (savedata.enableNegation && coinFlip()) {
-        bc, bcRev = `<span class="is-negated">${bcRev}</span>`, `<span class="is-negated">${bc}</span>`;
+    if (negationRoll()) {
+    const tempAb = ab;
+    ab = `<span class="is-negated">${abRev}</span>`;
+    abRev = `<span class="is-negated">${tempAb}</span>`;
+}
+    if (negationRoll()) {
+        const tempBc = bc;
+        bc = `<span class="is-negated">${bcRev}</span>`;
+        bcRev = `<span class="is-negated">${tempBc}</span>`;
     }
 
     if (!allowReversal || coinFlip()) {
         return `<span class="subject">${a}</span> <span class="relation">${ab}</span> <span class="subject">${b}</span> <span class="relation">${bc}</span> <span class="subject">${c}</span>`;
     } else {
         return `<span class="subject">${c}</span> <span class="relation">${bcRev}</span> <span class="subject">${b}</span> <span class="relation">${abRev}</span> <span class="subject">${a}</span>`;
+    }
+}
+
+// Create a negated conclusion HTML - wraps the relation in a "Not" indicator
+// This is actual negation, not inversion (e.g., "A is Not west of B" vs "A is east of B")
+function createNegatedConclusionHTML(premise, allowReversal=true, forceMinimal=null) {
+    const useMinimal = forceMinimal !== null ? forceMinimal : savedata.minimalMode;
+    const relation = useMinimal ? premise.relationMinimal : premise.relation;
+    const reverse = useMinimal ? premise.reverseMinimal : premise.reverse;
+
+    // Create the negated relation text - capitalize "Not" and format nicely
+    // For relations like "is west of", we want "is Not west of"
+    // For minimal symbols, we want "Not [symbol]"
+    const negRelation = useMinimal ? `Not ${relation}` : relation.replace(/^(is\s+)/, 'is Not ').replace(/^(are\s+)/, 'are Not ');
+    const negReverse = useMinimal ? `Not ${reverse}` : reverse.replace(/^(is\s+)/, 'is Not ').replace(/^(are\s+)/, 'are Not ');
+
+    if (!allowReversal || coinFlip()) {
+        return `<span class="subject">${premise.start}</span> <span class="relation">${negRelation}</span> <span class="subject">${premise.end}</span>`;
+    } else {
+        return `<span class="subject">${premise.end}</span> <span class="relation">${negReverse}</span> <span class="subject">${premise.start}</span>`;
     }
 }

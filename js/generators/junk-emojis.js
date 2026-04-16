@@ -235,7 +235,10 @@ function throwSvgsOnPage() {
     document.body.appendChild(container);
 }
 
-function renderJunkEmojisText(text) {
+function renderJunkEmojisText(text, pattern = null) {
+    // First, replace pattern words with their shape icons (for Anchor Space v2)
+    text = replaceWordsWithPatternShapes(text, pattern);
+
     text = text.replaceAll(/\[junk\](\d+)\[\/junk\]/gi, (match, id) => {
         let s = `<svg class="junk" width="${EMOJI_LENGTH}" height="${EMOJI_LENGTH}">`;
         s += `<use xlink:href="#junk-${id}"></use>`;
@@ -247,6 +250,11 @@ function renderJunkEmojisText(text) {
         return new VisualNoise().generateVisualNoise(parseInt(seed), parseInt(splits));
     });
 
+    text = text.replaceAll(/\[topo\](\d+),(\d+)(?:,([\d,]+))?\[\/topo\]/gi, (match, seed, splits, excludeStr) => {
+        const exclude = excludeStr ? excludeStr.split(',').map(x => parseInt(x, 10)).filter(x => !isNaN(x)) : [];
+        return new TopoMap().generateTopo(parseInt(seed, 10), parseInt(splits, 10), exclude);
+    });
+
     text = text.replaceAll(/\[svg\](\d+)\[\/svg\]/gi, (match, id) => {
         return REUSABLE_SVGS[id];
     });
@@ -254,20 +262,76 @@ function renderJunkEmojisText(text) {
     return text;
 }
 
+function renderPatternShape(pattern, word) {
+    if (!pattern || !pattern[word]) return null;
+    const data = pattern[word];
+    const size = 24;
+    const halfSize = size / 2;
+
+    let shapeSVG = '';
+    switch(data.shape) {
+        case 'circle':
+            shapeSVG = `<circle cx="${halfSize}" cy="${halfSize}" r="${halfSize - 2}" fill="${data.color.fill}" stroke="${data.color.stroke}" stroke-width="2"/>`;
+            break;
+        case 'square':
+            shapeSVG = `<rect x="2" y="2" width="${size - 4}" height="${size - 4}" rx="3" fill="${data.color.fill}" stroke="${data.color.stroke}" stroke-width="2"/>`;
+            break;
+        case 'triangle':
+            shapeSVG = `<polygon points="${halfSize},2 ${size - 2},${size - 2} 2,${size - 2}" fill="${data.color.fill}" stroke="${data.color.stroke}" stroke-width="2"/>`;
+            break;
+        case 'diamond':
+            shapeSVG = `<polygon points="${halfSize},2 ${size - 2},${halfSize} ${halfSize},${size - 2} 2,${halfSize}" fill="${data.color.fill}" stroke="${data.color.stroke}" stroke-width="2"/>`;
+            break;
+        case 'hexagon':
+            const hexPoints = [];
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i - Math.PI / 2;
+                hexPoints.push(`${halfSize + (halfSize - 2) * Math.cos(angle)},${halfSize + (halfSize - 2) * Math.sin(angle)}`);
+            }
+            shapeSVG = `<polygon points="${hexPoints.join(' ')}" fill="${data.color.fill}" stroke="${data.color.stroke}" stroke-width="2"/>`;
+            break;
+        case 'star':
+            const starPoints = [];
+            for (let i = 0; i < 10; i++) {
+                const angle = (Math.PI / 5) * i - Math.PI / 2;
+                const radius = i % 2 === 0 ? halfSize - 2 : (halfSize - 2) * 0.4;
+                starPoints.push(`${halfSize + radius * Math.cos(angle)},${halfSize + radius * Math.sin(angle)}`);
+            }
+            shapeSVG = `<polygon points="${starPoints.join(' ')}" fill="${data.color.fill}" stroke="${data.color.stroke}" stroke-width="2"/>`;
+            break;
+    }
+
+    return `<svg class="pattern-shape" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: inline-block; vertical-align: middle; margin: 0 2px;">${shapeSVG}</svg>`;
+}
+
+function replaceWordsWithPatternShapes(text, pattern) {
+    if (!pattern) return text;
+    // Replace each word in the pattern with its shape
+    for (const [word, data] of Object.entries(pattern)) {
+        const shapeSVG = renderPatternShape(pattern, word);
+        if (shapeSVG) {
+            // Use word boundary to match whole words only
+            const regex = new RegExp(`\\b${word}\\b`, 'g');
+            text = text.replace(regex, shapeSVG);
+        }
+    }
+    return text;
+}
+
 function renderJunkEmojis(question) {
     question = structuredClone(question);
     if (question.bucket) {
-        question.bucket = question.bucket.map(renderJunkEmojisText);
+        question.bucket = question.bucket.map(text => renderJunkEmojisText(text, question.pattern));
     }
 
     if (question.buckets) {
-        question.buckets = question.buckets.map(bucket => bucket.map(renderJunkEmojisText));
+        question.buckets = question.buckets.map(bucket => bucket.map(text => renderJunkEmojisText(text, question.pattern)));
     }
 
     if (question.wordCoordMap) {
         const words = Object.keys(question.wordCoordMap);
         for (const word of words) {
-            const rendered = renderJunkEmojisText(word);
+            const rendered = renderJunkEmojisText(word, question.pattern);
             if (rendered.length !== word.length) {
                 question.wordCoordMap[rendered] = question.wordCoordMap[word];
                 delete question.wordCoordMap[word];
@@ -280,15 +344,15 @@ function renderJunkEmojis(question) {
     }
 
     if (question.premises) {
-        question.premises = question.premises.map(renderJunkEmojisText);
+        question.premises = question.premises.map(text => renderJunkEmojisText(text, question.pattern));
     }
 
     if (question.operations) {
-        question.operations = question.operations.map(renderJunkEmojisText);
+        question.operations = question.operations.map(text => renderJunkEmojisText(text, question.pattern));
     }
 
     if (question.conclusion) {
-        question.conclusion = renderJunkEmojisText(question.conclusion);
+        question.conclusion = renderJunkEmojisText(question.conclusion, question.pattern);
     }
 
     return question;

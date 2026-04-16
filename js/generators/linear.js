@@ -1,16 +1,22 @@
 function pickLinearPremise(a, b, comparison, reverseComparison, min, minRev) {
-    if (savedata.minimalMode) {
+    // 1. Fix the dead zone and add half-minimal mode support
+    if (savedata.minimalMode || (savedata.halfMinimalMode && Math.random() < 0.5)) {
         comparison = min;
         reverseComparison = minRev;
-    } else {
-        comparison = comparison;
-        reverseComparison = reverseComparison;
     }
-    const ps = [
-    `<span class="subject">${a}</span> <span class="relation">${comparison}</span> <span class="subject">${b}</span>`,
-    `<span class="subject">${a}</span> <span class="relation"><span class="is-negated">${reverseComparison}</span></span> <span class="subject">${b}</span>`,
+let ps;
+if (Math.random() < 0.5) { // Forward
+    ps = [
+        `<span class="subject">${a}</span> <span class="relation">${comparison}</span> <span class="subject">${b}</span>`,
+        `<span class="subject">${a}</span> <span class="relation"><span class="is-negated">${reverseComparison}</span></span> <span class="subject">${b}</span>`,
     ];
-    return pickNegatable(ps);
+} else { // Reversed perspective
+    ps = [
+        `<span class="subject">${b}</span> <span class="relation">${reverseComparison}</span> <span class="subject">${a}</span>`,
+        `<span class="subject">${b}</span> <span class="relation"><span class="is-negated">${comparison}</span></span> <span class="subject">${a}</span>`,
+    ];
+}
+return pickNegatable(ps);
 }
 
 function startHeavyWeightedChoiceInRange(start, end) {
@@ -125,7 +131,7 @@ class LinearQuestion {
         }
 
         premises = scramble(premises);
-        premises = premises.map(p => createPremiseHTML(p));
+        premises = premises.map((p, i) => createPremiseHTML(p, true, i));
 
         if (savedata.enableMeta && !savedata.minimalMode && !savedata.widePremises) {
             premises = applyMeta(premises, p => p.match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]);
@@ -159,13 +165,16 @@ class LinearQuestion {
         }
         const [i, j] = findTwoWordIndexes(words);
 
+        let conclusionObj;
         if (coinFlip()) {
-            conclusion = createBasicPremiseHTML(this.generator.createLinearPremise(words[i], words[j]));
+            conclusionObj = this.generator.createLinearPremise(words[i], words[j]);
             isValid = i < j;
         } else {
-            conclusion = createBasicPremiseHTML(this.generator.createLinearPremise(words[j], words[i]));
+            conclusionObj = this.generator.createLinearPremise(words[j], words[i]);
             isValid = i > j;
         }
+        conclusion = createBasicPremiseHTML(conclusionObj);
+        [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj);
 
         return [premises, conclusion, isValid];
     }
@@ -328,6 +337,16 @@ class LinearQuestion {
     create(length) {
         this.generate(length);
         const countdown = this.getCountdown();
+
+        // Handle backtracking mode: conclusion is a premise object that needs HTML conversion
+        let finalConclusion = this.conclusion;
+        let finalIsValid = this.isValid;
+        if (this.isBacktrackingEnabled() && typeof this.conclusion === 'object' && this.conclusion !== null) {
+            const conclusionObj = this.conclusion;
+            finalConclusion = createBasicPremiseHTML(conclusionObj);
+            [finalConclusion, finalIsValid] = applyConclusionNegation(finalConclusion, finalIsValid, conclusionObj);
+        }
+
         return {
             category: this.generator.getName(),
             type: normalizeString('linear'),
@@ -335,8 +354,8 @@ class LinearQuestion {
             ...(this.bucket && { bucket: this.bucket }),
             ...(this.buckets && { buckets: this.buckets, modifiers: ['180'] }),
             premises: this.premises,
-            isValid: this.isValid,
-            conclusion: this.conclusion,
+            isValid: finalIsValid,
+            conclusion: finalConclusion,
             ...(savedata.widePremises && { plen: length }),
             ...(countdown && { countdown }),
         }

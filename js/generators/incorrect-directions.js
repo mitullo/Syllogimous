@@ -1,4 +1,28 @@
 class IncorrectDirections {
+    // Find alternative incorrect coords that are NOT the simple inverse
+    findAlternativeCoords(correctCoord, oppositeCoord) {
+        let alternatives = [];
+        // Generate all possible direction combinations within [-1, 0, 1] range
+        for (let x of [-1, 0, 1]) {
+            for (let y of [-1, 0, 1]) {
+                for (let z of [-1, 0, 1]) {
+                    let coord = [x, y, z];
+                    // Skip zero coord, correct coord, and opposite coord
+                    if (arraysEqual(coord, [0, 0, 0])) continue;
+                    if (arraysEqual(coord, correctCoord)) continue;
+                    if (arraysEqual(coord, oppositeCoord)) continue;
+                    // Check it's a valid direction (not all zeros and not the opposite)
+                    if (coord.some(d => d !== 0)) {
+                        alternatives.push(coord);
+                    }
+                }
+            }
+        }
+        // Shuffle and return a subset
+        shuffle(alternatives);
+        return alternatives.slice(0, 3);
+    }
+
     findUnused(combinations, correctCoord) {
         let unused = [];
         let permutation = correctCoord.map(d => 0);
@@ -23,12 +47,24 @@ class IncorrectDirections {
     createIncorrectConclusionCoords(usedCoords, correctCoord, diffCoord, hardModeDimensions) {
         let opposite = correctCoord.map(dir => -dir)
         let isUsingHardMode = hardModeDimensions && hardModeDimensions.length > 0;
+        let avoidOpposite = savedata.enableHarderConclusions;
         if (usedCoords.length <= 2) {
-            return [opposite]; // Few premises == anything that isn't the opposite tends to be easy.
+            if (avoidOpposite) {
+                // Try to find a non-opposite incorrect coord
+                let altCoords = this.findAlternativeCoords(correctCoord, opposite);
+                if (altCoords.length > 0) {
+                    return altCoords;
+                }
+            }
+            return [opposite];
         } else if (usedCoords.length <= 3 && !isUsingHardMode && Math.random() < 0.5) {
-            return [opposite];
+            if (!avoidOpposite) {
+                return [opposite];
+            }
         } else if (usedCoords.length <= 4 && !isUsingHardMode && Math.random() < 0.23) {
-            return [opposite];
+            if (!avoidOpposite) {
+                return [opposite];
+            }
         }
         const dirCoords = removeDuplicateArrays(usedCoords);
 

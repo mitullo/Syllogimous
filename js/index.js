@@ -5,6 +5,20 @@ if ('serviceWorker' in navigator)
             if (registrations.length) for (let r of registrations) r.unregister();
         });
 
+// Toggle settings section collapse/expand
+function toggleSettingsSection(header) {
+    const content = header.nextElementSibling;
+    const isCollapsed = header.classList.contains('collapsed');
+    
+    if (isCollapsed) {
+        header.classList.remove('collapsed');
+        content.classList.remove('collapsed');
+    } else {
+        header.classList.add('collapsed');
+        content.classList.add('collapsed');
+    }
+}
+
 const feedbackWrong = document.querySelector(".feedback--wrong");
 const feedbackMissed = document.querySelector(".feedback--missed");
 const feedbackRight = document.querySelector(".feedback--right");
@@ -39,6 +53,7 @@ const percentCorrectDisplay = document.getElementById("percent-correct-display")
 
 let carouselIndex = 0;
 let carouselEnabled = false;
+let carouselAutoAdvanceTimer = null;
 let question;
 const carousel = document.querySelector(".carousel");
 const carouselDisplayLabelType = carousel.querySelector(".carousel_display_label_type");
@@ -181,6 +196,10 @@ function refresh() {
 
 function carouselInit() {
     carouselIndex = 0;
+    if (carouselAutoAdvanceTimer) {
+        clearTimeout(carouselAutoAdvanceTimer);
+        carouselAutoAdvanceTimer = null;
+    }
     renderCarousel();
 }
 
@@ -189,20 +208,39 @@ function displayInit() {
     displayLabelType.textContent = q.category.split(":")[0];
     displayLabelLevel.textContent = (q.plen || q.premises.length) + "p";
     const easy = savedata.scrambleFactor < 12 ? ' (easy)' : '';
-    displayText.innerHTML = [
-        `<div class="preamble">Premises${easy}</div>`,
-        ...q.premises.map(p => `<div class="formatted-premise">${p}</div>`),
-        ...((q.operations && q.operations.length > 0) ? ['<div class="transform-header">Transformations</div>'] : []),
-        ...(q.operations ? q.operations.map(o => `<div class="formatted-operation">${o}</div>`) : []),
-        '<div class="postamble">Conclusion</div>',
-        '<div class="formatted-conclusion">'+q.conclusion+'</div>',
-    ].join('');
+    // For half-minimal mode, add alternating classes to premises
+    const halfMinimal = savedata.halfMinimalMode;
+
+    // Handle Anchor Space v2 pattern display
+    if (q.pattern && q.type === 'anchor-space-v2') {
+        displayText.innerHTML = renderPatternDisplay(q.pattern, q.premises, q.operations, q.conclusion, easy, halfMinimal);
+        // Pause timer during pattern memorization if setting enabled
+        if (savedata.anchorSpaceV2PauseTimer && timerRunning) {
+            stopCountDown();
+        }
+        // Bind the ready button
+        const readyBtn = document.getElementById('pattern-ready-btn');
+        if (readyBtn) {
+            readyBtn.addEventListener('click', () => {
+                showPremisesAfterPattern(q.premises, q.operations, q.conclusion, easy, halfMinimal);
+            });
+        }
+    } else {
+        displayText.innerHTML = buildPremisesHTML(q.premises, q.operations, q.conclusion, easy, halfMinimal);
+    }
+    
+    renderDebugIndicator();
     const isAnalogy = question?.tags?.includes('analogy');
     const isBinary = question.type === 'binary';
     if (savedata.minimalMode && question.type !== 'syllogism') {
         displayText.classList.add('minimal');
+        displayText.classList.remove('half-minimal');
+    } else if (savedata.halfMinimalMode) {
+        displayText.classList.add('half-minimal');
+        displayText.classList.remove('minimal');
     } else {
         displayText.classList.remove('minimal');
+        displayText.classList.remove('half-minimal');
     }
 
     if (savedata.widePremises && question.type !== 'syllogism') {
@@ -232,6 +270,134 @@ function displayInit() {
     } else {
         document.body.classList.add('light-mode');
     }
+
+    if (savedata.enableColorless) {
+        document.body.classList.add('colorless');
+    } else {
+        document.body.classList.remove('colorless');
+    }
+}
+
+function renderPatternDisplay(pattern, premises, operations, conclusion, easy, halfMinimal) {
+    const entries = Object.entries(pattern);
+    if (entries.length === 0) return buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal);
+
+    // Find bounds for the grid
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    entries.forEach(([word, data]) => {
+        const [x, y] = data.coord;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+    });
+
+    // Create coordinate to pattern data mapping
+    const coordMap = new Map();
+    entries.forEach(([word, data]) => {
+        const key = `${data.coord[0]},${data.coord[1]}`;
+        coordMap.set(key, { word, ...data });
+    });
+
+    // Build grid cells directly - just shapes, no word names
+    const cells = [];
+    for (let y = maxY; y >= minY; y--) {
+        for (let x = minX; x <= maxX; x++) {
+            const key = `${x},${y}`;
+            const cellData = coordMap.get(key);
+            if (cellData) {
+                const shapeSize = 32;
+                const shapeSVG = createShapeSVG(cellData.shape, cellData.color, shapeSize/2, shapeSize/2, shapeSize);
+                cells.push(`<div class="td" style="padding: 12px; text-align: center; min-width: 60px;">
+                    <svg width="${shapeSize}" height="${shapeSize}" viewBox="0 0 ${shapeSize} ${shapeSize}">${shapeSVG}</svg>
+                </div>`);
+            } else {
+                cells.push(`<div class="td" style="padding: 12px; min-width: 60px;"></div>`);
+            }
+        }
+    }
+
+    const numCols = maxX - minX + 1;
+    const tableHTML = `<div class="table pattern-table" style="grid-template-columns: repeat(${numCols}, auto); margin: 1rem auto;">${cells.join('')}</div>`;
+
+    // Build legend - just colors, no shape names
+    const legend = entries.map(([word, data]) => `
+        <span style="display: flex; align-items: center; gap: 0.3rem;">
+            <svg width="16" height="16" viewBox="0 0 20 20">${createShapeSVG(data.shape, data.color, 10, 10, 18)}</svg>
+            <span style="color: var(--text-color); font-size: 0.85rem;">${data.color.name}</span>
+        </span>
+    `).join('');
+
+    return `
+        <div class="pattern-memorization-phase" style="text-align: center; margin: 1rem 0;">
+            <div class="preamble">Memorize the Pattern</div>
+            ${tableHTML}
+            <div class="pattern-legend" style="margin: 0.5rem 0; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+                ${legend}
+            </div>
+            <button id="pattern-ready-btn" class="explanation-button" style="margin-top: 1rem;">I'm Ready</button>
+        </div>
+        <div id="premises-phase" style="display: none;">
+            ${buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal)}
+        </div>
+    `;
+}
+
+function createShapeSVG(shape, color, x, y, size) {
+    const halfSize = size / 2;
+    switch(shape) {
+        case 'circle':
+            return `<circle cx="${x}" cy="${y}" r="${halfSize}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+        case 'square':
+            return `<rect x="${x - halfSize}" y="${y - halfSize}" width="${size}" height="${size}" rx="4" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+        case 'triangle':
+            return `<polygon points="${x},${y - halfSize} ${x + halfSize},${y + halfSize} ${x - halfSize},${y + halfSize}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+        case 'diamond':
+            return `<polygon points="${x},${y - halfSize} ${x + halfSize},${y} ${x},${y + halfSize} ${x - halfSize},${y}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+        case 'hexagon':
+            const hexPoints = [];
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i - Math.PI / 2;
+                hexPoints.push(`${x + halfSize * Math.cos(angle)},${y + halfSize * Math.sin(angle)}`);
+            }
+            return `<polygon points="${hexPoints.join(' ')}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+        case 'star':
+            const starPoints = [];
+            for (let i = 0; i < 10; i++) {
+                const angle = (Math.PI / 5) * i - Math.PI / 2;
+                const radius = i % 2 === 0 ? halfSize : halfSize * 0.4;
+                starPoints.push(`${x + radius * Math.cos(angle)},${y + radius * Math.sin(angle)}`);
+            }
+            return `<polygon points="${starPoints.join(' ')}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+        default:
+            return `<circle cx="${x}" cy="${y}" r="${halfSize}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="3"/>`;
+    }
+}
+
+function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMinimal) {
+    const patternPhase = document.querySelector('.pattern-memorization-phase');
+    const premisesPhase = document.getElementById('premises-phase');
+    if (patternPhase) {
+        patternPhase.style.display = 'none';
+    }
+    if (premisesPhase) {
+        premisesPhase.style.display = 'block';
+    }
+    // Resume timer if it was paused during pattern memorization
+    if (savedata.anchorSpaceV2PauseTimer && timerToggled && !timerRunning) {
+        startCountDown();
+    }
+}
+
+function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal) {
+    return [
+        `<div class="preamble">Premises${easy}</div>`,
+        ...premises.map((p, i) => `<div class="formatted-premise ${halfMinimal && i % 2 === 0 ? 'minimal-style' : ''}">${p}</div>`),
+        ...((operations && operations.length > 0) ? ['<div class="transform-header">Transformations</div>'] : []),
+        ...(operations ? operations.map(o => `<div class="formatted-operation">${o}</div>`) : []),
+        '<div class="postamble">Conclusion</div>',
+        '<div class="formatted-conclusion">'+conclusion+'</div>',
+    ].join('');
 }
 
 function clearBackgroundImage() {
@@ -264,6 +430,18 @@ function populateAppearanceSettings() {
     document.getElementById('p-sfx').value = appState.sfx;
     document.getElementById('p-fast-ui').checked = appState.fastUi;
     document.getElementById('p-dark-mode').checked = appState.darkMode;
+    document.getElementById('p-timer-anim').value = appState.timerAnimation;
+    document.getElementById('p-font-size').value = appState.fontSize;
+    document.getElementById('p-density').value = appState.uiDensity;
+    document.getElementById('p-bracket-color').value = appState.bracketColor || '#1798B0';
+    document.getElementById('p-bracket-color-picker').value = appState.bracketColor || '#1798B0';
+    document.getElementById('p-color-words').checked = appState.colorWords;
+    document.getElementById('p-color-timer').checked = appState.colorTimer;
+    document.getElementById('p-timer-height').value = appState.timerHeight;
+    document.getElementById('p-border-radius').value = appState.borderRadius;
+    document.getElementById('p-premise-style').value = appState.premiseStyle;
+    document.getElementById('p-button-style').value = appState.buttonStyle;
+    applyAppearanceSettings();
 }
 
 function populateProgressionDropdown() {
@@ -291,6 +469,177 @@ function handleSfxChange(event) {
     refresh();
 }
 
+function handleTimerAnimChange(event) {
+    appState.timerAnimation = event.target.value;
+    save();
+}
+
+function handleFontSizeChange(event) {
+    appState.fontSize = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleDensityChange(event) {
+    appState.uiDensity = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleBracketColorChange(event) {
+    appState.bracketColor = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleTimerHeightChange(event) {
+    appState.timerHeight = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleBorderRadiusChange(event) {
+    appState.borderRadius = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function handlePremiseStyleChange(event) {
+    appState.premiseStyle = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function handlePresetColorClick(button) {
+    const color = button.getAttribute('data-color');
+    document.getElementById('p-bracket-color').value = color;
+    document.getElementById('p-bracket-color-picker').value = color;
+    appState.bracketColor = color;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleBracketColorChange(event) {
+    const color = event.target.value;
+    appState.bracketColor = color;
+    document.getElementById('p-bracket-color-picker').value = color;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleBracketColorPickerChange(event) {
+    const color = event.target.value;
+    appState.bracketColor = color;
+    document.getElementById('p-bracket-color').value = color;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleColorWordsChange(event) {
+    appState.colorWords = event.target.checked;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleColorTimerChange(event) {
+    appState.colorTimer = event.target.checked;
+    applyAppearanceSettings();
+    save();
+}
+
+function handleButtonStyleChange(event) {
+    appState.buttonStyle = event.target.value;
+    applyAppearanceSettings();
+    save();
+}
+
+function applyAppearanceSettings() {
+    const root = document.documentElement;
+    const timerBar = document.querySelector('.timer__bar');
+    const settingsContent = document.querySelectorAll('.settings-section-content');
+    
+    // Font size
+    const fontSizes = { small: '0.85rem', normal: '1rem', large: '1.15rem', huge: '1.3rem' };
+    root.style.setProperty('--base-font-size', fontSizes[appState.fontSize] || '1rem');
+    
+    // UI Density - apply to multiple spacing elements
+    const densities = { compact: '0.5rem', normal: '1rem', spacious: '1.5rem' };
+    const density = densities[appState.uiDensity] || '1rem';
+    root.style.setProperty('--ui-padding', density);
+    root.style.setProperty('--section-gap', density);
+    root.style.setProperty('--element-gap', `calc(${density} * 0.5)`);
+    
+    // Apply density to settings sections
+    settingsContent.forEach(el => {
+        el.style.gap = `calc(${density} * 0.75)`;
+    });
+    
+    // UI Density for premises - scale padding and gap
+    root.style.setProperty('--premise-gap', `calc(${density} * 0.5)`);
+    root.style.setProperty('--premise-padding-y', `calc(${density} * 0.25)`);
+    root.style.setProperty('--premise-padding-x', appState.uiDensity === 'compact' ? '0' : `calc(${density} * 0.25)`);
+    
+    // Theme color - sets glow, borders, buttons, and bracket colors
+    const themeColor = appState.bracketColor || '#1798B0';
+    root.style.setProperty('--theme-color', themeColor);
+    root.style.setProperty('--bracket-color', themeColor);
+    // compute derived accent colors (RGB and translucent variants) so sidebar
+    // elements can follow the chosen theme color (works in light/dark modes)
+    function hexToRgb(hex) {
+        if (!hex) return null;
+        hex = (hex + '').trim();
+        if (hex[0] === '#') hex = hex.slice(1);
+        if (hex.length === 3) {
+            hex = hex.split('').map(c => c + c).join('');
+        }
+        if (hex.length !== 6) return null;
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+        return { r, g, b };
+    }
+    const rgb = hexToRgb(themeColor) || { r: 23, g: 152, b: 176 };
+    root.style.setProperty('--accent-color', themeColor);
+    root.style.setProperty('--accent-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    root.style.setProperty('--accent-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.06)`);
+    root.style.setProperty('--accent-border', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)`);
+    root.style.setProperty('--accent-hover', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`);
+    root.style.setProperty('--accent-gear-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`);
+    root.style.setProperty('--accent-gear-bg-strong', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)`);
+    
+    // Timer height
+    const timerHeights = { thin: '10px', normal: '20px', thick: '30px' };
+    if (timerBar) timerBar.style.height = timerHeights[appState.timerHeight] || '20px';
+    
+    // Border radius - set CSS variable that .game-area uses
+    const borderRadii = { sharp: '0px', slight: '6px', rounded: '12px', pill: '24px' };
+    const radius = borderRadii[appState.borderRadius] || '12px';
+    root.style.setProperty('--game-area-radius', radius);
+    
+    // Premise style - add/remove classes
+    document.body.classList.remove('premise-minimal', 'premise-boxed', 'premise-card', 'premise-underline');
+    document.body.classList.add('premise-' + appState.premiseStyle);
+    
+    // Button style - only Contrast and Solid now
+    document.body.classList.remove('btn-solid', 'btn-contrast');
+    document.body.classList.add('btn-' + appState.buttonStyle);
+    
+    // Color words option
+    if (appState.colorWords) {
+        document.body.classList.add('colored-words');
+    } else {
+        document.body.classList.remove('colored-words');
+    }
+    
+    // Color timer bar option
+    if (appState.colorTimer) {
+        document.body.classList.add('colored-timer');
+    } else {
+        document.body.classList.remove('colored-timer');
+    }
+}
+
 function handleFastUiChange(event) {
     appState.fastUi = event.target.checked;
     removeFastFeedback();
@@ -299,6 +648,11 @@ function handleFastUiChange(event) {
 
 function handleDarkModeChange(event) {
     appState.darkMode = event.target.checked;
+    refresh();
+}
+
+function handleColorlessChange(event) {
+    savedata.enableColorless = event.target.checked;
     refresh();
 }
 
@@ -360,31 +714,78 @@ function renderCarousel() {
 
     carousel.classList.add("visible");
     display.classList.remove("visible");
-    if (carouselIndex == 0) {
-        carouselBackButton.disabled = true;
+
+    const perPage = Math.max(1, savedata.carouselPremisesPerPage || 1);
+    const totalPremises = q.premises.length;
+    const premisePages = Math.ceil(totalPremises / perPage);
+
+    // Handle "disable back button" option - hide it entirely
+    const disableBack = savedata.carouselDisableBack || false;
+    if (disableBack) {
+        carouselBackButton.style.display = 'none';
     } else {
-        carouselBackButton.disabled = false;
+        carouselBackButton.style.display = '';
+        // carouselIndex now represents "page number" for premises, then operations, then conclusion
+        if (carouselIndex == 0) {
+            carouselBackButton.disabled = true;
+        } else {
+            carouselBackButton.disabled = false;
+        }
     }
-    
-    if (carouselIndex < q.premises.length) {
+
+    // Clear any existing auto-advance timer
+    if (carouselAutoAdvanceTimer) {
+        clearTimeout(carouselAutoAdvanceTimer);
+        carouselAutoAdvanceTimer = null;
+    }
+
+    const autoSeconds = savedata.carouselAutoAdvanceSeconds || 0;
+    const isConclusion = carouselIndex >= premisePages + (q.operations ? q.operations.length : 0);
+
+    if (carouselIndex < premisePages) {
+        // Showing premises (multiple per page)
         carouselNextButton.disabled = false;
         disableConfirmationButtons();
         carouselDisplayLabelType.textContent = "Premise";
-        carouselDisplayLabelProgress.textContent = (carouselIndex + 1) + "/" + q.premises.length;
-        carouselDisplayText.innerHTML = q.premises[carouselIndex];
-    } else if (q.operations && carouselIndex < q.operations.length + q.premises.length) {
+
+        const startIdx = carouselIndex * perPage;
+        const endIdx = Math.min(startIdx + perPage, totalPremises);
+        const displayPremises = q.premises.slice(startIdx, endIdx);
+
+        // Show range in progress (e.g., "1-3/5" or "4/5" for single)
+        if (endIdx - startIdx > 1) {
+            carouselDisplayLabelProgress.textContent = (startIdx + 1) + "-" + endIdx + "/" + totalPremises;
+        } else {
+            carouselDisplayLabelProgress.textContent = (startIdx + 1) + "/" + totalPremises;
+        }
+
+        // Join premises with line break separator
+        carouselDisplayText.innerHTML = displayPremises.join('<br><br>');
+    } else if (q.operations && carouselIndex < premisePages + q.operations.length) {
+        // Showing operations (one per page, unchanged)
         carouselNextButton.disabled = false;
-        const operationIndex = carouselIndex - q.premises.length;
+        const operationIndex = carouselIndex - premisePages;
         disableConfirmationButtons();
         carouselDisplayLabelType.textContent = "Transformation";
         carouselDisplayLabelProgress.textContent = (operationIndex + 1) + "/" + q.operations.length;
         carouselDisplayText.innerHTML = q.operations[operationIndex];
     } else {
+        // Conclusion
         carouselNextButton.disabled = true;
         enableConfirmationButtons();
         carouselDisplayLabelType.textContent = "Conclusion";
         carouselDisplayLabelProgress.textContent = "";
         carouselDisplayText.innerHTML = q.conclusion;
+        renderDebugIndicator();
+    }
+
+    // Set up auto-advance timer if enabled and not on conclusion
+    if (autoSeconds > 0 && !isConclusion) {
+        carouselAutoAdvanceTimer = setTimeout(() => {
+            if (savedata.enableCarouselMode) {
+                carouselNext();
+            }
+        }, autoSeconds * 1000);
     }
 }
 
@@ -398,20 +799,28 @@ function carouselNext() {
     renderCarousel();
 }
 
+let timerStartTime = 0;
+let timerDuration = 0;
+let timerAnimationFrame = null;
+
 function startCountDown() {
     timerRunning = true;
     if (question) {
         question.startedAt = new Date().getTime();
     }
-    timerCount = findStartingTimerCount();
-    animateTimerBar();
+    timerDuration = findStartingTimerCount() * 1000; // convert to ms
+    timerStartTime = performance.now();
+    renderTimerBar();
+    animateTimerBarSmooth();
 }
 
 function stopCountDown() {
     timerRunning = false;
-    timerCount = findStartingTimerCount();
+    if (timerAnimationFrame) {
+        cancelAnimationFrame(timerAnimationFrame);
+        timerAnimationFrame = null;
+    }
     timerBar.style.width = '100%';
-    clearTimeout(timerInstance);
 }
 
 function renderTimerBar() {
@@ -425,16 +834,62 @@ function renderTimerBar() {
         customTimeInfo.classList.remove('visible');
         customTimeInfo.innerHTML = '';
     }
-    timerBar.style.width = (timerCount / startingTimerCount * 100) + '%';
 }
 
-function animateTimerBar() {
-    renderTimerBar();
-    if (timerCount > 0) {
-        timerCount--;
-        timerInstance = setTimeout(animateTimerBar, 1000);
+// Easing functions
+const easingFunctions = {
+    linear: t => t,
+    easeOutCubic: t => 1 - Math.pow(1 - t, 3),
+    easeOutQuart: t => 1 - Math.pow(1 - t, 4),
+    easeOutBack: t => {
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    },
+    easeOutBounce: t => {
+        const n1 = 7.5625;
+        const d1 = 2.75;
+        if (t < 1 / d1) {
+            return n1 * t * t;
+        } else if (t < 2 / d1) {
+            return n1 * (t -= 1.5 / d1) * t + 0.75;
+        } else if (t < 2.5 / d1) {
+            return n1 * (t -= 2.25 / d1) * t + 0.9375;
+        } else {
+            return n1 * (t -= 2.625 / d1) * t + 0.984375;
+        }
     }
-    else {
+};
+
+function animateTimerBarSmooth() {
+    if (!timerRunning) return;
+    
+    const elapsed = performance.now() - timerStartTime;
+    const remaining = Math.max(0, timerDuration - elapsed);
+    const t = 1 - (remaining / timerDuration); // normalized progress (0 to 1)
+    
+    let pct;
+    
+    if (appState.timerAnimation === 'stepEaseOut') {
+        // Step tick: smooth ease-out within each second, then hold
+        const totalSeconds = timerDuration / 1000;
+        const currentSecond = Math.floor(t * totalSeconds);
+        const secondProgress = (t * totalSeconds) % 1;
+        // Ease-out within the second, but don't go past the next tick point
+        const easedSecondProgress = 1 - Math.pow(1 - Math.min(secondProgress, 0.95), 3);
+        pct = (1 - (currentSecond + easedSecondProgress) / totalSeconds) * 100;
+    } else {
+        // Standard easing functions
+        const easingFn = easingFunctions[appState.timerAnimation] || easingFunctions.easeOutCubic;
+        const easedT = easingFn(t);
+        pct = (1 - easedT) * 100;
+    }
+    
+    timerBar.style.width = pct + '%';
+    
+    if (remaining > 0) {
+        timerAnimationFrame = requestAnimationFrame(animateTimerBarSmooth);
+    } else {
         timeElapsed();
     }
 }
@@ -462,7 +917,8 @@ function generateQuestion() {
         savedata.enableDirection,
         savedata.enableDirection3D,
         savedata.enableDirection4D,
-        savedata.enableAnchorSpace
+        savedata.enableAnchorSpace,
+        savedata.enableAnchorSpaceV2
     ].reduce((a, c) => a + +c, 0) > 0;
 
     const binaryEnable = [
@@ -471,6 +927,8 @@ function generateQuestion() {
         savedata.enableDirection,
         savedata.enableDirection3D,
         savedata.enableDirection4D,
+        savedata.enableAnchorSpace,
+        savedata.enableAnchorSpaceV2,
         savedata.enableSyllogism
     ].reduce((a, c) => a + +c, 0) > 1;
 
@@ -479,7 +937,7 @@ function generateQuestion() {
     quota = Math.max(2, quota);
     quota = Math.min(quota, maxStimuliAllowed());
 
-    const banNormalModes = savedata.onlyAnalogy || savedata.onlyBinary;
+    const banNormalModes = savedata.onlyAnalogy || savedata.onlyBinary || savedata.onlyMixedModes;
     if (!banNormalModes) {
         if (savedata.enableDistinction)
             generators.push(createDistinctionGenerator(quota));
@@ -493,9 +951,24 @@ function generateQuestion() {
             generators.push(createDirection3DGenerator(quota));
         if (savedata.enableDirection4D)
             generators.push(createDirection4DGenerator(quota));
+        if (savedata.enableMultiDim5D)
+            generators.push(createMultiDim5DGenerator(quota));
+        if (savedata.enableMultiDim6D)
+            generators.push(createMultiDim6DGenerator(quota));
         if (savedata.enableAnchorSpace)
             generators.push(createAnchorSpaceGenerator(quota));
+        if (savedata.enableAnchorSpaceV2)
+            generators.push(createAnchorSpaceV2Generator(quota));
     }
+
+    // Mixed Modes - combines multiple question types
+    if (savedata.enableMixedModes && !savedata.onlyAnalogy && !savedata.onlyBinary) {
+        const mixedMode = createMixedModeGenerator(quota);
+        if (mixedMode.question.getAvailableModes().length >= 2) {
+            generators.push(mixedMode);
+        }
+    }
+
     if (
      savedata.enableAnalogy
      && !savedata.onlyBinary
@@ -542,9 +1015,6 @@ function generateQuestion() {
         }
     }
 
-    if (!savedata.removeNegationExplainer && /is-negated/.test(JSON.stringify(q)))
-        q.premises.unshift('<span class="negation-explainer">Invert the <span class="is-negated">Red</span> text</span>');
-
     return q;
 }
 
@@ -573,6 +1043,13 @@ function renderConclusionSpoiler() {
         spoilerArea.classList.add('spoiler');
     } else {
         spoilerArea.classList.remove('spoiler');
+    }
+
+    // Handle vanishing premises - only works with spoiler conclusion
+    if (savedata.vanishingPremises && savedata.spoilerConclusion) {
+        spoilerArea.classList.add('vanish-premises');
+    } else {
+        spoilerArea.classList.remove('vanish-premises');
     }
 }
 
@@ -978,12 +1455,51 @@ timerToggle.addEventListener("click", evt => {
 });
 
 let dehoverQueue = [];
+let debugBuffer = '';
+let debugMode = false;
+const DEBUG_TRIGGER = 'debug1';
+
+function toggleDebugMode() {
+    debugMode = !debugMode;
+    renderDebugIndicator();
+}
+
+function renderDebugIndicator() {
+    const existingIndicator = document.querySelector('.debug-answer-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    if (debugMode && question && question.isValid !== undefined) {
+        const conclusionEl = document.querySelector('.formatted-conclusion');
+        if (conclusionEl) {
+            const indicator = document.createElement('span');
+            indicator.className = 'debug-answer-indicator';
+            indicator.textContent = question.isValid ? ' ✓ TRUE' : ' ✗ FALSE';
+            indicator.style.cssText = 'color: var(--bracket-color); font-weight: bold; margin-left: 1rem; font-size: 0.9em;';
+            conclusionEl.appendChild(indicator);
+        }
+    }
+}
+
 function handleKeyPress(event) {
     const tagName = event.target.tagName.toLowerCase();
     const isEditable = event.target.isContentEditable;
     if (tagName === "button" || tagName === "input" || tagName === "textarea" || isEditable) {
         return;
     }
+    
+    // Debug mode key sequence detection
+    debugBuffer += event.key.toLowerCase();
+    if (debugBuffer.length > DEBUG_TRIGGER.length) {
+        debugBuffer = debugBuffer.slice(-DEBUG_TRIGGER.length);
+    }
+    if (debugBuffer === DEBUG_TRIGGER) {
+        toggleDebugMode();
+        debugBuffer = '';
+        return;
+    }
+    
     switch (event.code) {
         case "KeyH":
             historyCheckbox.checked = !historyCheckbox.checked;

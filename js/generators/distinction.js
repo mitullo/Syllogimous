@@ -3,9 +3,9 @@ function createSamePremise(a, b) {
         start: a,
         end: b,
         relation: 'is same as',
-        reverse: 'is opposite of',
+        reverse: 'is same as', // Fixed: Same is symmetric
         relationMinimal: '=',
-        reverseMinimal: '☍',
+        reverseMinimal: '=', // Fixed
     }
 }
 
@@ -14,9 +14,9 @@ function createOppositePremise(a, b) {
         start: a,
         end: b,
         relation: 'is opposite of',
-        reverse: 'is same as',
+        reverse: 'is opposite of', // Fixed: Opposite is symmetric
         relationMinimal: '☍',
-        reverseMinimal: '=',
+        reverseMinimal: '☍', // Fixed
     }
 }
 
@@ -69,7 +69,7 @@ class DistinctionQuestion {
         ]
 
         premises = scramble(premises);
-        premises = premises.map(p => createPremiseHTML(p, false));
+        premises = premises.map((p, i) => createPremiseHTML(p, false, i));
 
         if (savedata.enableMeta && !savedata.minimalMode && !savedata.widePremises) {
             premises = applyMeta(premises, p => p.match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]);
@@ -128,13 +128,16 @@ class DistinctionQuestion {
         this.generate(length);
 
         let [startWord, endWord] = new DirectionPairChooser().pickTwoDistantWords(this.neighbors);
+        let conclusionObj;
         if (coinFlip()) {
-            this.conclusion = createBasicPremiseHTML(createSamePremise(startWord, endWord), false);
+            conclusionObj = createSamePremise(startWord, endWord);
             this.isValid = this.bucketMap[startWord] === this.bucketMap[endWord];
         } else {
-            this.conclusion = createBasicPremiseHTML(createOppositePremise(startWord, endWord), false);
+            conclusionObj = createOppositePremise(startWord, endWord);
             this.isValid = this.bucketMap[startWord] !== this.bucketMap[endWord];
         }
+        this.conclusion = createBasicPremiseHTML(conclusionObj, false);
+        [this.conclusion, this.isValid] = applyConclusionNegation(this.conclusion, this.isValid, conclusionObj);
 
         const countdown = this.getCountdown();
         return {

@@ -48,864 +48,1272 @@
 			<div id="sidebar-settings" class="offcanvas offcanvas--left">
 				<div class="offcanvas-body ffmono">
 					<div style="direction: ltr;">
-						<div class="mb-1"></div>
-						<div class="mb-1">
-							<span class="mb-05">Current Profile</span>
-							<div class="profile-container">
-							  <div class="profile-dropdown">
-							    <input type="text" class="profile-input" id="profile-input" placeholder="">
-							    <span class="profile-arrow" id="profile-arrow">▼</span>
-							    <div class="profile-list" id="profile-list">
-							    </div>
-								</div>
-								<div class="profile-plus" id="profile-plus">+</div>
-								<div class="profile-share" id="profile-share"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Share</span></div>
-								<div class="profile-copied" id="profile-copied">URL copied to clipboard</div>
-							</div>
-						</div>
-						<div class="mb-2">
-							<div class="inline-input__outer big-input">
-								Global Premises
-								<span class="inline-input__inner">
-									<input id="p-5" type="number" min="1" max="100" value="2" style="width: 5ch">qty
-								</span>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-41" type="checkbox">
-									<label class="switch" for="p-41"></label>
-								</div>
-								<label for="p-41" style="max-width: 170px;">Enable Auto Progression</label>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text">
-										Track any questions answered<br>
-										with the timer, and<br>
-										automatically update the<br>
-										timer and premises based on<br>
-										accuracy.<br>
-										<br>
-										Only applies when the<br>
-										timer is active.<br>
-									</div>
-								</div>
-								<span class="dropdown-settings">
-									<a style="margin-left: 0.5rem;" id="progression-settings-button" class="settings-gear"><img src="img/gear-solid.svg" alt="Settings Icon" width="20" height="20"></a>
-									<div id="progression-dropdown" class="dropdown">
-										<div class="dropdown-item">
-											Goal
-											<span class="inline-premise-spinner">
-												<input id="p-42" type="number" placeholder="" value="10" min="1" max="25" style="width: 5ch">sec
-											</span>
-										</div>
-										<div class="dropdown-item">
-											Questions to track
-											<span class="inline-premise-spinner">
-												<input id="p-49" type="number" placeholder="" value="20" min="5" max="50" style="width: 5ch">q
-											</span>
-										</div>
-										<div class="dropdown-item">
-											Success criteria
-											<span class="inline-premise-spinner">
-												<input id="p-50" type="number" placeholder="" value="90" min="50" max="100" style="width: 6ch">%
-											</span>
-										</div>
-										<div class="dropdown-item">
-											Failure criteria
-											<span class="inline-premise-spinner">
-												<input id="p-51" type="number" placeholder="" value="65" min="0" max="99" style="width: 6ch">%
-											</span>
-										</div>
-										<div class="dropdown-item">
-											<select id="p-52" name="progression-grouping" class="form-select ffmono">
-											  <option value="simple">Progress distinction and linear together</option>
-											  <option value="separate">Only progress linear questions together</option>
-											</select>
-										</div>
-										<div class="dropdown-item">
-											<select id="p-67" name="progression-change-mode" class="form-select ffmono">
-											  <option value="auto">Automatically adjust timer on level up</option>
-											  <option value="custom">Customize timer shifts</option>
-											</select>
-										</div>
-										<div id="time-dropper" class="dropdown-item" style="display: none;">
-											Decrease on level up
-											<span class="inline-premise-spinner">
-												<input id="p-68" type="number" placeholder="" value="5" min="1" max="50" style="width: 5ch">sec
-											</span>
-										</div>
-										<div id="time-bumper" class="dropdown-item" style="display: none;">
-											Increase on failure
-											<span class="inline-premise-spinner">
-												<input id="p-69" type="number" placeholder="" value="5" min="1" max="50" style="width: 5ch">sec
-											</span>
-										</div>
-									</div>
-								</span>
-							</div>
+						<!-- Back Button -->
+						<button class="settings-back-btn" id="settings-back-btn" onclick="goBackToSettingsMenu()">
+							<span>←</span> Back
+						</button>
+
+						<!-- Main Menu -->
+						<div class="settings-main-menu" id="settings-main-menu">
+							<button class="settings-menu-btn" data-section="profile-section" onclick="openSettingsSection('profile-section')">
+								<span class="btn-label">Profile</span>
+								<span class="btn-sublabel">Manage profiles</span>
+							</button>
+							<button class="settings-menu-btn" data-section="difficulty-section" onclick="openSettingsSection('difficulty-section')">
+								<span class="btn-label">Difficulty</span>
+								<span class="btn-sublabel">Progression & timers</span>
+							</button>
+							<button class="settings-menu-btn" data-section="content-section" onclick="openSettingsSection('content-section')">
+								<span class="btn-label">Content</span>
+								<span class="btn-sublabel">Words & display</span>
+							</button>
+							<button class="settings-menu-btn" data-section="gamemode-section" onclick="openSettingsSection('gamemode-section')">
+								<span class="btn-label">Game Modes</span>
+								<span class="btn-sublabel">Enable modes</span>
+							</button>
+							<button class="settings-menu-btn" data-section="appearance-section" onclick="openSettingsSection('appearance-section')">
+								<span class="btn-label">Appearance</span>
+								<span class="btn-sublabel">Theme & colors</span>
+							</button>
+							<button class="settings-menu-btn" data-section="advanced-section" onclick="openSettingsSection('advanced-section')">
+								<span class="btn-label">Advanced</span>
+								<span class="btn-sublabel">Experimental</span>
+							</button>
+							<button class="settings-menu-btn" id="reset-app" onclick="resetApp()">
+							<span class="btn-label">Reset App</span>
+							<span class="btn-sublabel">Clear all data & start fresh</span>
+						</button>
 						</div>
 
-						<div class="mb-2">
-						  <div class="inline-input__outer">
-								Progress Targets
-								<div class="tooltip-container" tabindex="0">
-								  ?
-								  <div class="tooltip-text right">
-										Set your daily and weekly<br>
-										time targets for training.<br>
-										Progress bars will show on<br>
-										the sides of the screen.<br>
+						<!-- Profile Section -->
+						<div id="profile-section" class="settings-section profile-section">
+							<div class="settings-section-header" onclick="toggleSettingsSection(this)">
+									<span class="settings-left"><img class="section-icon" src="icons/profile.png" alt="Profile"><span class="section-label">Profile</span></span>
+									<span class="section-arrow">▼</span>
+								</div>
+							<div class="settings-section-content">
+								<div class="mb-2">
+									<span class="mb-05">Current Profile</span>
+									<div class="profile-container">
+									  <div class="profile-dropdown">
+									    <input type="text" class="profile-input" id="profile-input" placeholder="">
+									    <span class="profile-arrow" id="profile-arrow">▼</span>
+									    <div class="profile-list" id="profile-list">
+									    </div>
+									</div>
+									<div class="profile-plus" id="profile-plus">+</div>
+									<div class="profile-share" id="profile-share"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Share</span></div>
+									<div class="profile-copied" id="profile-copied">URL copied to clipboard</div>
+								</div>
+							</div>
+						</div>
+                    </div>
+						<!-- Difficulty Section -->
+						<div id="difficulty-section" class="settings-section difficulty-section">
+							<div class="settings-section-header" onclick="toggleSettingsSection(this)">
+								<span class="settings-left"><img class="section-icon" src="icons/difficulty.png" alt="Difficulty"><span class="section-label">Difficulty & Progression</span></span>
+								<span class="section-arrow">▼</span>
+							</div>
+							<div class="settings-section-content">
+								<div class="mb-2">
+									<div class="inline-input__outer big-input">
+										Global Premises
+										<span class="inline-input__inner">
+											<input id="p-5" type="number" min="1" max="100" value="2" style="width: 5ch">qty
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-41" type="checkbox">
+											<label class="switch" for="p-41"></label>
+										</div>
+										<label for="p-41" style="max-width: 170px;">Enable Auto Progression</label>
+										<div class="tooltip-container" tabindex="0">
+											?
+											<div class="tooltip-text">
+												Track any questions answered<br>
+												with the timer, and<br>
+												automatically update the<br>
+												timer and premises based on<br>
+												accuracy.<br>
+												<br>
+												Only applies when the<br>
+												timer is active.<br>
+											</div>
+										</div>
+										<span class="dropdown-settings">
+											<a style="margin-left: 0.5rem;" id="progression-settings-button" class="settings-gear"><img src="img/gear-solid.svg" alt="Settings Icon" width="20" height="20"></a>
+											<div id="progression-dropdown" class="dropdown">
+												<div class="dropdown-item">
+													Goal
+													<span class="inline-premise-spinner">
+														<input id="p-42" type="number" placeholder="" value="10" min="1" max="25" style="width: 5ch">sec
+													</span>
+												</div>
+												<div class="dropdown-item">
+													Questions to track
+													<span class="inline-premise-spinner">
+														<input id="p-49" type="number" placeholder="" value="20" min="5" max="50" style="width: 5ch">q
+													</span>
+												</div>
+												<div class="dropdown-item">
+													Success criteria
+													<span class="inline-premise-spinner">
+														<input id="p-50" type="number" placeholder="" value="90" min="50" max="100" style="width: 6ch">%
+													</span>
+												</div>
+												<div class="dropdown-item">
+													Failure criteria
+													<span class="inline-premise-spinner">
+														<input id="p-51" type="number" placeholder="" value="65" min="0" max="99" style="width: 6ch">%
+													</span>
+												</div>
+												<div class="dropdown-item">
+													<select id="p-52" name="progression-grouping" class="form-select ffmono">
+													  <option value="simple">Progress distinction and linear together</option>
+													  <option value="separate">Only progress linear questions together</option>
+													  <option value="space-separate">Progress each space dimension separately</option>
+													  <option value="all-separate">Progress all modes separately</option>
+													</select>
+												</div>
+												<div class="dropdown-item">
+													<select id="p-67" name="progression-change-mode" class="form-select ffmono">
+													  <option value="auto">Automatically adjust timer on level up</option>
+													  <option value="custom">Customize timer shifts</option>
+													</select>
+												</div>
+												<div id="time-dropper" class="dropdown-item" style="display: none;">
+													Decrease on level up
+													<span class="inline-premise-spinner">
+														<input id="p-68" type="number" placeholder="" value="5" min="1" max="50" style="width: 5ch">sec
+													</span>
+												</div>
+												<div id="time-bumper" class="dropdown-item" style="display: none;">
+													Increase on failure
+													<span class="inline-premise-spinner">
+														<input id="p-69" type="number" placeholder="" value="5" min="1" max="50" style="width: 5ch">sec
+													</span>
+												</div>
+											</div>
+										</span>
+									</div>
+								</div>
+
+								<div class="mb-2">
+								  <div class="inline-input__outer">
+										Progress Targets
+										<div class="tooltip-container" tabindex="0">
+										  ?
+										  <div class="tooltip-text right">
+												Set your daily and weekly<br>
+												time targets for training.<br>
+												Progress bars will show on<br>
+												the sides of the screen.<br>
+										  </div>
+										</div>
+								  </div>
+								  <div class="multi-input">
+										<span class="single-input">
+										  Daily Target
+										  <span class="inline-premise-spinner">
+												<input id="p-63-optional" type="number" placeholder="" min="1" max="360" value="" style="width: 5ch">min
+											</span>
+										</span>
+										<span class="single-input">
+										  Weekly Target
+										  <span class="inline-premise-spinner">
+												<input id="p-64-optional" type="number" placeholder="" min="1" max="2500" value="" style="width: 6ch">min
+											</span>
+										</span>
 								  </div>
 								</div>
-						  </div>
-						  <div class="multi-input">
-								<span class="single-input">
-								  Daily Target
-								  <span class="inline-premise-spinner">
-										<input id="p-63-optional" type="number" placeholder="" min="1" max="360" value="" style="width: 5ch">min
-									</span>
-								</span>
-								<span class="single-input">
-								  Weekly Target
-								  <span class="inline-premise-spinner">
-										<input id="p-64-optional" type="number" placeholder="" min="1" max="2500" value="" style="width: 6ch">min
-									</span>
-								</span>
-						  </div>
+							</div>
 						</div>
 
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-20" type="checkbox" checked>
-									<label class="switch" for="p-20"></label>
-								</div>
-								<label for="p-20">Use Nonsense Words</label>
+						<!-- Content & Words Section -->
+						<div id="content-section" class="settings-section content-section">
+							<div class="settings-section-header" onclick="toggleSettingsSection(this)">
+								<span class="settings-left"><img class="section-icon" src="icons/content.png" alt="Content"><span class="section-label">Content & Words</span></span>
+								<span class="section-arrow">▼</span>
 							</div>
-						</div>		
-						<div class="mb-2" style="margin-left: 2rem;">
-							<div class="inline-input__outer">
-								Nonsense Word Length
-								<span class="inline-input__inner">
-									<input id="p-19" type="number" min="1" max="50" value="3" style="width: 5ch">
-								</span>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-27" type="checkbox">
-									<label class="switch" for="p-27"></label>
-								</div>
-								<label for="p-27">Use Garbage Words</label>
-							</div>
-						</div>		
-						<div class="mb-2" style="margin-left: 2rem;">
-							<div class="inline-input__outer">
-								Garbage Word Length
-								<span class="inline-input__inner">
-									<input id="p-26" type="number" min="1" max="50" value="3" style="width: 5ch">
-								</span>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-8" type="checkbox">
-									<label class="switch" for="p-8"></label>
-								</div>
-								<label for="p-8">Use Meaningful Words</label>
-							</div>							
-						</div>								
-						<div class="mb-2" style="margin-left: 2rem;">
-							<div class="ctrl__outer">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-22" type="checkbox" checked>
-										<label class="switch" for="p-22"></label>
+							<div class="settings-section-content">
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-20" type="checkbox" checked>
+											<label class="switch" for="p-20"></label>
+										</div>
+										<label for="p-20">Use Nonsense Words</label>
 									</div>
-									<label for="p-22">Nouns</label>
-								</div>
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-23" type="checkbox">
-										<label class="switch" for="p-23"></label>
+								</div>		
+								<div class="mb-2" style="margin-left: 2rem;">
+									<div class="inline-input__outer">
+										Nonsense Word Length
+										<span class="inline-input__inner">
+											<input id="p-19" type="number" min="1" max="50" value="3" style="width: 5ch">
+										</span>
 									</div>
-									<label for="p-23">Adjectives</label>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-27" type="checkbox">
+											<label class="switch" for="p-27"></label>
+										</div>
+										<label for="p-27">Use Garbage Words</label>
+									</div>
+								</div>		
+								<div class="mb-2" style="margin-left: 2rem;">
+									<div class="inline-input__outer">
+										Garbage Word Length
+										<span class="inline-input__inner">
+											<input id="p-26" type="number" min="1" max="50" value="3" style="width: 5ch">
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-8" type="checkbox">
+											<label class="switch" for="p-8"></label>
+										</div>
+										<label for="p-8">Use Meaningful Words</label>
+									</div>							
 								</div>								
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-21" type="checkbox">
-									<label class="switch" for="p-21"></label>
-								</div>
-								<label for="p-21">Use Emoji 🎉</label>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-28" type="checkbox">
-									<label class="switch" for="p-28"></label>
-								</div>
-								<label for="p-28">Use Voronoi Emoji <svg class="junk" width="50" height="50"><use xlink:href="#junk-0"></use></svg></label>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-38" type="checkbox">
-									<label class="switch" for="p-38"></label>
-								</div>
-								<label for="p-38">Use Visual Noise</label>
-								<span class="inline-premise-spinner">
-									<input id="p-39" type="number" placeholder="" value="5" min="1" max="25" style="width: 5ch">split
-								</span>
-							</div>
-						</div>
-						<hr class="divider"/>
-						<div class="mb-1">
-							<div class="inline-input__outer">
-								Scramble Factor
-								<span class="inline-premise-spinner">
-									<input id="p-31" type="number" placeholder="" min="0" max="100" value="" style="width: 6ch">%
-								</span>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text right">
-										How much to scramble premises.<br>
-										<br>
-										100% scrambles the most.<br>
-										Neighboring premises are rare.<br>
-										<br>
-										0% scrambles nothing (easy mode).<br>
-										<br>
-										Anything in between will try to<br>
-										keep a percentage of premises<br>
-										next to each other, unscrambled.<br>
+								<div class="mb-2" style="margin-left: 2rem;">
+									<div class="ctrl__outer">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-22" type="checkbox" checked>
+												<label class="switch" for="p-22"></label>
+											</div>
+											<label for="p-22">Nouns</label>
+										</div>
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-23" type="checkbox">
+												<label class="switch" for="p-23"></label>
+											</div>
+											<label for="p-23">Adjectives</label>
+										</div>								
 									</div>
 								</div>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-32" type="checkbox" checked>
-									<label class="switch" for="p-32"></label>
-								</div>
-								<label for="p-32">Enable Connection Branching</label>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text right">
-										Form of anti-strategy for space,<br>
-										distinction and 180° modes.<br>
-										Allows a word to appear in<br>
-										more than 2 premises, creating<br>
-										a branching structure such that<br>
-										<br>
-										A &lt;relation&gt; B<br>
-										A &lt;relation&gt; C<br>
-										A &lt;relation&gt; D<br>
-										<br>
-										is possible, where A appears in<br>
-										3 premises, rather than 2.<br>
-										<br>
-										Leave on if unsure (default).
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-21" type="checkbox">
+											<label class="switch" for="p-21"></label>
+										</div>
+										<label for="p-21">Use Emoji 🎉</label>
 									</div>
 								</div>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-46" type="checkbox">
-									<label class="switch" for="p-46"></label>
-								</div>
-								<label for="p-46">Spoiler Conclusion</label>
-							</div>
-						</div>
-						<hr class="divider"/>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-1" type="checkbox" checked>
-									<label class="switch" for="p-1"></label>
-								</div>
-								<label for="p-1">Enable Distinction</label>
-							</div>
-							<ul class="explainer">
-								<li>A is the same as B</li>
-								<li>A is opposite to B</li>
-							</ul>
-							<div class="multi-input">
-								<span class="single-input">
-									Premises
-									<span class="inline-premise-spinner"><input id="p-1-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
-								</span>
-								<span class="single-input">
-									Time
-									<span class="inline-premise-spinner"><input id="p-1-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-								</span>
-								<span class="single-input">
-									Priority
-									<span class="inline-premise-spinner"><input id="p-53" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-								</span>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-2" type="checkbox" checked>
-									<label class="switch" for="p-2"></label>
-								</div>
-								<label for="p-2">Enable Linear</label>
-								<span class="dropdown-settings">
-									<a id="linear-settings-button" class="settings-gear"><img src="img/gear-solid.svg" alt="Settings Icon" width="20" height="20">Modes</a>
-									<div id="linear-dropdown" class="dropdown">
-										<div class="dropdown-item" style="flex-direction: row-reverse; padding: 0 1rem;">
-											<span>Priority</span>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-28" type="checkbox">
+											<label class="switch" for="p-28"></label>
 										</div>
-										<div class="dropdown-item">
-											<input hidden id="p-leftright" type="checkbox">
-											<label class="switch" for="p-leftright"></label>
-											<label for="p-leftright">Left/Right</label>
-											<span class="inline-premise-spinner"><input id="p-54" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-										</div>
-										<div class="dropdown-item">
-											<input hidden id="p-topunder" type="checkbox">
-											<label class="switch" for="p-topunder"></label>
-											<label for="p-topunder">Top/Under</label>
-											<span class="inline-premise-spinner"><input id="p-55" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-										</div>
-										<div class="dropdown-item">
-											<input hidden id="p-comparison" type="checkbox">
-											<label class="switch" for="p-comparison"></label>
-											<label for="p-comparison">Comparison</label>
-											<span class="inline-premise-spinner"><input id="p-56" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-										</div>
-										<div class="dropdown-item">
-											<input hidden id="p-temporal" type="checkbox">
-											<label class="switch" for="p-temporal"></label>
-											<label for="p-temporal">Temporal</label>
-											<span class="inline-premise-spinner"><input id="p-57" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-										</div>
-										<div class="dropdown-item">
-											<input hidden id="p-contains" type="checkbox">
-											<label class="switch" for="p-contains"></label>
-											<label for="p-contains">Contains</label>
-											<span class="inline-premise-spinner"><input id="p-65" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-										</div>
+										<label for="p-28">Use Voronoi Emoji <svg class="junk" width="50" height="50"><use xlink:href="#junk-0"></use></svg></label>
 									</div>
-								</span>
-							</div>
-							<ul class="explainer">
-								<li>A is left of B</li>
-								<li>A is right of B</li>
-							</ul>
-							<div class="multi-input">
-								<span class="single-input">
-									Premises
-									<span class="inline-premise-spinner"><input id="p-2-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
-								</span>
-								<span class="single-input">
-									Time
-									<span class="inline-premise-spinner"><input id="p-2-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-								</span>
-								<span class="single-input">
-									180° Mode
-									<span class="inline-premise-spinner">
-										<input hidden id="p-47" type="checkbox">
-										<label class="switch" for="p-47"></label>
-										<div class="tooltip-container" style="position: absolute; right: 0;" tabindex="0">
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-38" type="checkbox">
+											<label class="switch" for="p-38"></label>
+										</div>
+										<label for="p-38">Use Visual Noise</label>
+										<span class="inline-premise-spinner">
+											<input id="p-39" type="number" placeholder="" value="5" min="1" max="25" style="width: 5ch">split
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-70" type="checkbox">
+											<label class="switch" for="p-70"></label>
+										</div>
+										<label for="p-70">Use Topo <svg class="junk" width="50" height="50"><use xlink:href="#topo-icon"></use></svg></label>
+									</div>
+								</div>
+								<hr class="divider"/>
+								<div class="mb-1">
+									<div class="inline-input__outer">
+										Scramble Factor
+										<span class="inline-premise-spinner">
+											<input id="p-31" type="number" placeholder="" min="0" max="100" value="" style="width: 6ch">%
+										</span>
+										<div class="tooltip-container" tabindex="0">
 											?
 											<div class="tooltip-text right">
-												Rather than only creating a<br>
-												straight line of relations,<br>
-												allow relations to flip<br>
-												directions, potentially<br>
-												creating overlap.<br>
+												How much to scramble premises.<br>
 												<br>
-												For example, the relations may<br>
-												go left, then right, then left<br>
-												left left, then right again,<br>
-												randomly.<br>
+												100% scrambles the most.<br>
+												Neighboring premises are rare.<br>
+												<br>
+												0% scrambles nothing (easy mode).<br>
+												<br>
+												Anything in between will try to<br>
+												keep a percentage of premises<br>
+												next to each other, unscrambled.<br>
 											</div>
 										</div>
-									</span>
-								</span>
-							</div>
-						</div>
-						<hr class="divider"/>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-6" type="checkbox" checked>
-									<label class="switch" for="p-6"></label>
-								</div>
-								<label for="p-6">Enable Space 2D</label>
-							</div>
-							<ul class="explainer">
-								<li>A is at South-West of B</li>
-							</ul>
-							<div class="multi-input">
-								<span class="single-input">
-									Premises
-									<span class="inline-premise-spinner"><input id="p-6-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
-								</span>
-								<span class="single-input">
-									Time
-									<span class="inline-premise-spinner"><input id="p-6-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-								</span>
-								<span class="single-input">
-									Priority
-									<span class="inline-premise-spinner"><input id="p-59" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-								</span>
-							</div>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-12" type="checkbox">
-									<label class="switch" for="p-12"></label>
-								</div>
-								<label for="p-12">Enable Space 3D</label>
-							</div>
-							<ul class="explainer">
-								<li>A is at Above and North-West of B</li>
-							</ul>
-							<div class="multi-input">
-								<span class="single-input">
-									Premises
-									<span class="inline-premise-spinner"><input id="p-12-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
-								</span>
-								<span class="single-input">
-									Time
-									<span class="inline-premise-spinner"><input id="p-12-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-								</span>
-								<span class="single-input">
-									Priority
-									<span class="inline-premise-spinner"><input id="p-60" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-								</span>
-							</div>
-						</div>
-						<hr class="divider"/>
-						<div class="mb-2">
-							<div class="inline-input__outer">
-								Image
-								<span class="inline-input__inner">
-								  <input type="file" id="image-upload" onchange="handleImageChange(event)" accept="image/*">
-								</span>
-							</div>
-							<button onclick="clearBackgroundImage()" style="float:right;">Clear Image</button>
-						</div>
-						<div class="mb-1">
-							<div class="ctrl__inner">
-								<div class="inline-input__outer">
-									<span>Color</span>
-									<span class="inline-input__inner">
-									  <input type="text" id="color-input" placeholder="Enter color (e.g. #ff0000)" value="#161F30CC" oninput="handleColorChange(event)" style="width: 11ch"></input>
-									</span>
-								</div>
-								<div>
-									<input hidden id="p-dark-mode" type="checkbox" checked onchange="handleDarkModeChange(event)">
-									<label class="switch" for="p-dark-mode"></label>
-								</div>
-								<label for="p-dark-mode">Dark Mode</label>
-							</div>
-						</div>
-						<div class="mb-2 ux-customize">
-							<div class="ctrl__inner">
-								<span>SFX</span>
-								<select id="p-sfx" class='select-item' onchange="handleSfxChange(event)">
-							    <option value="none">None</option>
-							    <option value="sfx1">Game-like</option>
-							    <option value="sfx2">Zen</option>
-								</select>
-							</div>
-							<div class="ctrl__inner">
-								<div>
-									<input hidden id="p-fast-ui" type="checkbox" onchange="handleFastUiChange(event)">
-									<label class="switch" for="p-fast-ui"></label>
-								</div>
-								<label for="p-fast-ui">Fast UI</label>
-								<span class="tooltip-container" tabindex="0">?
-									<div class="tooltip-text right">
-										Removes feedback animation,<br>
-										and disables true/false<br>
-										button swapping.<br>
 									</div>
-								</span>
-							</div>
-						</div>
-						<div class="folder" onclick="toggleExperimentalFolder()">
-							<span id="experimental-folder-arrow" class="folder-arrow">▶</span><span>Experimental</span>
-						</div>
-						<div id="experimental-folder-content" class="folder-content">
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-48" type="checkbox">
-										<label class="switch" for="p-48"></label>
-									</div>
-									<label for="p-48">Minimal Mode</label>
 								</div>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-66" type="checkbox">
-										<label class="switch" for="p-66"></label>
-									</div>
-									<label for="p-66">Wide Premises</label>
-								</div>
-							</div>
-						</div>
-						<div class="folder" onclick="toggleLegacyFolder()">
-							<span id="legacy-folder-arrow" class="folder-arrow">▶</span><span>Legacy Options</span>
-						</div>
-						<div id="legacy-folder-content" class="legacy-folder-content">
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-3" type="checkbox" checked>
-										<label class="switch" for="p-3"></label>
-									</div>
-									<span>Enable Syllogism</span>
-								</div>
-								<ul class="explainer">
-									<li>All A is B</li>
-									<li>Some A is B</li>
-								</ul>
-								<div class="multi-input">
-									<span class="single-input">
-										Premises
-										<span class="inline-premise-spinner"><input id="p-3-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
-									</span>
-									<span class="single-input">
-										Time
-										<span class="inline-premise-spinner"><input id="p-3-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-									</span>
-									<span class="single-input">
-										Priority
-										<span class="inline-premise-spinner"><input id="p-58" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-									</span>
-								</div>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-4" type="checkbox">
-										<label class="switch" for="p-4"></label>
-									</div>
-									<span>Enable Analogy</span>
-								</div>
-								<ul class="explainer">
-									<li>A is to B as B is to C</li>
-								</ul>
-								<div class="mb-1" style="margin-left: 2rem;">
+								<div class="mb-1">
 									<div class="ctrl__inner">
 										<div>
-											<input hidden id="p-14" type="checkbox">
-											<label class="switch" for="p-14"></label>
+											<input hidden id="p-32" type="checkbox" checked>
+											<label class="switch" for="p-32"></label>
 										</div>
-										<span>Only Analogy</span>
-									</div>
-								</div>
-								<div class="multi-input">
-									<span class="single-input">
-										Premise Offset
-										<span class="inline-premise-spinner"><input id="p-4-premises" type="number" placeholder="" min="-100" max="100" value="" style="width: 5ch">ps</span>
-									</span>
-									<span class="single-input">
-										Time Offset
-										<span class="inline-premise-spinner"><input id="p-4-time" type="number" placeholder="" min="-600" max="600" value="" style="width: 5ch">sec</span>
-									</span>
-									<div class="tooltip-container" tabindex="0">
-										?
-										<div class="tooltip-text right">
-											Shifts the underlying question's<br>
-											premise/timer count. Try -1
-										</div>
-									</div>
-								</div>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-11" type="checkbox">
-										<label class="switch" for="p-11"></label>
-									</div>
-									<span>Enable Negation</span>
-								</div>
-								<ul class="explainer">
-									<li>Invert the <span class="is-negated">Red</span> text</li>
-									<li><span class="is-negated">Is</span> = Is not</li>
-									<li><span class="is-negated">All</span> = No</li>
-								</ul>
-							</div>
-							<div class="mb-2" style="margin-left: 2rem;">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-18" type="checkbox">
-										<label class="switch" for="p-18"></label>
-									</div>
-									<span>Remove Negation Explainer</span>
-								</div>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-16" type="checkbox">
-										<label class="switch" for="p-16"></label>
-									</div>
-									<span>Enable Meta</span>
-								</div>
-								<ul class="explainer">
-									<li>A is (C to D) of B</li>
-								</ul>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner mb-05">
-									<div>
-										<input hidden id="p-43" type="checkbox">
-										<label class="switch" for="p-43"></label>
-									</div>
-									<span>Enable Anchor Space</span>
-									<span class="tooltip-container" tabindex="0">?
-										<div class="tooltip-text right">
-											Space 2D, but a diamond space<br>
-											starts out filled in with:<br>
-											<div class='anchor-explanation'>
-												<span id='svg-0'></span>
-												<span id='svg-2'></span><span id='svg-1'></span>
-												<span id='svg-3'></span>
+										<label for="p-32">Enable Connection Branching</label>
+										<div class="tooltip-container" tabindex="0">
+											?
+											<div class="tooltip-text right">
+												Form of anti-strategy for space,<br>
+												distinction and 180° modes.<br>
+												Allows a word to appear in<br>
+												more than 2 premises, creating<br>
+												a branching structure such that<br>
+												<br>
+												A &lt;relation&gt; B<br>
+												A &lt;relation&gt; C<br>
+												A &lt;relation&gt; D<br>
+												<br>
+												is possible, where A appears in<br>
+												3 premises, rather than 2.<br>
+												<br>
+												Leave on if unsure (default).
 											</div>
-											This is called the anchor,<br>
-											and all relations are built<br>
-											off it.
 										</div>
-									</span>
-								</div>
-								<div class="multi-input">
-									<span class="single-input">
-										Premises
-										<span class="inline-premise-spinner"><input id="p-44-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
-									</span>
-									<span class="single-input">
-										Time
-										<span class="inline-premise-spinner"><input id="p-45-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-									</span>
-									<span class="single-input">
-										Priority
-										<span class="inline-premise-spinner"><input id="p-62" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-									</span>
-								</div>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-13" type="checkbox">
-										<label class="switch" for="p-13"></label>
-									</div>
-									<span>Enable Space-Time</span>
-								</div>
-								<ul class="explainer">
-									<li>A is at Before, Below and South of B</li>
-								</ul>
-								<div class="multi-input">
-									<span class="single-input">
-										Premises
-										<span class="inline-premise-spinner"><input id="p-13-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
-									</span>
-									<span class="single-input">
-										Time
-										<span class="inline-premise-spinner"><input id="p-13-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-									</span>
-									<span class="single-input">
-										Priority
-										<span class="inline-premise-spinner"><input id="p-61" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
-									</span>
-								</div>
-							</div>
-							<div class="mb-05">Transforms:</div>
-							<div class="mb-1">
-								<div class="multi-input">
-									<span class="single-input">
-										2D
-										<span class="inline-premise-spinner"><input id="p-29" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
-									</span>
-									<span class="single-input">
-										3D
-										<span class="inline-premise-spinner"><input id="p-30" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
-									</span>
-									<span class="single-input">
-										Space-Time
-										<span class="inline-premise-spinner"><input id="p-33" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
-									</span>
-								</div>
-							</div>
-							<div class="ctrl__inner mb-05">
-								<div>
-									<input hidden id="p-35" type="checkbox" checked>
-									<label class="switch" for="p-35"></label>
-								</div>
-								<span>Mirror</span>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text shift-right">
-									Flips a word across another word,<br>
-									but only along one dimension (X/Y/Z).<br>
-									<br>
-									A is Y-mirrored across B<br>
-									<br>
-									Means to shift A up/down until<br>
-									it's fully mirrored across the<br>
-									X-axis of B.<br>
 									</div>
 								</div>
-								<div>
-									<input hidden id="p-36" type="checkbox" checked>
-									<label class="switch" for="p-36"></label>
-								</div>
-								<span>Scale</span>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text shift-left">
-										Shifts a word 2x away<br>
-										from another word, but only<br>
-										along one dimension (X/Y/Z).<br>
-										<br>
-										A is X-scaled 2x from B<br>
-										<br>
-										Means to shift A left/right<br>
-										until it doubles its<br>
-										X distance from B.<br>
-									</div>
-								</div>
-							</div>
-							<div class="ctrl__inner mb-05">
-								<div>
-									<input hidden id="p-34" type="checkbox" checked>
-									<label class="switch" for="p-34"></label>
-								</div>
-								<span>Set X/Y/Z</span>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text">
-										Moves a word so it lines up<br>
-										with the X/Y/Z of the another<br>
-										word.<br>
-									</div>
-								</div>
-								<div>
-									<input hidden id="p-37" type="checkbox">
-									<label class="switch" for="p-37"></label>
-								</div>
-								<span>Rotate</span>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text shift-left-left">
-										Rotates a word clockwise or<br>
-										counterclockwise around another<br>
-										word.<br>
-										<br>
-										In 3D mode, the word will<br>
-										need to rotate around the axis<br>
-										of the pivot word. For example,<br>
-										<br>
-										A is XY-rotated 90°↻ around B<br>
-										<br>
-										means that you find the Z-axis<br>
-										of B, and rotate A around that.<br>
-										(A will stay within the XY-plane)<br>
-									</div>
-								</div>
-							</div>
-							<div class="ctrl__inner mb-1">
-								<div>
-									<input hidden id="p-40" type="checkbox">
-									<label class="switch" for="p-40"></label>
-								</div>
-								<span>Interleave Mode</span>
-								<div class="tooltip-container" tabindex="0">
-									?
-									<div class="tooltip-text shift-left">
-									Transformations will be inserted<br>
-									in between premises, rather than<br>
-									only at the end. Requires 2+<br>
-									transforms to apply.<br>
-									</div>
-								</div>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-9" type="checkbox">
-										<label class="switch" for="p-9"></label>
-									</div>
-									<span>Enable Carousel Mode</span>
-								</div>
-								<p class="explainer">
-									See only one word at time.
-								</p>
-							</div>
-							<div class="mb-1">
-								<div class="ctrl__inner">
-									<div>
-										<input hidden id="p-7" type="checkbox">
-										<label class="switch" for="p-7"></label>
-									</div>
-									<span>Enable Binary</span>
-								</div>
-								<ul class="explainer">
-									<li>A is the same as B</li>
-									<li>OR</li>
-									<li>C is at North-West of D</li>
-								</ul>
-								<div class="mb-1" style="margin-left: 2rem;">
+								<div class="mb-1">
 									<div class="ctrl__inner">
 										<div>
-											<input hidden id="p-15" type="checkbox">
-											<label class="switch" for="p-15"></label>
+											<input hidden id="p-46" type="checkbox">
+											<label class="switch" for="p-46"></label>
 										</div>
-										<span>Only Binary</span>
+										<label for="p-46">Spoiler Conclusion</label>
+									</div>
+									<div style="margin-left: 2rem; margin-top: 0.5rem;">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-11-vanish" type="checkbox">
+												<label class="switch" for="p-11-vanish"></label>
+											</div>
+											<span>Vanishing Premises</span>
+										</div>
 									</div>
 								</div>
-								<div class="multi-input">
-									<span class="single-input">
-										Premises
-										<span class="inline-premise-spinner"><input id="p-7-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 4ch">ps</span>
-									</span>
-									<span class="single-input shrink">
-										Time
-										<span class="inline-premise-spinner"><input id="p-7-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
-									</span>
-									<span class="single-input grow">
+							</div>
+						</div>
+
+						<!-- Game Mode Section -->
+						<div id="gamemode-section" class="settings-section gamemode-section">
+							<div class="settings-section-header" onclick="toggleSettingsSection(this)">
+								<span class="settings-left"><img class="section-icon" src="icons/game%20modes.png" alt="Game Modes"><span class="section-label">Game Modes</span></span>
+								<span class="section-arrow">▼</span>
+							</div>
+							<div class="settings-section-content">
+								<div class="mb-1">
+									<div class="ctrl__inner">
 										<div>
-											<span>Operators</span>
+											<input hidden id="p-1" type="checkbox" checked>
+											<label class="switch" for="p-1"></label>
+										</div>
+										<label for="p-1">Enable Distinction</label>
+									</div>
+									<ul class="explainer">
+										<li>A is the same as B</li>
+										<li>A is opposite to B</li>
+									</ul>
+									<div class="multi-input">
+										<span class="single-input">
+											Premises
+											<span class="inline-premise-spinner"><input id="p-1-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+										</span>
+										<span class="single-input">
+											Time
+											<span class="inline-premise-spinner"><input id="p-1-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+										</span>
+										<span class="single-input">
+											Priority
+											<span class="inline-premise-spinner"><input id="p-53" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-2" type="checkbox" checked>
+											<label class="switch" for="p-2"></label>
+										</div>
+										<label for="p-2">Enable Linear</label>
+										<span class="dropdown-settings">
+											<a id="linear-settings-button" class="settings-gear"><img src="img/gear-solid.svg" alt="Settings Icon" width="20" height="20">Modes</a>
+											<div id="linear-dropdown" class="dropdown">
+												<div class="dropdown-item" style="flex-direction: row-reverse; padding: 0 1rem;">
+													<span>Priority</span>
+												</div>
+												<div class="dropdown-item">
+													<input hidden id="p-leftright" type="checkbox">
+													<label class="switch" for="p-leftright"></label>
+													<label for="p-leftright">Left/Right</label>
+													<span class="inline-premise-spinner"><input id="p-54" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+												</div>
+												<div class="dropdown-item">
+													<input hidden id="p-topunder" type="checkbox">
+													<label class="switch" for="p-topunder"></label>
+													<label for="p-topunder">Top/Under</label>
+													<span class="inline-premise-spinner"><input id="p-55" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+												</div>
+												<div class="dropdown-item">
+													<input hidden id="p-comparison" type="checkbox">
+													<label class="switch" for="p-comparison"></label>
+													<label for="p-comparison">Comparison</label>
+													<span class="inline-premise-spinner"><input id="p-56" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+												</div>
+												<div class="dropdown-item">
+													<input hidden id="p-temporal" type="checkbox">
+													<label class="switch" for="p-temporal"></label>
+													<label for="p-temporal">Temporal</label>
+													<span class="inline-premise-spinner"><input id="p-57" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+												</div>
+												<div class="dropdown-item">
+													<input hidden id="p-contains" type="checkbox">
+													<label class="switch" for="p-contains"></label>
+													<label for="p-contains">Contains</label>
+													<span class="inline-premise-spinner"><input id="p-65" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+												</div>
+											</div>
+										</span>
+									</div>
+									<ul class="explainer">
+										<li>A is left of B</li>
+										<li>A is right of B</li>
+									</ul>
+									<div class="multi-input">
+										<span class="single-input">
+											Premises
+											<span class="inline-premise-spinner"><input id="p-2-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+										</span>
+										<span class="single-input">
+											Time
+											<span class="inline-premise-spinner"><input id="p-2-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+										</span>
+										<span class="single-input">
+											180° Mode
+											<span class="inline-premise-spinner">
+												<input hidden id="p-47" type="checkbox">
+												<label class="switch" for="p-47"></label>
+												<div class="tooltip-container" style="position: absolute; right: 0;" tabindex="0">
+													?
+													<div class="tooltip-text right">
+														Rather than only creating a<br>
+														straight line of relations,<br>
+														allow relations to flip<br>
+														directions, potentially<br>
+														creating overlap.<br>
+														<br>
+														For example, the relations may<br>
+														go left, then right, then left<br>
+														left left, then right again,<br>
+														randomly.<br>
+													</div>
+												</div>
+											</span>
+										</span>
+									</div>
+								</div>
+								<hr class="divider"/>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-6" type="checkbox" checked>
+											<label class="switch" for="p-6"></label>
+										</div>
+										<label for="p-6">Enable Space 2D</label>
+									</div>
+									<ul class="explainer">
+										<li>A is at South-West of B</li>
+									</ul>
+									<div class="multi-input">
+										<span class="single-input">
+											Premises
+											<span class="inline-premise-spinner"><input id="p-6-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+										</span>
+										<span class="single-input">
+											Time
+											<span class="inline-premise-spinner"><input id="p-6-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+										</span>
+										<span class="single-input">
+											Priority
+											<span class="inline-premise-spinner"><input id="p-59" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-12" type="checkbox">
+											<label class="switch" for="p-12"></label>
+										</div>
+										<label for="p-12">Enable Space 3D</label>
+									</div>
+									<ul class="explainer">
+										<li>A is at Above and North-West of B</li>
+									</ul>
+									<div class="multi-input">
+										<span class="single-input">
+											Premises
+											<span class="inline-premise-spinner"><input id="p-12-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+										</span>
+										<span class="single-input">
+											Time
+											<span class="inline-premise-spinner"><input id="p-12-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+										</span>
+										<span class="single-input">
+											Priority
+											<span class="inline-premise-spinner"><input id="p-60" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-13" type="checkbox">
+											<label class="switch" for="p-13"></label>
+										</div>
+										<label for="p-13">Enable Space 4D</label>
+									</div>
+									<ul class="explainer">
+										<li>A is at Before, Below and South of B</li>
+									</ul>
+									<div class="multi-input">
+										<span class="single-input">
+											Premises
+											<span class="inline-premise-spinner"><input id="p-13-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+										</span>
+										<span class="single-input">
+											Time
+											<span class="inline-premise-spinner"><input id="p-13-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+										</span>
+										<span class="single-input">
+											Priority
+											<span class="inline-premise-spinner"><input id="p-61" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-13-5d" type="checkbox">
+											<label class="switch" for="p-13-5d"></label>
+										</div>
+										<label for="p-13-5d">Enable 5D (Space + Time layers)</label>
+									</div>
+									<ul class="explainer">
+										<li>A is South of B and was before B</li>
+										<li>Spatial + Temporal relation layers</li>
+									</ul>
+									<div class="multi-input">
+										<span class="single-input">
+											Premises
+											<span class="inline-premise-spinner"><input id="p-13-5d-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+										</span>
+										<span class="single-input">
+											Time
+											<span class="inline-premise-spinner"><input id="p-13-5d-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+										</span>
+										<span class="single-input">
+											Priority
+											<span class="inline-premise-spinner"><input id="p-md5d-weight" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div>
+											<input hidden id="p-13-6d" type="checkbox">
+											<label class="switch" for="p-13-6d"></label>
+										</div>
+										<label for="p-13-6d">Enable 6D (Space + Time + Quantity)</label>
+									</div>
+									<ul class="explainer">
+										<li>A is South of B, was before B, and has more than B</li>
+										<li>Spatial + Temporal + Comparative layers</li>
+									</ul>
+									<div class="multi-input">
+										<span class="single-input">
+											Premises
+											<span class="inline-premise-spinner"><input id="p-13-6d-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+										</span>
+										<span class="single-input">
+											Time
+											<span class="inline-premise-spinner"><input id="p-13-6d-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+										</span>
+										<span class="single-input">
+											Priority
+											<span class="inline-premise-spinner"><input id="p-md6d-weight" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Appearance Section -->
+						<div id="appearance-section" class="settings-section appearance-section">
+							<div class="settings-section-header" onclick="toggleSettingsSection(this)">
+								<span class="settings-left"><img class="section-icon" src="icons/appearance.png" alt="Appearance"><span class="section-label">Appearance</span></span>
+								<span class="section-arrow">▼</span>
+							</div>
+							<div class="settings-section-content">
+								<div class="mb-2">
+									<div class="inline-input__outer">
+										Image
+										<span class="inline-input__inner">
+										  <input type="file" id="image-upload" onchange="handleImageChange(event)" accept="image/*">
+										</span>
+									</div>
+									<button onclick="clearBackgroundImage()">Clear Image</button>
+								</div>
+								<div class="mb-1">
+									<div class="ctrl__inner">
+										<div class="inline-input__outer">
+											<span>Color</span>
+											<span class="inline-input__inner">
+											  <input type="text" id="color-input" placeholder="Enter color (e.g. #ff0000)" value="#161F30CC" oninput="handleColorChange(event)" style="width: 11ch"></input>
+											</span>
+										</div>
+										<div>
+											<input hidden id="p-dark-mode" type="checkbox" checked onchange="handleDarkModeChange(event)">
+											<label class="switch" for="p-dark-mode"></label>
+										</div>
+										<label for="p-dark-mode">Dark Mode</label>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Timer Animation</span>
+										<select id="p-timer-anim" class='select-item' onchange="handleTimerAnimChange(event)">
+										    <option value="linear">Linear</option>
+										    <option value="easeOutCubic">Ease Out</option>
+										    <option value="easeOutQuart">Ease Out Quart</option>
+										    <option value="easeOutBack">Ease Out Back</option>
+										    <option value="easeOutBounce">Bounce</option>
+										    <option value="stepEaseOut" selected>Step Tick</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Font Size</span>
+										<select id="p-font-size" class='select-item' onchange="handleFontSizeChange(event)">
+										    <option value="small">Small</option>
+										    <option value="normal" selected>Normal</option>
+										    <option value="large">Large</option>
+										    <option value="huge">Huge</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>UI Density</span>
+										<select id="p-density" class='select-item' onchange="handleDensityChange(event)">
+										    <option value="compact">Compact</option>
+										    <option value="normal" selected>Normal</option>
+										    <option value="spacious">Spacious</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+										<span>Theme Color</span>
+										<div class="color-presets" style="display: flex; gap: 0.5rem; flex-wrap: wrap; width: 100%;">
+											<button type="button" class="color-preset" data-color="#1798B0" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #1798B0; background: #1798B0; cursor: pointer;" title="Cyan Blue"></button>
+											<button type="button" class="color-preset" data-color="#ff0000" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ff0000; background: #ff0000; cursor: pointer;" title="Red"></button>
+											<button type="button" class="color-preset" data-color="#ff4500" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ff4500; background: #ff4500; cursor: pointer;" title="Orange Red"></button>
+											<button type="button" class="color-preset" data-color="#ffa500" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ffa500; background: #ffa500; cursor: pointer;" title="Orange"></button>
+											<button type="button" class="color-preset" data-color="#ffff00" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ffff00; background: #ffff00; cursor: pointer;" title="Yellow"></button>
+											<button type="button" class="color-preset" data-color="#00ff00" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #00ff00; background: #00ff00; cursor: pointer;" title="Green"></button>
+											<button type="button" class="color-preset" data-color="#0000ff" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #0000ff; background: #0000ff; cursor: pointer;" title="Blue"></button>
+											<button type="button" class="color-preset" data-color="#9400d3" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #9400d3; background: #9400d3; cursor: pointer;" title="Violet"></button>
+											<button type="button" class="color-preset" data-color="#ff1493" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ff1493; background: #ff1493; cursor: pointer;" title="Pink"></button>
+										</div>
+										<div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-top: 0.25rem;">
+											<span style="font-size: 0.85rem; opacity: 0.7;">Custom:</span>
+											<input type="color" id="p-bracket-color-picker" value="#1798B0" onchange="handleBracketColorPickerChange(event)" style="width: 32px; height: 28px; border: none; border-radius: 4px; cursor: pointer; padding: 0; background: transparent;">
+											<input type="text" id="p-bracket-color" class="select-item" placeholder="#1798B0" value="#1798B0" onchange="handleBracketColorChange(event)" style="width: 8ch; text-align: center; flex: 1;">
+										</div>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Color Words</span>
+										<div>
+											<input hidden id="p-color-words" type="checkbox" onchange="handleColorWordsChange(event)">
+											<label class="switch" for="p-color-words"></label>
+										</div>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Color Timer Bar</span>
+										<div>
+											<input hidden id="p-color-timer" type="checkbox" onchange="handleColorTimerChange(event)">
+											<label class="switch" for="p-color-timer"></label>
+										</div>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Timer Bar Height</span>
+										<select id="p-timer-height" class='select-item' onchange="handleTimerHeightChange(event)">
+										    <option value="thin">Thin (10px)</option>
+										    <option value="normal" selected>Normal (20px)</option>
+										    <option value="thick">Thick (30px)</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Game Area Radius</span>
+										<select id="p-border-radius" class='select-item' onchange="handleBorderRadiusChange(event)">
+										    <option value="sharp">Sharp</option>
+										    <option value="slight">Slight</option>
+										    <option value="rounded" selected>Rounded</option>
+										    <option value="pill">Pill</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Premise Style</span>
+										<select id="p-premise-style" class='select-item' onchange="handlePremiseStyleChange(event)">
+										    <option value="minimal" selected>Minimal</option>
+										    <option value="boxed">Boxed</option>
+										    <option value="card">Card</option>
+										    <option value="underline">Underline</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>Button Style</span>
+										<select id="p-button-style" class='select-item' onchange="handleButtonStyleChange(event)">
+										    <option value="solid" selected>Solid</option>
+										    <option value="contrast">Contrast</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-2 ux-customize">
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+										<span>SFX</span>
+										<select id="p-sfx" class='select-item' onchange="handleSfxChange(event)">
+										    <option value="none">None</option>
+										    <option value="sfx1">Game-like</option>
+										    <option value="sfx2">Zen</option>
+										</select>
+									</div>
+									<div class="ctrl__inner" style="margin-top: 8px;">
+										<div>
+											<input hidden id="p-fast-ui" type="checkbox" onchange="handleFastUiChange(event)">
+											<label class="switch" for="p-fast-ui"></label>
+										</div>
+										<label for="p-fast-ui">Fast UI</label>
+										<span class="tooltip-container" tabindex="0">?
+											<div class="tooltip-text right">
+												Removes feedback animation,<br>
+												and disables true/false<br>
+												button swapping.<br>
+											</div>
+										</span>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Advanced Section -->
+						<div id="advanced-section" class="settings-section advanced-section">
+							<div class="settings-section-header" onclick="toggleSettingsSection(this)">
+								<span class="settings-left"><img class="section-icon" src="icons/advanced.png" alt="Advanced"><span class="section-label">Advanced</span></span>
+								<span class="section-arrow">▼</span>
+							</div>
+							<div class="settings-section-content">
+								<div class="folder" onclick="toggleExperimentalFolder()">
+									<span id="experimental-folder-arrow" class="folder-arrow">▶</span><span>Experimental</span>
+								</div>
+								<div id="experimental-folder-content" class="folder-content">
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-48" type="checkbox">
+												<label class="switch" for="p-48"></label>
+											</div>
+											<label for="p-48">Minimal Mode</label>
+										</div>
+										<div style="margin-left: 2rem; margin-top: 0.5rem;">
+											<div class="ctrl__inner">
+												<div>
+													<input hidden id="p-48-half" type="checkbox">
+													<label class="switch" for="p-48-half"></label>
+												</div>
+												<span>Half-Minimal Mode</span>
+											</div>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-66" type="checkbox">
+												<label class="switch" for="p-66"></label>
+											</div>
+											<label for="p-66">Wide Premises</label>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-colorless" type="checkbox" onchange="handleColorlessChange(event)">
+												<label class="switch" for="p-colorless"></label>
+											</div>
+											<label for="p-colorless">Colorless</label>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-mixed" type="checkbox">
+												<label class="switch" for="p-mixed"></label>
+											</div>
+											<label for="p-mixed">Mixed Modes</label>
+										</div>
+										<ul class="explainer">
+											<li>Combine multiple question types in a single question</li>
+											<li>Example: Distinction + 2D Direction</li>
+										</ul>
+										<div style="margin-left: 2rem; margin-top: 0.5rem;">
+											<div class="ctrl__inner">
+												<div>
+													<input hidden id="p-mixed-only" type="checkbox">
+													<label class="switch" for="p-mixed-only"></label>
+												</div>
+												<label for="p-mixed-only">Only Mixed Modes</label>
+											</div>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-hard-conc" type="checkbox">
+												<label class="switch" for="p-hard-conc"></label>
+											</div>
+											<label for="p-hard-conc">Harder Conclusions</label>
+											<span class="tooltip-container" tabindex="0">?
+												<div class="tooltip-text right">
+													Avoids trivial inverse conclusions<br>
+													(e.g., if correct is North,<br>
+													wrong won't be South)
+												</div>
+											</span>
+										</div>
+									</div>
+								</div>
+								<div class="folder" onclick="toggleLegacyFolder()">
+									<span id="legacy-folder-arrow" class="folder-arrow">▶</span><span>Legacy Options</span>
+								</div>
+								<div id="legacy-folder-content" class="legacy-folder-content">
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-3" type="checkbox" checked>
+												<label class="switch" for="p-3"></label>
+											</div>
+											<span>Enable Syllogism</span>
+										</div>
+										<ul class="explainer">
+											<li>All A is B</li>
+											<li>Some A is B</li>
+										</ul>
+										<div class="multi-input">
+											<span class="single-input">
+												Premises
+												<span class="inline-premise-spinner"><input id="p-3-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+											</span>
+											<span class="single-input">
+												Time
+												<span class="inline-premise-spinner"><input id="p-3-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+											</span>
+											<span class="single-input">
+												Priority
+												<span class="inline-premise-spinner"><input id="p-58" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+											</span>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-4" type="checkbox">
+												<label class="switch" for="p-4"></label>
+											</div>
+											<span>Enable Analogy</span>
+										</div>
+										<ul class="explainer">
+											<li>A is to B as B is to C</li>
+										</ul>
+										<div class="mb-1" style="margin-left: 2rem;">
+											<div class="ctrl__inner">
+												<div>
+													<input hidden id="p-14" type="checkbox">
+													<label class="switch" for="p-14"></label>
+												</div>
+												<span>Only Analogy</span>
+											</div>
+										</div>
+										<div class="multi-input">
+											<span class="single-input">
+												Premise Offset
+												<span class="inline-premise-spinner"><input id="p-4-premises" type="number" placeholder="" min="-100" max="100" value="" style="width: 5ch">ps</span>
+											</span>
+											<span class="single-input">
+												Time Offset
+												<span class="inline-premise-spinner"><input id="p-4-time" type="number" placeholder="" min="-600" max="600" value="" style="width: 5ch">sec</span>
+											</span>
 											<div class="tooltip-container" tabindex="0">
 												?
 												<div class="tooltip-text right">
-													Number of binary<br>
-													operators to<br>
-													use in the conclusion
+													Shifts the underlying question's<br>
+													premise/timer count. Try -1
 												</div>
 											</div>
 										</div>
-										<span class="inline-premise-spinner"><input id="p-17" type="number" min="1" value="1" max="10" style="width: 5ch">lvl</span>
-									</span>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-11" type="checkbox">
+												<label class="switch" for="p-11"></label>
+											</div>
+											<span>Enable Negation</span>
+											<span class="inline-premise-spinner">
+												<input id="p-11-freq" type="number" placeholder="" value="50" min="0" max="100" style="width: 5ch">% freq
+											</span>
+										</div>
+										<div style="margin-left: 2rem; margin-top: 0.5rem;">
+											<div class="ctrl__inner">
+												<div>
+													<input hidden id="p-11-conc" type="checkbox">
+													<label class="switch" for="p-11-conc"></label>
+												</div>
+												<span>Conclusion Negation</span>
+												<span class="inline-premise-spinner">
+													<input id="p-11-conc-freq" type="number" placeholder="" value="50" min="0" max="100" style="width: 5ch">% freq
+												</span>
+											</div>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-16" type="checkbox">
+												<label class="switch" for="p-16"></label>
+											</div>
+											<span>Enable Meta</span>
+										</div>
+										<ul class="explainer">
+											<li>A is (C to D) of B</li>
+										</ul>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner mb-05">
+											<div>
+												<input hidden id="p-43" type="checkbox">
+												<label class="switch" for="p-43"></label>
+											</div>
+											<span>Enable Anchor Space</span>
+											<span class="tooltip-container" tabindex="0">?
+												<div class="tooltip-text right">
+													Space 2D, but a diamond space<br>
+													starts out filled in with:<br>
+													<div class='anchor-explanation'>
+														<span id='svg-0'></span>
+														<span id='svg-2'></span><span id='svg-1'></span>
+														<span id='svg-3'></span>
+													</div>
+													This is called the anchor,<br>
+													and all relations are built<br>
+													off it.
+												</div>
+											</span>
+										</div>
+										<div class="multi-input">
+											<span class="single-input">
+												Premises
+												<span class="inline-premise-spinner"><input id="p-44-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+											</span>
+											<span class="single-input">
+												Time
+												<span class="inline-premise-spinner"><input id="p-45-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+											</span>
+											<span class="single-input">
+												Priority
+												<span class="inline-premise-spinner"><input id="p-62" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+											</span>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner mb-05">
+											<div>
+												<input hidden id="p-anc-v2" type="checkbox">
+												<label class="switch" for="p-anc-v2"></label>
+											</div>
+											<span>Enable Anchor Space v2</span>
+											<span class="tooltip-container" tabindex="0">?
+												<div class="tooltip-text right">
+													Visual pattern memory mode.<br>
+													Colored shapes appear on a grid.<br>
+													Memorize the pattern, then<br>
+													answer direction questions.<br>
+													Supports transforms too.
+												</div>
+											</span>
+										</div>
+										<div class="multi-input">
+											<span class="single-input">
+												Premises
+												<span class="inline-premise-spinner"><input id="p-anc-v2-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 5ch">ps</span>
+											</span>
+											<span class="single-input">
+												Time
+												<span class="inline-premise-spinner"><input id="p-anc-v2-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+											</span>
+											<span class="single-input">
+												Priority
+												<span class="inline-premise-spinner"><input id="p-anc-v2-weight" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+											</span>
+										</div>
+										<div class="multi-input mt-05">
+											<span class="single-input">
+												Shapes
+												<span class="inline-premise-spinner"><input id="p-anc-v2-count" type="number" placeholder="" min="3" max="8" value="4" style="width: 5ch">ct</span>
+											</span>
+											<span class="single-input">
+												Transforms
+												<span class="inline-premise-spinner"><input id="p-anc-v2-hard" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
+											</span>
+										</div>
+										<div class="mt-05">
+											<div class="ctrl__inner">
+												<div>
+													<input hidden id="p-anc-v2-pause" type="checkbox" checked>
+													<label class="switch" for="p-anc-v2-pause"></label>
+												</div>
+												<label for="p-anc-v2-pause">Pause timer during pattern memorization</label>
+											</div>
+										</div>
+									</div>
+									<div class="mb-05">Transforms:</div>
+									<div class="mb-1">
+										<div class="multi-input">
+											<span class="single-input">
+												2D
+												<span class="inline-premise-spinner"><input id="p-29" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
+											</span>
+											<span class="single-input">
+												3D
+												<span class="inline-premise-spinner"><input id="p-30" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
+											</span>
+											<span class="single-input">
+												Space Four D
+												<span class="inline-premise-spinner"><input id="p-33" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
+											</span>
+											<span class="single-input">
+												Anchor
+												<span class="inline-premise-spinner"><input id="p-33-anc" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
+											</span>
+										</div>
+									</div>
+									<div class="ctrl__inner mb-05">
+										<div>
+											<input hidden id="p-35" type="checkbox" checked>
+											<label class="switch" for="p-35"></label>
+										</div>
+										<span>Mirror</span>
+										<div class="tooltip-container" tabindex="0">
+											?
+											<div class="tooltip-text shift-right">
+											Flips a word across another word,<br>
+											but only along one dimension (X/Y/Z).<br>
+											<br>
+											A is Y-mirrored across B<br>
+											<br>
+											Means to shift A up/down until<br>
+											it's fully mirrored across the<br>
+											X-axis of B.<br>
+											</div>
+										</div>
+									</div>
+									<div class="ctrl__inner mb-05">
+										<div>
+											<input hidden id="p-36" type="checkbox" checked>
+											<label class="switch" for="p-36"></label>
+										</div>
+										<span>Scale</span>
+										<div class="tooltip-container" tabindex="0">
+											?
+											<div class="tooltip-text shift-left">
+												Shifts a word 2x away<br>
+												from another word, but only<br>
+												along one dimension (X/Y/Z).<br>
+												<br>
+												A is X-scaled 2x from B<br>
+												<br>
+												Means to shift A left/right<br>
+												until it doubles its<br>
+												X distance from B.<br>
+											</div>
+										</div>
+									</div>
+									<div class="ctrl__inner mb-05">
+										<div>
+											<input hidden id="p-34" type="checkbox" checked>
+											<label class="switch" for="p-34"></label>
+										</div>
+										<span>Set X/Y/Z</span>
+										<div class="tooltip-container" tabindex="0">
+											?
+											<div class="tooltip-text">
+												Moves a word so it lines up<br>
+												with the X/Y/Z of the another<br>
+												word.<br>
+											</div>
+										</div>
+									</div>
+									<div class="ctrl__inner mb-05">
+										<div>
+											<input hidden id="p-37" type="checkbox">
+											<label class="switch" for="p-37"></label>
+										</div>
+										<span>Rotate</span>
+										<div class="tooltip-container" tabindex="0">
+											?
+											<div class="tooltip-text shift-left-left">
+												Rotates a word clockwise or<br>
+												counterclockwise around another<br>
+												word.<br>
+												<br>
+												In 3D mode, the word will<br>
+												need to rotate around the axis<br>
+												of the pivot word. For example,<br>
+												<br>
+												A is XY-rotated 90°↻ around B<br>
+												<br>
+												means that you find the Z-axis<br>
+												of B, and rotate A around that.<br>
+												(A will stay within the XY-plane)<br>
+											</div>
+										</div>
+									</div>
+									<div class="ctrl__inner mb-1">
+										<div>
+											<input hidden id="p-40" type="checkbox">
+											<label class="switch" for="p-40"></label>
+										</div>
+										<span>Interleave Mode</span>
+										<div class="tooltip-container" tabindex="0">
+											?
+											<div class="tooltip-text shift-left">
+											Transformations will be inserted<br>
+											in between premises, rather than<br>
+											only at the end. Requires 2+<br>
+											transforms to apply.<br>
+											</div>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-9" type="checkbox">
+												<label class="switch" for="p-9"></label>
+											</div>
+											<span>Enable Carousel Mode</span>
+											<span class="inline-premise-spinner">
+												<input id="p-9-premises" type="number" placeholder="" value="1" min="1" max="10" style="width: 5ch"> per page
+											</span>
+										</div>
+										<p class="explainer">
+											See one or more premises at a time. Use number input to change how many premises appear per page.
+										</p>
+										<div style="margin-left: 2rem; margin-top: 0.5rem;">
+											<div class="ctrl__inner mb-1">
+												<div>
+													<input hidden id="p-9-noback" type="checkbox">
+													<label class="switch" for="p-9-noback"></label>
+												</div>
+												<span>Disable "Back" button (one-way only)</span>
+											</div>
+											<div class="ctrl__inner">
+												<span>Auto-advance after</span>
+												<span class="inline-premise-spinner">
+													<input id="p-9-auto" type="number" placeholder="" value="0" min="0" max="60" style="width: 5ch"> sec
+												</span>
+												<span class="explainer-small">(0 = disabled, click Next manually)</span>
+											</div>
+										</div>
+									</div>
+									<div class="mb-1">
+										<div class="ctrl__inner">
+											<div>
+												<input hidden id="p-7" type="checkbox">
+												<label class="switch" for="p-7"></label>
+											</div>
+											<span>Enable Binary</span>
+										</div>
+										<ul class="explainer">
+											<li>A is the same as B</li>
+											<li>OR</li>
+											<li>C is at North-West of D</li>
+										</ul>
+										<div class="mb-1" style="margin-left: 2rem;">
+											<div class="ctrl__inner">
+												<div>
+													<input hidden id="p-15" type="checkbox">
+													<label class="switch" for="p-15"></label>
+												</div>
+												<span>Only Binary</span>
+											</div>
+										</div>
+										<div class="multi-input">
+											<span class="single-input">
+												Premises
+												<span class="inline-premise-spinner"><input id="p-7-premises" type="number" placeholder="" min="1" max="100" value="" style="width: 4ch">ps</span>
+											</span>
+											<span class="single-input shrink">
+												Time
+												<span class="inline-premise-spinner"><input id="p-7-time" type="number" placeholder="" min="1" max="600" value="" style="width: 5ch">sec</span>
+											</span>
+											<span class="single-input grow">
+												<div>
+													<span>Operators</span>
+													<div class="tooltip-container" tabindex="0">
+														?
+														<div class="tooltip-text right">
+															Number of binary<br>
+															operators to<br>
+															use in the conclusion
+														</div>
+													</div>
+												</div>
+												<span class="inline-premise-spinner"><input id="p-17" type="number" min="1" value="1" max="10" style="width: 5ch">lvl</span>
+											</span>
+										</div>
+									</div>
 								</div>
 							</div>
-						</div>
-						<div class="mb-1">
-							<button id="reset-app" onclick="resetApp()">Reset App</button>
-							<ul class="explainer">
-								<li>Resets score, history and settings</li>
-							</ul>
 						</div>
 					</div>
 				</div>
@@ -921,12 +1329,16 @@
 					<label class="offcanvas-close" for="offcanvas-history">✕</label>
 				</div>
 				<div class="offcanvas-body ffmono hql-frame">
-					<div>Total answer time: <span id="total-display"></span></div>
-					<div>Avg answer time: <span id="average-display"></span></div>
-					<div>Avg correct answer time: <span id="average-correct-display"></span></div>
-					<div>% of answers correct: <span id="percent-correct-display"></span></div>
+					<div class="history-stats">
+						<div class="stat-row"><span class="stat-label">Total:</span> <span id="total-display"></span></div>
+						<div class="stat-row"><span class="stat-label">Avg:</span> <span id="average-display"></span></div>
+						<div class="stat-row"><span class="stat-label">Avg Correct:</span> <span id="average-correct-display"></span></div>
+						<div class="stat-row"><span class="stat-label">% Correct:</span> <span id="percent-correct-display"></span></div>
+					</div>
 					<div id="history-list" class="hql"></div>
-					<button onclick="clearHistory()">Clear Session</button>
+					<div class="history-footer">
+						<button class="clear-history-btn" onclick="clearHistory()">Clear Session</button>
+					</div>
 				</div>
 			</div>
 			<input id="offcanvas-credits"
@@ -961,6 +1373,19 @@
 						<ul class="explainer">
 							<li><a href="https://www.linkedin.com/in/f3d3r1c07r0774/">Fredo</a> - Original creator of Syllogimous. This app is a modified version of their work.</li>
 						</ul>
+						<hr class="divider"/>
+						<div class="inline-input__outer">
+							Images
+						</div>
+						<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
+							<img src="icons/1.jpg" alt="1" style="width: 100%; border-radius: 4px;">
+							<img src="icons/2.jpg" alt="2" style="width: 100%; border-radius: 4px;">
+							<img src="icons/3.jpg" alt="3" style="width: 100%; border-radius: 4px;">
+							<img src="icons/4.jpg" alt="4" style="width: 100%; border-radius: 4px;">
+							<img src="icons/5.jpg" alt="5" style="width: 100%; border-radius: 4px;">
+							<img src="icons/6.jpg" alt="6" style="width: 100%; border-radius: 4px;">
+							<img src="icons/7.jpg" alt="7" style="width: 100%; border-radius: 4px; grid-column: span 2;">
+						</div>
 					</div>
 				</div>
 			</div>
@@ -978,13 +1403,13 @@
 					<div class="timer">
 						<div class="custom-time-info"></div>
 						<div class="timer__bar" style="width: 100%"></div>
-						<div class="inline-input__outer" style="position: absolute; top: 0; transform: translate(12px, 12px);">
-							Timer
-							<span class="inline-input__inner">
-								<input id="timer-input" type="number" min="1" value="30" style="width: 6ch">sec
-							</span>
-							<input id="timer-toggle" type="checkbox">
-						</div>
+					</div>
+					<div class="inline-input__outer timer-controls">
+						Timer
+						<span class="inline-input__inner">
+							<input id="timer-input" type="number" min="1" value="30" style="width: 6ch">sec
+						</span>
+						<input id="timer-toggle" type="checkbox">
 					</div>
 				</div>
 
@@ -2097,6 +2522,7 @@
 <symbol id="junk-997" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 50 50"><polygon points="0,50 0,0 5,0 21,15 16,50 0,50" fill="hsl(350, 99%, 76%)" /><polygon points="50,0 50,0 21,15 5,0 50,0" fill="hsl(40, 55%, 34%)" /><polygon points="50,50 16,50 21,15 50,0 50,50" fill="hsl(100, 75%, 60%)" /></symbol>
 <symbol id="junk-998" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 50 50"><polygon points="33,0 13,50 0,50 0,0 33,0" fill="hsl(350, 99%, 83%)" /><polygon points="50,0 50,50 13,50 33,0 50,0" fill="hsl(40, 55%, 44%)" /></symbol>
 <symbol id="junk-999" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 50 50"><polygon points="0,0 50,0 50,20 35,19 0,17 0,0" fill="hsl(350, 99%, 94%)" /><polygon points="50,50 0,50 0,17 35,19 50,20 50,50" fill="hsl(40, 55%, 51%)" /></symbol>
+<symbol id="topo-icon" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 50 50"><path d="M5,40 Q15,35 25,40 T45,40" stroke="currentColor" stroke-width="2" fill="none" /><path d="M5,30 Q15,25 25,30 T45,30" stroke="currentColor" stroke-width="2" fill="none" /><path d="M5,20 Q15,15 25,20 T45,20" stroke="currentColor" stroke-width="2" fill="none" /><path d="M5,10 Q15,5 25,10 T45,10" stroke="currentColor" stroke-width="2" fill="none" /></symbol>
 </defs>
 </svg>
 		</span>
@@ -2113,15 +2539,18 @@
 		<script src="js/generators/junk-emojis.js"></script>
 		<script src="js/generators/visual-noise.js"></script>
 		<script src="js/generators/space-hard-mode.js"></script>
+		<script src="js/generators/pattern-display.js"></script>
 		<script src="js/generators/direction-pair-chooser.js"></script>
 		<script src="js/generators/incorrect-directions.js"></script>
 		<script src="js/generators/direction.js"></script>
+		<script src="js/generators/multi-dimensional.js"></script>
 		<script src="js/generators/meta.js"></script>
 		<script src="js/generators/distinction.js"></script>
 		<script src="js/generators/linear.js"></script>
 		<script src="js/generators/syllogism.js"></script>
 		<script src="js/generators/binary.js"></script>
 		<script src="js/generators/analogy.js"></script>
+		<script src="js/generators/mixed-mode.js"></script>
 		<script src="js/generators/banned.js"></script>
 		<script src="js/generators/stimuli.js"></script>
 		<script src="js/generators/premise-html.js"></script>

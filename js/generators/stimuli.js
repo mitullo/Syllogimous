@@ -50,6 +50,27 @@ function createVisualNoiseTag() {
     return `[vnoise]${id},${splits}[/vnoise]`;
 }
 
+let topoStimulusNonce = 0;
+function createTopoTag(excludePalettes = []) {
+    const splits = savedata.visualNoiseSplits;
+    const excludeSet = new Set(excludePalettes || []);
+    let attempts = 0;
+    let id, paletteIdx;
+    // Retry until we find a seed that produces a non-excluded palette
+    do {
+        id = ((++topoStimulusNonce * 0x9e3779b1) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+        if (typeof TopoMap !== 'undefined') {
+            const mixed = TopoMap.mix32(id);
+            paletteIdx = TopoMap.mix32(mixed ^ 0xcafebabe) % TopoMap.PALETTES.length;
+        } else {
+            paletteIdx = -1; // Fallback if TopoMap not loaded
+        }
+        attempts++;
+    } while (excludeSet.has(paletteIdx) && attempts < 100);
+    const excludeStr = excludePalettes.length ? `,${excludePalettes.join(',')}` : '';
+    return `[topo]${id},${splits}${excludeStr}[/topo]`;
+}
+
 function maxStimuliAllowed() {
     const stimuliConfigs = createStimuliConfigs();
     return stimuliConfigs.reduce((a, b) => Math.min(a, b.limit), 999) - 1;
@@ -85,6 +106,25 @@ function createStimuliConfigs() {
         stimuliConfigs.push({
             limit: 1000,
             generate: () => createVisualNoiseTag(),
+        });
+    };
+    if (savedata.useTopo) {
+        const usedTopoPalettes = [];
+        stimuliConfigs.push({
+            limit: 1000,
+            generate: () => {
+                // Generate a tag with excluded palettes to ensure variety within question
+                const tag = createTopoTag([...usedTopoPalettes]);
+                // Parse the seed from the tag to determine which palette will be used
+                const match = tag.match(/\[topo\](\d+),/);
+                if (match && typeof TopoMap !== 'undefined') {
+                    const seed = parseInt(match[1], 10);
+                    const mixed = TopoMap.mix32(seed);
+                    const paletteIdx = TopoMap.mix32(mixed ^ 0xcafebabe) % TopoMap.PALETTES.length;
+                    usedTopoPalettes.push(paletteIdx);
+                }
+                return tag;
+            },
         });
     };
     if (savedata.useGarbageWords) {

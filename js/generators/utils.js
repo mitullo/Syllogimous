@@ -23,6 +23,33 @@ function coinFlip() {
     return Math.random() > 0.5;
 }
 
+function negationRoll() {
+    if (!savedata.enableNegation) {
+        return false;
+    }
+    const freq = savedata.negationFrequency || 50;
+    return Math.random() * 100 < freq;
+}
+
+// Apply conclusion negation if enabled - wraps the conclusion in a "Not" form
+// and flips the validity. This is actual negation, not inversion.
+// Returns [conclusionHTML, isValid] tuple
+function applyConclusionNegation(conclusion, isValid, premiseObj) {
+    if (!savedata.enableConclusionNegation || !conclusion || !premiseObj) {
+        return [conclusion, isValid];
+    }
+
+    // Use frequency setting (default 50%)
+    const freq = savedata.conclusionNegationFrequency || 50;
+    if (Math.random() * 100 < freq) {
+        const negatedConclusion = createNegatedConclusionHTML(premiseObj, false);
+        // Negation flips the validity - "A is Not west of B" is true when "A is west of B" is false
+        return [negatedConclusion, !isValid];
+    }
+
+    return [conclusion, isValid];
+}
+
 function randomInclusive(start, end) {
     if (start >= end) {
         return start;
@@ -61,7 +88,15 @@ function getPremisesFor(key, defaultQuota) {
 }
 
 function pickNegatable(cs) {
-    return savedata.enableNegation ? pickRandomItems(cs, 1).picked[0] : cs[0];
+    if (!savedata.enableNegation) {
+        return cs[0];
+    }
+    const freq = savedata.negationFrequency || 50;
+    // For 50% frequency, use random pick. Otherwise, weighted choice based on frequency
+    if (Math.random() * 100 < freq) {
+        return pickRandomItems(cs, 1).picked[0];
+    }
+    return cs[0];
 }
 
 function interleaveArrays(arr1, arr2) {

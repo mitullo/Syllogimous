@@ -98,10 +98,16 @@ class Direction2D {
     }
 
     hardModeAllowed() {
+        if (this.enableAnchor) {
+            return savedata.anchorSpaceHardModeLevel > 0;
+        }
         return this.enableHardMode;
     }
 
     hardModeLevel() {
+        if (this.enableAnchor) {
+            return savedata.anchorSpaceHardModeLevel;
+        }
         return savedata.space2DHardModeLevel;
     }
 
@@ -198,7 +204,7 @@ class Direction4D {
     }
 
     getName() {
-        return "Space Time";
+        return "Space 4D";
     }
 
     hardModeAllowed() {
@@ -273,9 +279,10 @@ class DirectionQuestion {
         let [wordCoordMap, neighbors, premises, usedDirCoords] = [];
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
         const branchesAllowed = Math.random() < 0.75;
+        let anchorWords = null;
         while (true) {
             if (this.generator.shouldUseAnchor()) {
-                [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMapAnchor(length, branchesAllowed);
+                [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchor(length, branchesAllowed);
             } else if (numInterleaved > 0) {
                 [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMapInterleaved(length);
             } else {
@@ -301,21 +308,23 @@ class DirectionQuestion {
         }
 
         let isValid;
+        let conclusionObj;
         if (coinFlip()) { // correct
             isValid = true;
-            conclusion = this.generator.createDirectionStatement(startWord, endWord, conclusionCoord);
+            conclusionObj = this.generator.createDirectionStatement(startWord, endWord, conclusionCoord);
         }
         else {            // wrong
             isValid = false;
             const incorrectCoord = this.incorrectDirections.chooseIncorrectCoord(usedDirCoords, conclusionCoord, diffCoord, hardModeDimensions);
-            conclusion = this.generator.createDirectionStatement(startWord, endWord, incorrectCoord);
+            conclusionObj = this.generator.createDirectionStatement(startWord, endWord, incorrectCoord);
         }
 
         if (numInterleaved === 0) {
             premises = scramble(premises);
         }
-        premises = premises.map(p => createPremiseHTML(p));
-        conclusion = createBasicPremiseHTML(conclusion);
+        premises = premises.map((p, i) => createPremiseHTML(p, true, i));
+        conclusion = createBasicPremiseHTML(conclusionObj);
+        [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj);
         const countdown = this.generator.getCountdown();
         const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
         let modifiers = [];
@@ -325,6 +334,12 @@ class DirectionQuestion {
         if (numInterleaved > 0) {
             modifiers.push(`interleave`);
         }
+        // Generate pattern for Anchor Space v2
+        let pattern = null;
+        if (this.generator.getName() === "Anchor Space v2") {
+            pattern = this.generator.generatePattern(wordCoordMap, anchorWords);
+        }
+
         return {
             category: this.generator.getName(),
             type: normalizeString(this.generator.getName()),
@@ -337,6 +352,7 @@ class DirectionQuestion {
             operations,
             conclusion,
             ...(countdown && { countdown }),
+            ...(pattern && { pattern }),
         }
     }
 
@@ -379,7 +395,7 @@ class DirectionQuestion {
         }
         conclusion += analogyTo(c, d);
 
-        premises = premises.map(p => createPremiseHTML(p));
+        premises = premises.map((p, i) => createPremiseHTML(p, true, i));
         const countdown = this.generator.getCountdown();
         const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
         let modifiers = [];
@@ -509,26 +525,78 @@ class DirectionQuestion {
     }
 
     createWordMapAnchor(length, branchesAllowed) {
-        const star = '[svg]0[/svg]';
-        const circle = '[svg]1[/svg]';
-        const triangle = '[svg]2[/svg]';
-        const heart = '[svg]3[/svg]';
+        // For Anchor Space v2, use normal words instead of [svg] tag words
+        const isV2 = this.generator.getName() === 'Anchor Space v2';
+
+        let star, circle, triangle, heart, center, ne, nw, sw;
+        if (isV2) {
+            // Use normal words for v2 - pattern will assign shapes later
+            // Create 8 words to allow up to 8 shapes (center + 4 cardinal + 3 diagonal)
+            const normalWords = createStimuli(8);
+            star = normalWords[0];      // [0, 1] - North
+            circle = normalWords[1];    // [1, 0] - East
+            triangle = normalWords[2];  // [-1, 0] - West
+            heart = normalWords[3];     // [0, -1] - South
+            center = normalWords[4];    // [0, 0] - Center
+            ne = normalWords[5];        // [1, 1] - Northeast
+            nw = normalWords[6];        // [-1, 1] - Northwest
+            sw = normalWords[7];        // [-1, -1] - Southwest
+        } else {
+            // Classic anchor space uses [svg] tag words
+            star = '[svg]0[/svg]';
+            circle = '[svg]1[/svg]';
+            triangle = '[svg]2[/svg]';
+            heart = '[svg]3[/svg]';
+        }
 
         let result;
         for (let i = 0; i < 10; i++) {
-            const words = createStimuli(length, [star, circle, triangle, heart]);
+            const excludedWords = isV2 ? [star, circle, triangle, heart, center, ne, nw, sw] : [star, circle, triangle, heart];
+            const words = createStimuli(length, excludedWords);
             let wordCoordMap = {
                 [star]: [0, 1],
                 [circle]: [1, 0],
                 [triangle]: [-1, 0],
                 [heart]: [0, -1],
             };
+            if (isV2) {
+                wordCoordMap[center] = [0, 0];
+                wordCoordMap[ne] = [1, 1];
+                wordCoordMap[nw] = [-1, 1];
+                wordCoordMap[sw] = [-1, -1];
+            }
 
-            let starters = [star, circle, triangle, heart];
+            let starters = isV2 ? [star, circle, triangle, heart, center, ne, nw, sw] : [star, circle, triangle, heart];
             shuffle(starters);
-            const bannedFromBranching = [starters[1], starters[2], starters[3]];
+            const bannedFromBranching = isV2 ? [starters[1], starters[2], starters[3], starters[4], starters[5], starters[6], starters[7]] : [starters[1], starters[2], starters[3]];
             let neighbors;
-            if (branchesAllowed) {
+            if (isV2) {
+                // For V2 with 8 words, create neighbors for all 8
+                if (branchesAllowed) {
+                    neighbors = {
+                        [starters[0]]: [starters[1], starters[2], starters[3], starters[4], starters[5], starters[6], starters[7]],
+                        [starters[1]]: [starters[0]],
+                        [starters[2]]: [starters[0]],
+                        [starters[3]]: [starters[0]],
+                        [starters[4]]: [starters[0]],
+                        [starters[5]]: [starters[0]],
+                        [starters[6]]: [starters[0]],
+                        [starters[7]]: [starters[0]],
+                    };
+                } else {
+                    // Non-branching: center connects to 4 cardinals, diagonals connect to adjacent cardinals
+                    neighbors = {
+                        [starters[0]]: [starters[1], starters[2], starters[4], starters[6]],
+                        [starters[1]]: [starters[0], starters[3], starters[5]],
+                        [starters[2]]: [starters[0], starters[7]],
+                        [starters[3]]: [starters[1]],
+                        [starters[4]]: [starters[0]],
+                        [starters[5]]: [starters[1]],
+                        [starters[6]]: [starters[0]],
+                        [starters[7]]: [starters[2]],
+                    };
+                }
+            } else if (branchesAllowed) {
                 neighbors = {
                     [starters[0]]: [starters[1], starters[2], starters[3]],
                     [starters[1]]: [starters[0]],
@@ -546,11 +614,16 @@ class DirectionQuestion {
 
             result = this.buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed, bannedFromBranching);
             const anchorConnections = starters.map(s => neighbors[s].length).reduce((a, b) => a + b, 0);
-            if (anchorConnections >= 8) {
+            // For V2 with 8 words: need 14 connections (branching) or 12 (non-branching)
+            // For classic with 4 words: need 8 connections (branching) or 6 (non-branching)
+            const requiredConnections = isV2 ? (branchesAllowed ? 14 : 12) : (branchesAllowed ? 8 : 6);
+            if (anchorConnections >= requiredConnections) {
                 break;
             }
         }
-        return result;
+        // Return anchor words for V2 so generatePattern can use only those
+        const anchorWordsList = isV2 ? [star, circle, triangle, heart, center, ne, nw, sw] : [star, circle, triangle, heart];
+        return [...result, anchorWordsList];
     }
 
     buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed, bannedFromBranching=[]) {
@@ -604,8 +677,117 @@ function createDirection4DGenerator(length) {
 
 function createAnchorSpaceGenerator(length) {
     return {
-        question: new DirectionQuestion(new Direction2D(false, true)),
+        question: new DirectionQuestion(new Direction2D(true, true)),
         premiseCount: getPremisesFor('overrideAnchorSpacePremises', length),
         weight: savedata.overrideAnchorSpaceWeight,
+    };
+}
+
+class AnchorSpaceV2 {
+    constructor() {
+        this.shapeColors = [
+            { name: 'Red', fill: '#e74c3c', stroke: '#c0392b' },
+            { name: 'Blue', fill: '#3498db', stroke: '#2980b9' },
+            { name: 'Green', fill: '#2ecc71', stroke: '#27ae60' },
+            { name: 'Yellow', fill: '#f1c40f', stroke: '#f39c12' },
+            { name: 'Purple', fill: '#9b59b6', stroke: '#8e44ad' },
+            { name: 'Orange', fill: '#e67e22', stroke: '#d35400' },
+            { name: 'Cyan', fill: '#1abc9c', stroke: '#16a085' },
+            { name: 'Pink', fill: '#fd79a8', stroke: '#e84393' }
+        ];
+    }
+
+    getShapeSVG(index, x, y, size) {
+        const color = this.shapeColors[index % this.shapeColors.length];
+        const shapes = [
+            // Circle
+            `<circle cx="${x}" cy="${y}" r="${size/2}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="2"/>`,
+            // Square
+            `<rect x="${x-size/2}" y="${y-size/2}" width="${size}" height="${size}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="2"/>`,
+            // Triangle
+            `<polygon points="${x},${y-size/2} ${x+size/2},${y+size/2} ${x-size/2},${y+size/2}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="2"/>`,
+            // Diamond
+            `<polygon points="${x},${y-size/2} ${x+size/2},${y} ${x},${y+size/2} ${x-size/2},${y}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="2"/>`,
+            // Hexagon
+            `<polygon points="${x-size/3},${y-size/2} ${x+size/3},${y-size/2} ${x+size/2},${y} ${x+size/3},${y+size/2} ${x-size/3},${y+size/2} ${x-size/2},${y}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="2"/>`,
+            // Star
+            `<polygon points="${x},${y-size/2} ${x+size/6},${y-size/6} ${x+size/2},${y-size/6} ${x+size/4},${y+size/8} ${x+size/3},${y+size/2} ${x},${y+size/4} ${x-size/3},${y+size/2} ${x-size/4},${y+size/8} ${x-size/2},${y-size/6} ${x-size/6},${y-size/6}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="2"/>`
+        ];
+        return shapes[index % shapes.length];
+    }
+
+    generatePattern(wordCoordMap, anchorWords) {
+        // Only select from anchor words to avoid coordinate conflicts with dynamically added words
+        const words = anchorWords || Object.keys(wordCoordMap).slice(0, 8);
+        const numShapes = Math.min(words.length, savedata.anchorSpaceV2ShapeCount || 4);
+        const shapeNames = ['circle', 'square', 'triangle', 'diamond', 'hexagon', 'star'];
+
+        // Shuffle words to get random selection each time
+        const shuffledWords = shuffle([...words]);
+        const selectedWords = shuffledWords.slice(0, numShapes);
+
+        // Shuffle colors and shapes for random assignment
+        const shuffledColors = shuffle([...this.shapeColors]);
+        const shuffledShapes = shuffle([...shapeNames]);
+
+        // Assign colors and shapes to words randomly
+        const pattern = {};
+        for (let i = 0; i < numShapes; i++) {
+            const word = selectedWords[i];
+            const color = shuffledColors[i % shuffledColors.length];
+            const shape = shuffledShapes[i % shuffledShapes.length];
+            pattern[word] = { color, shape, coord: wordCoordMap[word] };
+        }
+
+        return pattern;
+    }
+
+    getName() {
+        return "Anchor Space v2";
+    }
+
+    hardModeAllowed() {
+        return savedata.anchorSpaceV2HardModeLevel > 0;
+    }
+
+    hardModeLevel() {
+        return savedata.anchorSpaceV2HardModeLevel;
+    }
+
+    getCountdown() {
+        return savedata.overrideAnchorSpaceV2Time;
+    }
+
+    shouldUseAnchor() {
+        return true;
+    }
+
+    initialCoord() {
+        return [0, 0];
+    }
+
+    pickDirection(baseWord, neighbors, wordCoordMap) {
+        return pickWeightedRandomDirection(dirCoords.slice(1), baseWord, neighbors, wordCoordMap);
+    }
+
+    createDirectionStatement(a, b, dirCoord) {
+        const direction = dirStringFromCoord(dirCoord);
+        const reverseDirection = dirStringFromCoord(inverse(dirCoord));
+        return {
+            start: b,
+            end: a,
+            relation: `is ${direction} of`,
+            reverse: `is ${reverseDirection} of`,
+            relationMinimal: dirStringMinimal(dirCoord),
+            reverseMinimal: dirStringMinimal(inverse(dirCoord)),
+        };
+    }
+}
+
+function createAnchorSpaceV2Generator(length) {
+    return {
+        question: new DirectionQuestion(new AnchorSpaceV2()),
+        premiseCount: getPremisesFor('overrideAnchorSpaceV2Premises', length),
+        weight: savedata.overrideAnchorSpaceV2Weight,
     };
 }

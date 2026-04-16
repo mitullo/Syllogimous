@@ -49,6 +49,8 @@ class AnalogyQuestion {
             generators.push(createDirection4DGenerator(length));
         if (savedata.enableAnchorSpace)
             generators.push(createAnchorSpaceGenerator(length));
+        if (savedata.enableAnchorSpaceV2)
+            generators.push(createAnchorSpaceV2Generator(length));
 
         const totalWeight = generators.reduce((sum, item) => sum + item.weight, 0);
         const randomValue = Math.random() * totalWeight;
