@@ -156,8 +156,18 @@ function createMultiDim5DGenerator(length) {
                     conclusionObj = createMultiDimStatement(startWord, endWord, normalizedDiff, 5);
                 } else {
                     const wrongCoord = [...normalizedDiff];
-                    const axisToChange = Math.floor(Math.random() * 4);
-                    wrongCoord[axisToChange] += Math.random() < 0.5 ? 1 : -1;
+                    
+                    // Check for interference (sophisticated false conclusion)
+                    const interferenceLevel = savedata.space5DInterference || 0;
+                    if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
+                        // Keep spatial dimensions correct, only change time dimension
+                        const currentTime = wrongCoord[3];
+                        const timeOptions = [-1, 0, 1].filter(t => t !== currentTime);
+                        wrongCoord[3] = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+                    } else {
+                        const axisToChange = Math.floor(Math.random() * 4);
+                        wrongCoord[axisToChange] += Math.random() < 0.5 ? 1 : -1;
+                    }
                     conclusionObj = createMultiDimStatement(startWord, endWord, wrongCoord, 5);
                 }
 
@@ -224,8 +234,18 @@ function createMultiDim6DGenerator(length) {
                     conclusionObj = createMultiDimStatement(startWord, endWord, normalizedDiff, 6);
                 } else {
                     const wrongCoord = [...normalizedDiff];
-                    const axisToChange = Math.floor(Math.random() * 4);
-                    wrongCoord[axisToChange] += Math.random() < 0.5 ? 1 : -1;
+                    
+                    // Check for interference (sophisticated false conclusion)
+                    const interferenceLevel = savedata.space6DInterference || 0;
+                    if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
+                        // Keep spatial dimensions correct, only change time dimension
+                        const currentTime = wrongCoord[3];
+                        const timeOptions = [-1, 0, 1].filter(t => t !== currentTime);
+                        wrongCoord[3] = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+                    } else {
+                        const axisToChange = Math.floor(Math.random() * 4);
+                        wrongCoord[axisToChange] += Math.random() < 0.5 ? 1 : -1;
+                    }
                     conclusionObj = createMultiDimStatement(startWord, endWord, wrongCoord, 6);
                 }
 

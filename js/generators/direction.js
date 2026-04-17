@@ -359,7 +359,28 @@ class DirectionQuestion {
         }
         else {            // wrong
             isValid = false;
-            const incorrectCoord = this.incorrectDirections.chooseIncorrectCoord(usedDirCoords, conclusionCoord, diffCoord, hardModeDimensions);
+            let incorrectCoord;
+            
+            // Check for interference (sophisticated false conclusion)
+            // For 4D+: keep spatial dimensions correct, only change higher dimensions
+            const interferenceLevel = this.getInterferenceLevel();
+            const coordLength = conclusionCoord.length;
+            if (interferenceLevel > 0 && coordLength > 3 && Math.random() * 100 < interferenceLevel) {
+                // Create sophisticated false conclusion: spatial matches, higher dimension wrong
+                incorrectCoord = [...conclusionCoord];
+                // Change only the time dimension (index 3) to a different valid value
+                const currentTime = incorrectCoord[3];
+                const timeOptions = [-1, 0, 1].filter(t => t !== currentTime);
+                incorrectCoord[3] = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+            } else if (interferenceLevel > 0 && coordLength === 3 && Math.random() * 100 < interferenceLevel) {
+                // 3D interference: keep X and Y correct, only change Z (above/below)
+                incorrectCoord = [...conclusionCoord];
+                const currentZ = incorrectCoord[2];
+                const zOptions = [-1, 0, 1].filter(z => z !== currentZ);
+                incorrectCoord[2] = zOptions[Math.floor(Math.random() * zOptions.length)];
+            } else {
+                incorrectCoord = this.incorrectDirections.chooseIncorrectCoord(usedDirCoords, conclusionCoord, diffCoord, hardModeDimensions);
+            }
             conclusionObj = this.generator.createDirectionStatement(startWord, endWord, incorrectCoord);
         }
 
@@ -470,6 +491,20 @@ class DirectionQuestion {
             conclusion,
             ...(countdown && { countdown }),
         }
+    }
+
+    getInterferenceLevel() {
+        const name = this.generator.getName();
+        if (name.includes('Three D') || name.includes('3D')) {
+            return savedata.space3DInterference || 0;
+        } else if (name.includes('4D')) {
+            return savedata.space4DInterference || 0;
+        } else if (name.includes('Five D') || name.includes('5D')) {
+            return savedata.space5DInterference || 0;
+        } else if (name.includes('Six D') || name.includes('6D')) {
+            return savedata.space6DInterference || 0;
+        }
+        return 0;
     }
 
     getNumTransformsSplit(numPremises) {
