@@ -3445,6 +3445,37 @@ textarea:focus-visible {
     border-color: rgba(200, 148, 255, 0.2);
 }
 
+/* Discord button */
+.settings-menu-btn.discord-btn {
+    background: linear-gradient(145deg, rgba(88, 101, 242, 0.2), rgba(88, 101, 242, 0.08));
+    border-color: rgba(88, 101, 242, 0.35);
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem;
+}
+
+.settings-menu-btn.discord-btn:hover {
+    background: linear-gradient(145deg, rgba(88, 101, 242, 0.3), rgba(88, 101, 242, 0.15));
+    border-color: rgba(88, 101, 242, 0.5);
+    box-shadow: 0 12px 24px rgba(88, 101, 242, 0.25);
+}
+
+.settings-menu-btn.discord-btn .discord-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    filter: brightness(0) invert(1);
+}
+
+.settings-menu-btn.discord-btn .btn-label {
+    color: #fff;
+    font-family: "Roboto", "Segoe UI", system-ui, sans-serif;
+    letter-spacing: 0.05em;
+}
+
 /* Back button */
 .settings-back-btn {
     display: none;
@@ -3891,6 +3922,16 @@ textarea:focus-visible {
 .light-mode .settings-menu-btn[data-section="advanced-section"] {
     background: linear-gradient(145deg, rgba(200, 148, 255, 0.25), rgba(200, 148, 255, 0.1));
     border-color: rgba(200, 148, 255, 0.4);
+}
+
+.light-mode .settings-menu-btn.discord-btn {
+    background: linear-gradient(145deg, rgba(88, 101, 242, 0.15), rgba(88, 101, 242, 0.08));
+    border-color: rgba(88, 101, 242, 0.25);
+}
+
+.light-mode .settings-menu-btn.discord-btn:hover {
+    background: linear-gradient(145deg, rgba(88, 101, 242, 0.25), rgba(88, 101, 242, 0.15));
+    border-color: rgba(88, 101, 242, 0.4);
 }
 
 /* Light-mode timer controls neutral styling */
