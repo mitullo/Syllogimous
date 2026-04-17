@@ -34,7 +34,7 @@ function negationRoll() {
 // Apply conclusion negation if enabled - wraps the conclusion in a "Not" form
 // and flips the validity. This is actual negation, not inversion.
 // Returns [conclusionHTML, isValid] tuple
-function applyConclusionNegation(conclusion, isValid, premiseObj) {
+function applyConclusionNegation(conclusion, isValid, premiseObj, pattern=null) {
     if (!savedata.enableConclusionNegation || !conclusion || !premiseObj) {
         return [conclusion, isValid];
     }
@@ -42,7 +42,7 @@ function applyConclusionNegation(conclusion, isValid, premiseObj) {
     // Use frequency setting (default 50%)
     const freq = savedata.conclusionNegationFrequency || 50;
     if (Math.random() * 100 < freq) {
-        const negatedConclusion = createNegatedConclusionHTML(premiseObj, false);
+        const negatedConclusion = createNegatedConclusionHTML(premiseObj, false, null, pattern);
         // Negation flips the validity - "A is Not west of B" is true when "A is west of B" is false
         return [negatedConclusion, !isValid];
     }

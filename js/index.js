@@ -39,6 +39,7 @@ let timerToggled = false;
 let timerTime = 30;
 let timerCount = 30;
 let timerInstance;
+let isPatternMemorizationPhase = false;
 let timerRunning = false;
 let processingAnswer = false;
 
@@ -213,6 +214,7 @@ function displayInit() {
 
     // Handle Anchor Space v2 pattern display
     if (q.pattern && q.type === 'anchor-space-v2') {
+        isPatternMemorizationPhase = true;
         displayText.innerHTML = renderPatternDisplay(q.pattern, q.premises, q.operations, q.conclusion, easy, halfMinimal);
         // Hide TRUE/FALSE buttons during pattern memorization
         disableConfirmationButtons();
@@ -224,6 +226,7 @@ function displayInit() {
         const readyBtn = document.getElementById('pattern-ready-btn');
         if (readyBtn) {
             readyBtn.addEventListener('click', () => {
+                isPatternMemorizationPhase = false;
                 showPremisesAfterPattern(q.premises, q.operations, q.conclusion, easy, halfMinimal);
             });
         }
@@ -1505,7 +1508,7 @@ timerInput.addEventListener("input", evt => {
 
 function handleCountDown() {
     timerToggled = timerToggle.checked;
-    if (timerToggled)
+    if (timerToggled && !isPatternMemorizationPhase)
         startCountDown();
     else
         stopCountDown();

@@ -280,6 +280,8 @@ class DirectionQuestion {
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
         const branchesAllowed = Math.random() < 0.75;
         let anchorWords = null;
+        let pattern = null;
+        let wordsInPremises = new Set();
         while (true) {
             if (this.generator.shouldUseAnchor()) {
                 [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchor(length, branchesAllowed);
@@ -288,7 +290,49 @@ class DirectionQuestion {
             } else {
                 [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMap(length, branchesAllowed);
             }
-            [startWord, endWord] = this.pairChooser.pickTwoDistantWords(neighbors);
+            // Extract all words that actually appear in premises
+            wordsInPremises = new Set();
+            for (const premise of premises) {
+                // Handle wide premises (arrays) and regular premises (objects)
+                const premiseList = Array.isArray(premise) ? premise : [premise];
+                for (const p of premiseList) {
+                    if (p.start) wordsInPremises.add(p.start);
+                    if (p.end) wordsInPremises.add(p.end);
+                }
+            }
+            // For Anchor Space modes, only pick conclusion words from words that appear in premises
+            if (this.generator.shouldUseAnchor() && anchorWords) {
+                // For Anchor Space v2, also generate pattern for display
+                if (this.generator.getName() === "Anchor Space v2") {
+                    pattern = this.generator.generatePattern(wordCoordMap, anchorWords);
+                }
+                // Build constrained neighbor map from only words in premises
+                const premiseNeighbors = {};
+                for (const word of wordsInPremises) {
+                    if (neighbors[word]) {
+                        premiseNeighbors[word] = neighbors[word].filter(n => wordsInPremises.has(n));
+                    }
+                }
+                // Check if we have valid pairs with distance > 1 (required by pickTwoDistantWords)
+                const hasValidPairs = this._hasValidDistantPairs(premiseNeighbors);
+                if (!hasValidPairs) {
+                    // Words in premises don't form valid distant pairs, retry with new word map
+                    continue;
+                }
+                const pairResult = this.pairChooser.pickTwoDistantWords(premiseNeighbors);
+                if (!pairResult) {
+                    // No valid pairs found, retry with new word map
+                    continue;
+                }
+                [startWord, endWord] = pairResult;
+            } else {
+                const pairResult = this.pairChooser.pickTwoDistantWords(neighbors);
+                if (!pairResult) {
+                    // No valid pairs found, retry with new word map
+                    continue;
+                }
+                [startWord, endWord] = pairResult;
+            }
             [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
             if (conclusionCoord.slice(0, 3).some(c => c !== 0)) {
                 break;
@@ -322,9 +366,9 @@ class DirectionQuestion {
         if (numInterleaved === 0) {
             premises = scramble(premises);
         }
-        premises = premises.map((p, i) => createPremiseHTML(p, true, i));
-        conclusion = createBasicPremiseHTML(conclusionObj);
-        [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj);
+        premises = premises.map((p, i) => createPremiseHTML(p, true, i, pattern));
+        conclusion = createBasicPremiseHTML(conclusionObj, true, null, pattern);
+        [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj, pattern);
         const countdown = this.generator.getCountdown();
         const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
         let modifiers = [];
@@ -334,10 +378,18 @@ class DirectionQuestion {
         if (numInterleaved > 0) {
             modifiers.push(`interleave`);
         }
-        // Generate pattern for Anchor Space v2
-        let pattern = null;
-        if (this.generator.getName() === "Anchor Space v2") {
-            pattern = this.generator.generatePattern(wordCoordMap, anchorWords);
+        // Pattern already generated above for v2, regular Anchor Space doesn't need pattern
+
+        // For V2, filter wordCoordMap to only include words that appear in premises
+        // For classic Anchor Space, keep all anchor words for the explanation grid
+        const isV2 = this.generator.getName() === "Anchor Space v2";
+        const finalWordCoordMap = isV2 ? {} : wordCoordMap;
+        if (isV2) {
+            for (const word of wordsInPremises) {
+                if (wordCoordMap[word]) {
+                    finalWordCoordMap[word] = wordCoordMap[word];
+                }
+            }
         }
 
         return {
@@ -346,7 +398,7 @@ class DirectionQuestion {
             ...((totalTransforms > 0 || savedata.widePremises) && { plen: length }),
             modifiers,
             startedAt: new Date().getTime(),
-            wordCoordMap,
+            wordCoordMap: finalWordCoordMap,
             isValid,
             premises,
             operations,
@@ -528,30 +580,74 @@ class DirectionQuestion {
         // For Anchor Space v2, use normal words instead of [svg] tag words
         const isV2 = this.generator.getName() === 'Anchor Space v2';
 
-        let star, circle, triangle, heart, center, ne, nw, sw;
         if (isV2) {
-            // Use normal words for v2 - pattern will assign shapes later
-            // Create 8 words to allow up to 8 shapes (center + 4 cardinal + 3 diagonal)
-            const normalWords = createStimuli(8);
-            star = normalWords[0];      // [0, 1] - North
-            circle = normalWords[1];    // [1, 0] - East
-            triangle = normalWords[2];  // [-1, 0] - West
-            heart = normalWords[3];     // [0, -1] - South
-            center = normalWords[4];    // [0, 0] - Center
-            ne = normalWords[5];        // [1, 1] - Northeast
-            nw = normalWords[6];        // [-1, 1] - Northwest
-            sw = normalWords[7];        // [-1, -1] - Southwest
-        } else {
-            // Classic anchor space uses [svg] tag words
-            star = '[svg]0[/svg]';
-            circle = '[svg]1[/svg]';
-            triangle = '[svg]2[/svg]';
-            heart = '[svg]3[/svg]';
+            // V2 uses shape IDs that will be mapped to actual shapes by generatePattern
+            const numShapes = savedata.anchorSpaceV2ShapeCount || 4;
+            const star = numShapes > 0 ? 'shape_0' : null;      // [0, 1] - North
+            const circle = numShapes > 1 ? 'shape_1' : null;    // [1, 0] - East
+            const triangle = numShapes > 2 ? 'shape_2' : null;  // [-1, 0] - West
+            const heart = numShapes > 3 ? 'shape_3' : null;     // [0, -1] - South
+            const center = numShapes > 4 ? 'shape_4' : null;     // [0, 0] - Center
+            const ne = numShapes > 5 ? 'shape_5' : null;           // [1, 1] - Northeast
+            const nw = numShapes > 6 ? 'shape_6' : null;           // [-1, 1] - Northwest
+            const se = numShapes > 7 ? 'shape_7' : null;           // [1, -1] - Southeast
+
+            let result;
+            for (let i = 0; i < 10; i++) {
+                const excludedWords = [star, circle, triangle, heart, center, ne, nw, se].filter(w => w);
+                const words = createStimuli(length, excludedWords);
+                let wordCoordMap = {};
+                if (star) wordCoordMap[star] = [0, 1];
+                if (circle) wordCoordMap[circle] = [1, 0];
+                if (triangle) wordCoordMap[triangle] = [-1, 0];
+                if (heart) wordCoordMap[heart] = [0, -1];
+                if (center) wordCoordMap[center] = [0, 0];
+                if (ne) wordCoordMap[ne] = [1, 1];
+                if (nw) wordCoordMap[nw] = [-1, 1];
+                if (se) wordCoordMap[se] = [1, -1];
+
+                let starters = [star, circle, triangle, heart, center, ne, nw, se].filter(w => w);
+                shuffle(starters);
+                const bannedFromBranching = starters.slice(1);
+                let neighbors;
+                const numStarters = starters.length;
+                if (branchesAllowed) {
+                    // Hub and spoke: first connects to all others
+                    neighbors = { [starters[0]]: starters.slice(1) };
+                    for (let i = 1; i < numStarters; i++) {
+                        neighbors[starters[i]] = [starters[0]];
+                    }
+                } else {
+                    // Linear chain
+                    neighbors = { [starters[0]]: numStarters > 1 ? [starters[1]] : [] };
+                    for (let i = 1; i < numStarters - 1; i++) {
+                        neighbors[starters[i]] = [starters[i-1], starters[i+1]];
+                    }
+                    if (numStarters > 1) {
+                        neighbors[starters[numStarters-1]] = [starters[numStarters-2]];
+                    }
+                }
+
+                result = this.buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed, bannedFromBranching, isV2, length);
+                const anchorConnections = starters.map(s => neighbors[s]?.length || 0).reduce((a, b) => a + b, 0);
+                const requiredConnections = branchesAllowed ? (numStarters - 1) * 2 : numStarters * 2 - 2;
+                if (anchorConnections >= requiredConnections) {
+                    break;
+                }
+            }
+            const anchorWordsList = [star, circle, triangle, heart, center, ne, nw, se].filter(w => w);
+            return [...result, anchorWordsList];
         }
+
+        // Classic Anchor Space - original working code
+        const star = '[svg]0[/svg]';
+        const circle = '[svg]1[/svg]';
+        const triangle = '[svg]2[/svg]';
+        const heart = '[svg]3[/svg]';
 
         let result;
         for (let i = 0; i < 10; i++) {
-            const excludedWords = isV2 ? [star, circle, triangle, heart, center, ne, nw, sw] : [star, circle, triangle, heart];
+            const excludedWords = [star, circle, triangle, heart];
             const words = createStimuli(length, excludedWords);
             let wordCoordMap = {
                 [star]: [0, 1],
@@ -559,44 +655,12 @@ class DirectionQuestion {
                 [triangle]: [-1, 0],
                 [heart]: [0, -1],
             };
-            if (isV2) {
-                wordCoordMap[center] = [0, 0];
-                wordCoordMap[ne] = [1, 1];
-                wordCoordMap[nw] = [-1, 1];
-                wordCoordMap[sw] = [-1, -1];
-            }
 
-            let starters = isV2 ? [star, circle, triangle, heart, center, ne, nw, sw] : [star, circle, triangle, heart];
+            let starters = [star, circle, triangle, heart];
             shuffle(starters);
-            const bannedFromBranching = isV2 ? [starters[1], starters[2], starters[3], starters[4], starters[5], starters[6], starters[7]] : [starters[1], starters[2], starters[3]];
+            const bannedFromBranching = [starters[1], starters[2], starters[3]];
             let neighbors;
-            if (isV2) {
-                // For V2 with 8 words, create neighbors for all 8
-                if (branchesAllowed) {
-                    neighbors = {
-                        [starters[0]]: [starters[1], starters[2], starters[3], starters[4], starters[5], starters[6], starters[7]],
-                        [starters[1]]: [starters[0]],
-                        [starters[2]]: [starters[0]],
-                        [starters[3]]: [starters[0]],
-                        [starters[4]]: [starters[0]],
-                        [starters[5]]: [starters[0]],
-                        [starters[6]]: [starters[0]],
-                        [starters[7]]: [starters[0]],
-                    };
-                } else {
-                    // Non-branching: center connects to 4 cardinals, diagonals connect to adjacent cardinals
-                    neighbors = {
-                        [starters[0]]: [starters[1], starters[2], starters[4], starters[6]],
-                        [starters[1]]: [starters[0], starters[3], starters[5]],
-                        [starters[2]]: [starters[0], starters[7]],
-                        [starters[3]]: [starters[1]],
-                        [starters[4]]: [starters[0]],
-                        [starters[5]]: [starters[1]],
-                        [starters[6]]: [starters[0]],
-                        [starters[7]]: [starters[2]],
-                    };
-                }
-            } else if (branchesAllowed) {
+            if (branchesAllowed) {
                 neighbors = {
                     [starters[0]]: [starters[1], starters[2], starters[3]],
                     [starters[1]]: [starters[0]],
@@ -612,26 +676,92 @@ class DirectionQuestion {
                 };
             }
 
-            result = this.buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed, bannedFromBranching);
+            result = this.buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed, bannedFromBranching, false, length);
             const anchorConnections = starters.map(s => neighbors[s].length).reduce((a, b) => a + b, 0);
-            // For V2 with 8 words: need 14 connections (branching) or 12 (non-branching)
-            // For classic with 4 words: need 8 connections (branching) or 6 (non-branching)
-            const requiredConnections = isV2 ? (branchesAllowed ? 14 : 12) : (branchesAllowed ? 8 : 6);
+            const requiredConnections = branchesAllowed ? 8 : 6;
             if (anchorConnections >= requiredConnections) {
                 break;
             }
         }
-        // Return anchor words for V2 so generatePattern can use only those
-        const anchorWordsList = isV2 ? [star, circle, triangle, heart, center, ne, nw, sw] : [star, circle, triangle, heart];
-        return [...result, anchorWordsList];
+        return [...result, [star, circle, triangle, heart]];
     }
 
-    buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed, bannedFromBranching=[]) {
+    _hasValidDistantPairs(neighbors) {
+        const words = Object.keys(neighbors);
+        if (words.length < 2) return false;
+
+        // Check if any pair has distance > 1
+        for (let i = 0; i < words.length; i++) {
+            for (let j = i + 1; j < words.length; j++) {
+                const dist = this._distanceBetween(words[i], words[j], neighbors);
+                if (dist > 1) return true;
+            }
+        }
+        return false;
+    }
+
+    _distanceBetween(start, end, neighbors) {
+        let distance = 0;
+        let layer = [start];
+        let found = {[start]: true};
+        while (layer.length > 0) {
+            distance++;
+            let newLayer = [];
+            for (const node of layer) {
+                for (const neighbor of (neighbors[node] || [])) {
+                    if (found[neighbor]) continue;
+                    if (neighbor === end) return distance;
+                    newLayer.push(neighbor);
+                    found[neighbor] = true;
+                }
+            }
+            layer = newLayer;
+        }
+        return distance;
+    }
+
+    buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed, bannedFromBranching=[], isAnchorSpaceV2=false, numPremisesNeeded=0) {
         let premiseMap = {};
         let usedDirCoords = [];
 
+        // Get the set of anchor words (shapes) - these are the words already in wordCoordMap
+        const anchorWords = new Set(Object.keys(wordCoordMap));
+        const wordsInPremises = new Set(anchorWords);
+
+        // Track which shapes have been used in premises - ensure all shapes get used
+        const usedShapes = new Set();
+        const anchorWordList = [...anchorWords];
+        let shapeIndex = 0;
+
+        // For each new word, connect it to the graph
         for (const nextWord of words) {
-            const baseWord = pickBaseWord(neighbors, branchesAllowed, bannedFromBranching);
+            let baseWord;
+            if (isAnchorSpaceV2) {
+                // For V2, cycle through shapes to ensure all appear in premises
+                // First ensure each shape is used at least once
+                if (usedShapes.size < anchorWords.size) {
+                    // Find a shape that hasn't been used yet
+                    for (const shape of anchorWordList) {
+                        if (!usedShapes.has(shape) && neighbors[shape] && neighbors[shape].length > 0) {
+                            baseWord = shape;
+                            break;
+                        }
+                    }
+                }
+                // If all shapes used or no unused shape available, pick randomly from available shapes
+                if (!baseWord) {
+                    const availableAnchors = anchorWordList.filter(w => neighbors[w] && neighbors[w].length > 0);
+                    if (availableAnchors.length > 0) {
+                        baseWord = pickRandomItems(availableAnchors, 1).picked[0];
+                    }
+                }
+                // Fallback to standard selection if no anchor available
+                if (!baseWord) {
+                    baseWord = pickBaseWord(neighbors, branchesAllowed, bannedFromBranching);
+                }
+            } else {
+                baseWord = pickBaseWord(neighbors, branchesAllowed, bannedFromBranching);
+            }
             const dirCoord = this.generator.pickDirection(baseWord, neighbors, wordCoordMap);
             wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
             premiseMap[premiseKey(baseWord, nextWord)] = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
@@ -640,6 +770,12 @@ class DirectionQuestion {
             neighbors[baseWord].push(nextWord);
             neighbors[nextWord] = neighbors[nextWord] ?? [];
             neighbors[nextWord].push(baseWord);
+            wordsInPremises.add(baseWord);
+            wordsInPremises.add(nextWord);
+            // Track that this shape was used
+            if (anchorWords.has(baseWord)) {
+                usedShapes.add(baseWord);
+            }
         }
 
         let premises = orderPremises(premiseMap, neighbors);
@@ -717,26 +853,24 @@ class AnchorSpaceV2 {
     }
 
     generatePattern(wordCoordMap, anchorWords) {
-        // Only select from anchor words to avoid coordinate conflicts with dynamically added words
-        const words = anchorWords || Object.keys(wordCoordMap).slice(0, 8);
-        const numShapes = Math.min(words.length, savedata.anchorSpaceV2ShapeCount || 4);
+        // Get all shape IDs from wordCoordMap (keys starting with 'shape_')
+        const allKeys = Object.keys(wordCoordMap);
+        const shapeIds = anchorWords?.filter(id => id.startsWith('shape_')) ||
+                        allKeys.filter(k => k.startsWith('shape_'));
+        const numShapes = shapeIds.length;
         const shapeNames = ['circle', 'square', 'triangle', 'diamond', 'hexagon', 'star'];
-
-        // Shuffle words to get random selection each time
-        const shuffledWords = shuffle([...words]);
-        const selectedWords = shuffledWords.slice(0, numShapes);
 
         // Shuffle colors and shapes for random assignment
         const shuffledColors = shuffle([...this.shapeColors]);
         const shuffledShapes = shuffle([...shapeNames]);
 
-        // Assign colors and shapes to words randomly
+        // Assign colors and shapes to ALL shape IDs
         const pattern = {};
         for (let i = 0; i < numShapes; i++) {
-            const word = selectedWords[i];
+            const shapeId = shapeIds[i];
             const color = shuffledColors[i % shuffledColors.length];
             const shape = shuffledShapes[i % shuffledShapes.length];
-            pattern[word] = { color, shape, coord: wordCoordMap[word] };
+            pattern[shapeId] = { color, shape, coord: wordCoordMap[shapeId] };
         }
 
         return pattern;

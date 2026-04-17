@@ -17,13 +17,18 @@ function orderPremises(premiseMap, neighbors) {
         if (premiseMap[key]) {
             premises.push(premiseMap[key]);
         }
-        const traversalOptions = [...neighbors[word]];
-        traversalOptions.sort((a,b) => neighbors[a].length - neighbors[b].length);
+        const wordNeighbors = neighbors[word] || [];
+        const traversalOptions = [...wordNeighbors];
+        traversalOptions.sort((a,b) => (neighbors[a] || []).length - (neighbors[b] || []).length);
         for (const neighbor of traversalOptions) {
             traverse(neighbor, word);
         }
     }
-    const start = Object.keys(neighbors).filter(word => neighbors[word].length === 1)[0];
+    const start = Object.keys(neighbors).filter(word => (neighbors[word] || []).length === 1)[0];
+    if (!start) {
+        // No valid start found (no words with exactly 1 neighbor), return premises in map order
+        return Object.values(premiseMap);
+    }
     traverse(start, null);
 
     return premises;

@@ -15,6 +15,12 @@ class DirectionPairChooser {
         const useMiddleNodes = deprioritizePoles ? oneOutOf(6) : oneOutOf(25);
         const useNearEdge = deprioritizePoles ? oneOutOf(2.5) : oneOutOf(4.5);
         const ranks = this._rankPairs(pool, neighbors);
+
+        // Return null if no valid pairs found (caller should handle this)
+        if (ranks.length === 0) {
+            return null;
+        }
+
         let startWord, endWord;
         if (Object.keys(neighbors).length <= 5) {
             [startWord, endWord] = pickRandomItems(ranks[0][1], 1).picked[0];
