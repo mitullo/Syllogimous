@@ -1,11 +1,11 @@
-function pickLinearPremise(a, b, comparison, reverseComparison, min, minRev) {
+function pickLinearPremise(a, b, comparison, reverseComparison, min, minRev, fixedOrder = false) {
     // 1. Fix the dead zone and add half-minimal mode support
     if (savedata.minimalMode || (savedata.halfMinimalMode && Math.random() < 0.5)) {
         comparison = min;
         reverseComparison = minRev;
     }
 let ps;
-if (Math.random() < 0.5) { // Forward
+if (fixedOrder || Math.random() < 0.5) { // Forward (or fixed order for backtracking)
     ps = [
         `<span class="subject">${a}</span> <span class="relation">${comparison}</span> <span class="subject">${b}</span>`,
         `<span class="subject">${a}</span> <span class="relation"><span class="is-negated">${reverseComparison}</span></span> <span class="subject">${b}</span>`,
@@ -86,17 +86,37 @@ class LinearGenerator {
         }
     }
 
-    createBacktrackingLinearPremise(a, b, options, negationOptions) {
-        if (coinFlip()) {
-            [a, b] = [b, a];
-            options = options.map(choice => -choice);
-            negationOptions = negationOptions.map(choice => -choice);
-        }
-        const choice = pickRandomItems(options, 1).picked[0] + 1;
-        const relations = [this.prev, this.equal, this.next];
-        const relationsMin = [this.prevMin, this.equalMin, this.nextMin];
+    createBacktrackingLinearPremise(a, b, options, negationOptions, isValid) {
+        // Map comparison values (-1, 0, 1) to correct relations
+        // For most modes: -1=prev, 0=equal, +1=next (e.g., less/equal/more)
+        // For reversed modes like CONTAINS_WITHIN: -1=within(next), 0=equal, +1=contains(prev)
+        const relations = [-1, 0, 1].map(i => this.getRelationForComparison(i));
+        const relationsMin = [-1, 0, 1].map(i => this.getRelationMinimalForComparison(i));
+
+        // Pick the relation from options (when isValid=true, options contains correct relation;
+        // when isValid=false, options contains incorrect relations)
+        const picked = pickRandomItems(options, 1).picked[0];
+        const choice = picked + 1;
         const negatedChoice = pickRandomItems(negationOptions.map(o => o+1).filter(x => x !== choice), 1).picked[0];
-        return pickLinearPremise(a, b, relations[choice], relations[negatedChoice], relationsMin[choice], relationsMin[negatedChoice]);
+        // Use fixedOrder=true to prevent random word swapping - we already computed the correct relation
+        return pickLinearPremise(a, b, relations[choice], relations[negatedChoice], relationsMin[choice], relationsMin[negatedChoice], true);
+    }
+
+    // Map comparison value (-1=a<b, 0=equal, 1=a>b) to the correct relation string
+    getRelationForComparison(val) {
+        // For reversed semantics (CONTAINS_WITHIN): a<b means a is within b (next relation)
+        if (this.name === 'Contains') {
+            return val === -1 ? this.next : val === 1 ? this.prev : this.equal;
+        }
+        // Standard semantics (Comparison, Temporal, etc.): a<b means a is less/before (prev relation)
+        return val === -1 ? this.prev : val === 1 ? this.next : this.equal;
+    }
+
+    getRelationMinimalForComparison(val) {
+        if (this.name === 'Contains') {
+            return val === -1 ? this.nextMin : val === 1 ? this.prevMin : this.equalMin;
+        }
+        return val === -1 ? this.prevMin : val === 1 ? this.nextMin : this.equalMin;
     }
 
     getName() {
@@ -264,9 +284,10 @@ class LinearQuestion {
         const comparison = bucketMap[a] === bucketMap[b] ? 0 : (bucketMap[a] < bucketMap[b] ? -1 : 1)
         let conclusion, isValid;
         if (coinFlip()) {
-            conclusion = this.generator.createBacktrackingLinearPremise(a, b, [comparison], [-1, 0, 1].filter(o => o !== comparison));
             isValid = true;
+            conclusion = this.generator.createBacktrackingLinearPremise(a, b, [comparison], [-1, 0, 1].filter(o => o !== comparison), isValid);
         } else {
+            isValid = false;
             let options = [-1, 0, 1].filter(o => o !== comparison);
             const distance = Math.abs(bucketMap[a] - bucketMap[b]);
             const includeZero = {
@@ -278,8 +299,7 @@ class LinearQuestion {
             if (!includeZero) {
                 options = options.filter(o => o !== 0);
             }
-            conclusion = this.generator.createBacktrackingLinearPremise(a, b, options, [comparison]);
-            isValid = false;
+            conclusion = this.generator.createBacktrackingLinearPremise(a, b, options, [comparison], isValid);
         }
 
         return [premises, conclusion, isValid, buckets, bucketMap];

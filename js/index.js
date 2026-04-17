@@ -1522,10 +1522,55 @@ let dehoverQueue = [];
 let debugBuffer = '';
 let debugMode = false;
 const DEBUG_TRIGGER = 'debug1';
+const DEBUG_TRIGGER2 = 'debug2';
 
 function toggleDebugMode() {
     debugMode = !debugMode;
     renderDebugIndicator();
+}
+
+function logSpatialMapDebug() {
+    const q = question;
+    console.log('=== SPATIAL MAP DEBUG ===');
+    console.log('Category:', q.category);
+    console.log('Type:', q.type);
+    console.log('isValid:', q.isValid);
+    console.log('Conclusion:', q.conclusion);
+    
+    if (q.bucket) {
+        console.log('Linear bucket (order matters):', q.bucket);
+    }
+    
+    if (q.buckets) {
+        console.log('Backtracking buckets (same column = same value):');
+        q.buckets.forEach((bucket, i) => {
+            console.log(`  Column ${i}: [${bucket.join(', ')}]`);
+        });
+    }
+    
+    if (q.bucketMap) {
+        console.log('Bucket map (word -> bucket index):', q.bucketMap);
+        
+        // Extract conclusion words and show their bucket positions
+        const conclusionText = q.conclusion?.replace(/<[^>]+>/g, '') || '';
+        const words = conclusionText.match(/\b[A-Z]{3,}\b/g);
+        if (words && words.length >= 2) {
+            const [a, b] = [words[0], words[1]];
+            const bucketA = q.bucketMap[a];
+            const bucketB = q.bucketMap[b];
+            console.log(`Conclusion words: ${a} (bucket ${bucketA}) vs ${b} (bucket ${bucketB})`);
+            if (bucketA !== undefined && bucketB !== undefined) {
+                const comparison = bucketA === bucketB ? 0 : (bucketA < bucketB ? -1 : 1);
+                console.log('Raw comparison value (-1=a<b, 0=equal, 1=a>b):', comparison);
+            }
+        }
+    }
+    
+    if (q.wordCoordMap) {
+        console.log('Word coordinate map:', q.wordCoordMap);
+    }
+    
+    console.log('========================');
 }
 
 function renderDebugIndicator() {
@@ -1555,11 +1600,17 @@ function handleKeyPress(event) {
     
     // Debug mode key sequence detection
     debugBuffer += event.key.toLowerCase();
-    if (debugBuffer.length > DEBUG_TRIGGER.length) {
-        debugBuffer = debugBuffer.slice(-DEBUG_TRIGGER.length);
+    const maxTriggerLen = Math.max(DEBUG_TRIGGER.length, DEBUG_TRIGGER2.length);
+    if (debugBuffer.length > maxTriggerLen) {
+        debugBuffer = debugBuffer.slice(-maxTriggerLen);
     }
     if (debugBuffer === DEBUG_TRIGGER) {
         toggleDebugMode();
+        debugBuffer = '';
+        return;
+    }
+    if (debugBuffer === DEBUG_TRIGGER2) {
+        logSpatialMapDebug();
         debugBuffer = '';
         return;
     }
