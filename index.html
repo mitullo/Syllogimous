@@ -132,7 +132,7 @@
 										<label for="p-41" style="max-width: 170px;">Enable Auto Progression</label>
 										<div class="tooltip-container" tabindex="0">
 											?
-											<div class="tooltip-text">
+											<div class="tooltip-text pos-left-50">
 												Track any questions answered<br>
 												with the timer, and<br>
 												automatically update the<br>
@@ -555,6 +555,12 @@
 											<span class="inline-premise-spinner"><input id="p-59" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
 										</span>
 									</div>
+									<div class="multi-input mt-05">
+										<span class="single-input">
+											Transforms
+											<span class="inline-premise-spinner"><input id="p-29" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
+										</span>
+									</div>
 								</div>
 								<div class="mb-1">
 									<div class="ctrl__inner">
@@ -581,6 +587,16 @@
 											<span class="inline-premise-spinner"><input id="p-60" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
 										</span>
 									</div>
+									<div class="multi-input mt-05">
+										<span class="single-input">
+											Transforms
+											<span class="inline-premise-spinner"><input id="p-30" type="number" placeholder="" min="0" max="10" value="" style="width: 3ch">lvl</span>
+										</span>
+										<span class="single-input">
+											Interference
+											<span class="inline-premise-spinner"><input id="p-30-int" type="number" placeholder="" min="0" max="100" value="0" style="width: 4ch">%</span>
+										</span>
+									</div>
 								</div>
 								<div class="mb-1">
 									<div class="ctrl__inner">
@@ -605,6 +621,16 @@
 										<span class="single-input">
 											Priority
 											<span class="inline-premise-spinner"><input id="p-61" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+									<div class="multi-input mt-05">
+										<span class="single-input">
+											Transforms
+											<span class="inline-premise-spinner"><input id="p-33" type="number" placeholder="" min="0" max="10" value="" style="width: 3ch">lvl</span>
+										</span>
+										<span class="single-input">
+											Interference
+											<span class="inline-premise-spinner"><input id="p-33-int" type="number" placeholder="" min="0" max="100" value="0" style="width: 4ch">%</span>
 										</span>
 									</div>
 								</div>
@@ -634,6 +660,16 @@
 											<span class="inline-premise-spinner"><input id="p-md5d-weight" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
 										</span>
 									</div>
+									<div class="multi-input mt-05">
+										<span class="single-input">
+											Transforms
+											<span class="inline-premise-spinner"><input id="p-33-5d" type="number" placeholder="" min="0" max="10" value="" style="width: 3ch">lvl</span>
+										</span>
+										<span class="single-input">
+											Interference
+											<span class="inline-premise-spinner"><input id="p-33-5d-int" type="number" placeholder="" min="0" max="100" value="0" style="width: 4ch">%</span>
+										</span>
+									</div>
 								</div>
 								<div class="mb-1">
 									<div class="ctrl__inner">
@@ -659,6 +695,16 @@
 										<span class="single-input">
 											Priority
 											<span class="inline-premise-spinner"><input id="p-md6d-weight" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
+										</span>
+									</div>
+									<div class="multi-input mt-05">
+										<span class="single-input">
+											Transforms
+											<span class="inline-premise-spinner"><input id="p-33-6d" type="number" placeholder="" min="0" max="10" value="" style="width: 3ch">lvl</span>
+										</span>
+										<span class="single-input">
+											Interference
+											<span class="inline-premise-spinner"><input id="p-33-6d-int" type="number" placeholder="" min="0" max="100" value="0" style="width: 4ch">%</span>
 										</span>
 									</div>
 								</div>
@@ -724,6 +770,7 @@
 									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
 										<span>UI Density</span>
 										<select id="p-density" class='select-item' onchange="handleDensityChange(event)">
+										    <option value="super-compact">Super Compact</option>
 										    <option value="compact">Compact</option>
 										    <option value="normal" selected>Normal</option>
 										    <option value="spacious">Spacious</option>
@@ -923,11 +970,15 @@
 												<label class="switch" for="p-mixed"></label>
 											</div>
 											<label for="p-mixed">Mixed Modes</label>
+											<span class="tooltip-container" tabindex="0">?
+												<div class="tooltip-text pos-left-150">
+													Combine multiple question types<br>
+													in a single question<br>
+													<br>
+													Example: Distinction + 2D Direction
+												</div>
+											</span>
 										</div>
-										<ul class="explainer">
-											<li>Combine multiple question types in a single question</li>
-											<li>Example: Distinction + 2D Direction</li>
-										</ul>
 										<div style="margin-left: 2rem; margin-top: 0.5rem;">
 											<div class="ctrl__inner">
 												<div>
@@ -946,10 +997,12 @@
 											</div>
 											<label for="p-hard-conc">Harder Conclusions</label>
 											<span class="tooltip-container" tabindex="0">?
-												<div class="tooltip-text right">
+												<div class="tooltip-text pos-left-50">
 													Avoids trivial inverse conclusions<br>
 													(e.g., if correct is North,<br>
-													wrong won't be South)
+													wrong won't be South)<br>
+													<br>
+													Works only for space D's
 												</div>
 											</span>
 										</div>
@@ -1008,11 +1061,11 @@
 										</div>
 										<div class="multi-input">
 											<span class="single-input">
-												Premise Offset
+												Premises
 												<span class="inline-premise-spinner"><input id="p-4-premises" type="number" placeholder="" min="-100" max="100" value="" style="width: 5ch">ps</span>
 											</span>
 											<span class="single-input">
-												Time Offset
+												Time
 												<span class="inline-premise-spinner"><input id="p-4-time" type="number" placeholder="" min="-600" max="600" value="" style="width: 5ch">sec</span>
 											</span>
 											<div class="tooltip-container" tabindex="0">
@@ -1096,6 +1149,12 @@
 												<span class="inline-premise-spinner"><input id="p-62" type="number" placeholder="" min="1" max="9999" value="100" style="width: 6ch">%</span>
 											</span>
 										</div>
+										<div class="multi-input mt-05">
+											<span class="single-input">
+												Transforms
+												<span class="inline-premise-spinner"><input id="p-33-anc" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
+											</span>
+										</div>
 									</div>
 									<div class="mb-1">
 										<div class="ctrl__inner mb-05">
@@ -1148,27 +1207,6 @@
 											</div>
 										</div>
 									</div>
-									<div class="mb-05">Transforms:</div>
-									<div class="mb-1">
-										<div class="multi-input">
-											<span class="single-input">
-												2D
-												<span class="inline-premise-spinner"><input id="p-29" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
-											</span>
-											<span class="single-input">
-												3D
-												<span class="inline-premise-spinner"><input id="p-30" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
-											</span>
-											<span class="single-input">
-												Space Four D
-												<span class="inline-premise-spinner"><input id="p-33" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
-											</span>
-											<span class="single-input">
-												Anchor
-												<span class="inline-premise-spinner"><input id="p-33-anc" type="number" placeholder="" min="0" max="10" value="" style="width: 5ch">lvl</span>
-											</span>
-										</div>
-									</div>
 									<div class="ctrl__inner mb-05">
 										<div>
 											<input hidden id="p-35" type="checkbox" checked>
@@ -1197,7 +1235,7 @@
 										<span>Scale</span>
 										<div class="tooltip-container" tabindex="0">
 											?
-											<div class="tooltip-text shift-left">
+											<div class="tooltip-text">
 												Shifts a word 2x away<br>
 												from another word, but only<br>
 												along one dimension (X/Y/Z).<br>
@@ -1233,7 +1271,7 @@
 										<span>Rotate</span>
 										<div class="tooltip-container" tabindex="0">
 											?
-											<div class="tooltip-text shift-left-left">
+											<div class="tooltip-text">
 												Rotates a word clockwise or<br>
 												counterclockwise around another<br>
 												word.<br>
@@ -1258,7 +1296,7 @@
 										<span>Interleave Mode</span>
 										<div class="tooltip-container" tabindex="0">
 											?
-											<div class="tooltip-text shift-left">
+											<div class="tooltip-text pos-left-50">
 											Transformations will be inserted<br>
 											in between premises, rather than<br>
 											only at the end. Requires 2+<br>
@@ -1273,13 +1311,17 @@
 												<label class="switch" for="p-9"></label>
 											</div>
 											<span>Enable Carousel Mode</span>
+											<span class="tooltip-container" tabindex="0">?
+												<div class="tooltip-text pos-center">
+													See one or more premises at a time.<br>
+													Use number input to change how<br>
+													many premises appear per page.
+												</div>
+											</span>
 											<span class="inline-premise-spinner">
 												<input id="p-9-premises" type="number" placeholder="" value="1" min="1" max="10" style="width: 5ch"> per page
 											</span>
 										</div>
-										<p class="explainer">
-											See one or more premises at a time. Use number input to change how many premises appear per page.
-										</p>
 										<div style="margin-left: 2rem; margin-top: 0.5rem;">
 											<div class="ctrl__inner mb-1">
 												<div>

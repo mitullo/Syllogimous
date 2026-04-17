@@ -616,7 +616,7 @@ function applyAppearanceSettings() {
     root.style.setProperty('--base-font-size', fontSizes[appState.fontSize] || '1rem');
     
     // UI Density - apply to multiple spacing elements
-    const densities = { compact: '0.5rem', normal: '1rem', spacious: '1.5rem' };
+    const densities = { 'super-compact': '0.25rem', compact: '0.5rem', normal: '1rem', spacious: '1.5rem' };
     const density = densities[appState.uiDensity] || '1rem';
     root.style.setProperty('--ui-padding', density);
     root.style.setProperty('--section-gap', density);
@@ -630,7 +630,7 @@ function applyAppearanceSettings() {
     // UI Density for premises - scale padding and gap
     root.style.setProperty('--premise-gap', `calc(${density} * 0.5)`);
     root.style.setProperty('--premise-padding-y', `calc(${density} * 0.25)`);
-    root.style.setProperty('--premise-padding-x', appState.uiDensity === 'compact' ? '0' : `calc(${density} * 0.25)`);
+    root.style.setProperty('--premise-padding-x', (appState.uiDensity === 'compact' || appState.uiDensity === 'super-compact') ? '0' : `calc(${density} * 0.25)`);
     
     // Theme color - sets glow, borders, buttons, and bracket colors
     const themeColor = appState.bracketColor || '#1798B0';
