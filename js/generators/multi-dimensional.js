@@ -6,23 +6,23 @@ function subCoords(a, b) {
     return b.map((c, i) => c - a[i]);
 }
 
-// Layer definitions
+// Layer definitions perfectly aligned to map vector values [-1, 0, 1] to indices [0, 1, 2]
 const temporalLayers = [
-    { name: 'was before', reverse: 'will be after', minimal: '←t', reverseMinimal: 't→' },
-    { name: 'is simultaneous with', reverse: 'is simultaneous with', minimal: '=t', reverseMinimal: '=t' },
-    { name: 'will be after', reverse: 'was before', minimal: 't→', reverseMinimal: '←t' },
+    { name: 'was before', reverse: 'will be after', minimal: '←t', reverseMinimal: 't→' }, // -1
+    { name: 'is simultaneous with', reverse: 'is simultaneous with', minimal: '=t', reverseMinimal: '=t' }, // 0
+    { name: 'will be after', reverse: 'was before', minimal: 't→', reverseMinimal: '←t' }, // 1
 ];
 
 const quantityLayers = [
-    { name: 'has more than', reverse: 'has less than', minimal: '>', reverseMinimal: '<' },
-    { name: 'has equal to', reverse: 'has equal to', minimal: '=q', reverseMinimal: '=q' },
-    { name: 'has less than', reverse: 'has more than', minimal: '<', reverseMinimal: '>' },
+    { name: 'has less than', reverse: 'has more than', minimal: '<', reverseMinimal: '>' }, // -1
+    { name: 'has equal to', reverse: 'has equal to', minimal: '=q', reverseMinimal: '=q' }, // 0
+    { name: 'has more than', reverse: 'has less than', minimal: '>', reverseMinimal: '<' }, // 1
 ];
 
 const membershipLayers = [
-    { name: 'contains', reverse: 'is within', minimal: '⊃', reverseMinimal: '⊂' },
-    { name: 'is separate from', reverse: 'is separate from', minimal: '≠m', reverseMinimal: '≠m' },
-    { name: 'is within', reverse: 'contains', minimal: '⊂', reverseMinimal: '⊃' },
+    { name: 'is within', reverse: 'contains', minimal: '⊂', reverseMinimal: '⊃' }, // -1
+    { name: 'is separate from', reverse: 'is separate from', minimal: '≠m', reverseMinimal: '≠m' }, // 0
+    { name: 'contains', reverse: 'is within', minimal: '⊃', reverseMinimal: '⊂' }, // 1
 ];
 
 // Helper to create spatial-only direction statement (extracted from dirCoord[0..2])
@@ -31,8 +31,8 @@ function createSpatialStatement(a, b, dirCoord) {
     const direction = dirStringFromCoord(spatialCoord);
     const reverseDirection = dirStringFromCoord(inverse(spatialCoord));
     return {
-        start: a,
-        end: b,
+        start: b, // Fixed: Next word is the subject
+        end: a,   // Fixed: Base word is the object
         relation: `is ${direction} of`,
         reverse: `is ${reverseDirection} of`,
         relationMinimal: dirStringMinimal(spatialCoord),
@@ -42,32 +42,30 @@ function createSpatialStatement(a, b, dirCoord) {
 
 // Create a multi-dimensional premise combining spatial and additional layers
 function createMultiDimStatement(a, b, dirCoord, dimensions) {
-    // Create spatial-only statement (don't use Direction4D's which includes time)
     const spatialStmt = createSpatialStatement(a, b, dirCoord);
     
-    // Add additional layers based on dimension count
     let layers = [spatialStmt];
     let layerMinimals = [
         savedata.minimalMode ? spatialStmt.relationMinimal : spatialStmt.relation
     ];
 
-    // 5D: Add temporal layer
+    // 5D: Add temporal layer using the actual coordinate
     if (dimensions >= 5) {
-        const temporal = temporalLayers[Math.floor(Math.random() * temporalLayers.length)];
+        const temporal = temporalLayers[dirCoord[3] + 1]; 
         layers.push(temporal);
         layerMinimals.push(savedata.minimalMode ? temporal.minimal : temporal.name);
     }
 
-    // 6D: Add quantity layer
+    // 6D: Add quantity layer using the actual coordinate
     if (dimensions >= 6) {
-        const quantity = quantityLayers[Math.floor(Math.random() * quantityLayers.length)];
+        const quantity = quantityLayers[dirCoord[4] + 1];
         layers.push(quantity);
         layerMinimals.push(savedata.minimalMode ? quantity.minimal : quantity.name);
     }
 
-    // 7D: Add membership layer
+    // 7D: Add membership layer using the actual coordinate
     if (dimensions >= 7) {
-        const membership = membershipLayers[Math.floor(Math.random() * membershipLayers.length)];
+        const membership = membershipLayers[dirCoord[5] + 1];
         layers.push(membership);
         layerMinimals.push(savedata.minimalMode ? membership.minimal : membership.name);
     }
@@ -75,35 +73,20 @@ function createMultiDimStatement(a, b, dirCoord, dimensions) {
     // Combine all layers into a single relation
     if (savedata.minimalMode) {
         return {
-            start: a,
-            end: b,
+            start: b, // Fixed
+            end: a,   // Fixed
             relation: layerMinimals.join(' '),
             reverse: layerMinimals.slice().reverse().join(' '),
             relationMinimal: layerMinimals.join(' '),
             reverseMinimal: layerMinimals.slice().reverse().join(' '),
         };
     } else {
-        // Build relation text (just the relation, no words - HTML adds start/end)
-        const fullRelations = layers.map((layer, i) => {
-            if (i === 0) {
-                // Spatial layer: already has "is X of" format
-                return layer.relation;
-            }
-            // Additional layers: just the layer name
-            return layer.name;
-        });
-        
-        // Build reverse relation
-        const reverseRelations = layers.map((layer, i) => {
-            if (i === 0) {
-                return layer.reverse;
-            }
-            return layer.reverse;
-        });
+        const fullRelations = layers.map((layer, i) => i === 0 ? layer.relation : layer.name);
+        const reverseRelations = layers.map((layer, i) => layer.reverse);
         
         return {
-            start: a,
-            end: b,
+            start: b, // Fixed
+            end: a,   // Fixed
             relation: fullRelations.join(', '),
             reverse: reverseRelations.join(', '),
             relationMinimal: layerMinimals.join(' '),
@@ -125,12 +108,22 @@ function createMultiDim5DGenerator(length) {
                 const words = createStimuli(length + 1);
                 const premises = [];
                 const neighbors = {};
-                const wordCoordMap = { [words[0]]: [0, 0, 0, 0] };
+                
+                // Maintain a 4D map for the pathfinder to prevent distance calculation crashes, 
+                // and a true 5D map for the logic.
+                const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
+                const wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0] };
                 
                 for (let i = 0; i < length; i++) {
                     const baseWord = words[i];
                     const nextWord = words[i + 1];
-                    const dirCoord = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap);
+                    const dirCoord4D = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap4D);
+                    
+                    // Generate actual coordinate for 5th dimension
+                    const dim5 = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
+                    const dirCoord = [...dirCoord4D, dim5];
+                    
+                    wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
                     wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
                     
                     const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 5);
@@ -144,9 +137,9 @@ function createMultiDim5DGenerator(length) {
                 const endIdx = startIdx + 1 + Math.floor(Math.random() * (length - startIdx - 1));
                 const startWord = words[startIdx];
                 const endWord = words[endIdx];
-                const diffCoord = subCoords(wordCoordMap[endWord], wordCoordMap[startWord]);
                 
-                // Normalize diffCoord to direction vector (like Direction4D does)
+                // Fixed: Subcoords evaluates B - A. To get End - Start, pass Start then End.
+                const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
                 const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
                 
                 let isValid = coinFlip();
@@ -156,17 +149,17 @@ function createMultiDim5DGenerator(length) {
                     conclusionObj = createMultiDimStatement(startWord, endWord, normalizedDiff, 5);
                 } else {
                     const wrongCoord = [...normalizedDiff];
-                    
-                    // Check for interference (sophisticated false conclusion)
                     const interferenceLevel = savedata.space5DInterference || 0;
+                    
                     if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
-                        // Keep spatial dimensions correct, only change time dimension
-                        const currentTime = wrongCoord[3];
-                        const timeOptions = [-1, 0, 1].filter(t => t !== currentTime);
-                        wrongCoord[3] = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+                        const currentVal = wrongCoord[3];
+                        const options = [-1, 0, 1].filter(v => v !== currentVal);
+                        wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
                     } else {
-                        const axisToChange = Math.floor(Math.random() * 4);
-                        wrongCoord[axisToChange] += Math.random() < 0.5 ? 1 : -1;
+                        const axisToChange = Math.floor(Math.random() * 5);
+                        const currentVal = wrongCoord[axisToChange];
+                        const options = [-1, 0, 1].filter(v => v !== currentVal);
+                        wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
                     }
                     conclusionObj = createMultiDimStatement(startWord, endWord, wrongCoord, 5);
                 }
@@ -203,12 +196,20 @@ function createMultiDim6DGenerator(length) {
                 const words = createStimuli(length + 1);
                 const premises = [];
                 const neighbors = {};
-                const wordCoordMap = { [words[0]]: [0, 0, 0, 0] };
+                
+                const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
+                const wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0, 0] };
                 
                 for (let i = 0; i < length; i++) {
                     const baseWord = words[i];
                     const nextWord = words[i + 1];
-                    const dirCoord = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap);
+                    const dirCoord4D = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap4D);
+                    
+                    const dim5 = Math.floor(Math.random() * 3) - 1;
+                    const dim6 = Math.floor(Math.random() * 3) - 1;
+                    const dirCoord = [...dirCoord4D, dim5, dim6];
+                    
+                    wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
                     wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
                     
                     const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
@@ -222,9 +223,8 @@ function createMultiDim6DGenerator(length) {
                 const endIdx = startIdx + 1 + Math.floor(Math.random() * (length - startIdx - 1));
                 const startWord = words[startIdx];
                 const endWord = words[endIdx];
-                const diffCoord = subCoords(wordCoordMap[endWord], wordCoordMap[startWord]);
                 
-                // Normalize diffCoord to direction vector
+                const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
                 const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
                 
                 let isValid = coinFlip();
@@ -234,17 +234,17 @@ function createMultiDim6DGenerator(length) {
                     conclusionObj = createMultiDimStatement(startWord, endWord, normalizedDiff, 6);
                 } else {
                     const wrongCoord = [...normalizedDiff];
-                    
-                    // Check for interference (sophisticated false conclusion)
                     const interferenceLevel = savedata.space6DInterference || 0;
+                    
                     if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
-                        // Keep spatial dimensions correct, only change time dimension
-                        const currentTime = wrongCoord[3];
-                        const timeOptions = [-1, 0, 1].filter(t => t !== currentTime);
-                        wrongCoord[3] = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+                        const currentVal = wrongCoord[3];
+                        const options = [-1, 0, 1].filter(v => v !== currentVal);
+                        wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
                     } else {
-                        const axisToChange = Math.floor(Math.random() * 4);
-                        wrongCoord[axisToChange] += Math.random() < 0.5 ? 1 : -1;
+                        const axisToChange = Math.floor(Math.random() * 6);
+                        const currentVal = wrongCoord[axisToChange];
+                        const options = [-1, 0, 1].filter(v => v !== currentVal);
+                        wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
                     }
                     conclusionObj = createMultiDimStatement(startWord, endWord, wrongCoord, 6);
                 }

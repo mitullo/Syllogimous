@@ -204,7 +204,7 @@ class Direction4D {
     }
 
     getName() {
-        return "Space 4D";
+        return "SPACE FOUR D";
     }
 
     hardModeAllowed() {

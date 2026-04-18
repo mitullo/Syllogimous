@@ -178,9 +178,14 @@ class SpaceHardMode {
             plane.sort();
             let [m, n] = plane;
             dimensionsUsed.push.apply(dimensionsUsed, plane.filter(d => dimensionsUsed.indexOf(d) == -1));
+            // Track whether the plane axes were swapped from the standard sorted order.
+            // When axes are swapped (e.g., XZ→ZX), the rotation direction is reversed,
+            // so we need to swap the CW/CCW labels to keep them visually correct.
+            let swappedAxes = false;
             if (m === 0 && n === 2) {
-                // ZX matches the right-hand rule for rotation, XZ (the reverse) does not
+                // ZX plane: swap to match right-hand rule convention (planeName = ZX)
                 [m, n] = [n, m];
+                swappedAxes = true;
             }
             const planeName = dimensionNames[m] + dimensionNames[n];
             const planeOp = (dimensionPool.length === 2) ? 'rotated' : (`<span class="highlight">${planeName}</span>-rotated`);
@@ -189,7 +194,10 @@ class SpaceHardMode {
             let diffN = p2[n] - p1[n];
             newPoint[m] -= diffM;
             newPoint[n] -= diffN;
-            if (coinFlip()) {
+            // When axes are swapped, the mathematical rotation direction is reversed,
+            // so we swap the CW/CCW labels to match the visual direction on screen.
+            const isClockwise = coinFlip() !== swappedAxes;
+            if (isClockwise) {
                 newPoint[m] += diffN
                 newPoint[n] += -diffM
                 operations.push(createRotationTemplate(a, b, planeOp, planeName, `<span class="pos-degree">90°↷</span>`));

@@ -151,26 +151,42 @@ function createExplanation3D(grid, filler, pattern = null) {
 
 function createExplanation4D(grid, pattern = null) {
     const filler = createFiller(grid);
-    let s = '<div class="four-d-scene" style="display: flex; gap: 0.5rem;">';
+    let s = '<div class="four-d-scene" style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">';
     for (let i = 0; i < grid.length; i++) {
         let time = i + 1;
-        s += '<div>';
-        s += '<div>Time ' + time + '</div>'
+        s += '<div style="border: 1px solid rgba(255,255,255,0.2); padding: 0.3rem; border-radius: 4px; background: rgba(255,255,255,0.05);">';
+        s += '<div style="text-align: center; font-size: 0.8rem; margin-bottom: 0.2rem; opacity: 0.8;">T' + time + '</div>';
         s += createExplanation3D(grid[i], filler, pattern);
         s += '</div>';
     }
-    s += '</div>'
+    s += '</div>';
     return s;
 }
 
 function createExplanation5D(grid, pattern = null) {
     const filler = createFiller(grid);
-    let s = '<div class="five-d-scene" style="display: flex; flex-direction: column; gap: 1rem;">';
-    for (let i = 0; i < grid.length; i++) {
-        let quantity = i === 0 ? 'Less' : (i === grid.length - 1 ? 'More' : 'Mid');
-        s += '<div>';
-        s += '<div style="text-align: center; font-weight: bold; margin-bottom: 0.5rem;">Quantity: ' + quantity + '</div>';
-        s += createExplanation4D(grid[i], pattern);
+    let s = '<div class="five-d-scene" style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 1rem; justify-content: center;">';
+    
+    for (let qtyIdx = 0; qtyIdx < grid.length; qtyIdx++) {
+        let quantity = qtyIdx === 0 ? 'Less' : (qtyIdx === grid.length - 1 ? 'More' : 'Mid');
+        const qtyGrid = grid[qtyIdx];
+        
+        // Softer card-like container
+        s += '<div style="border: 1px solid rgba(128, 128, 128, 0.2); padding: 1rem; border-radius: 12px; background: rgba(128, 128, 128, 0.04); box-shadow: 0 2px 8px rgba(0,0,0,0.02);">';
+        s += '<div style="text-align: center; font-weight: 600; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--bracket-color); letter-spacing: 0.5px;">QTY: ' + quantity.toUpperCase() + '</div>';
+        
+        // Show Time slices horizontally
+        s += '<div style="display: flex; flex-direction: row; gap: 0.75rem;">';
+        for (let timeIdx = 0; timeIdx < qtyGrid.length; timeIdx++) {
+            let timeLabel = 'T' + (timeIdx + 1);
+            const timeGrid = qtyGrid[timeIdx];
+            
+            s += '<div style="text-align: center; display: flex; flex-direction: column; align-items: center;">';
+            s += '<div style="font-size: 0.75rem; margin-bottom: 0.4rem; opacity: 0.6; font-weight: 500;">' + timeLabel + '</div>';
+            s += createExplanation3D(timeGrid, filler, pattern);
+            s += '</div>';
+        }
+        s += '</div>';
         s += '</div>';
     }
     s += '</div>';
@@ -179,13 +195,42 @@ function createExplanation5D(grid, pattern = null) {
 
 function createExplanation6D(grid, pattern = null) {
     const filler = createFiller(grid);
-    let s = '<div class="six-d-scene" style="display: flex; flex-direction: column; gap: 1rem;">';
-    for (let i = 0; i < grid.length; i++) {
-        let membership = i === 0 ? 'Outside' : (i === grid.length - 1 ? 'Inside' : 'Boundary');
-        s += '<div style="border: 1px solid var(--bracket-color); padding: 0.5rem; border-radius: 4px;">';
-        s += '<div style="text-align: center; font-weight: bold; margin-bottom: 0.5rem; color: var(--bracket-color);">Membership: ' + membership + '</div>';
-        s += createExplanation5D(grid[i], pattern);
-        s += '</div>';
+    let s = '<div class="six-d-scene" style="display: flex; flex-direction: column; gap: 1.5rem; align-items: center;">';
+    
+    for (let memIdx = 0; memIdx < grid.length; memIdx++) {
+        let membership = memIdx === 0 ? 'Outside' : (memIdx === grid.length - 1 ? 'Inside' : 'Boundary');
+        const memGrid = grid[memIdx];
+        
+        // Outer Membership Section (Clean, visually separated)
+        s += '<div style="width: 100%; border: 1px solid rgba(128, 128, 128, 0.15); padding: 1.25rem; border-radius: 16px; background: rgba(128, 128, 128, 0.02);">';
+        s += '<div style="text-align: center; font-weight: 700; margin-bottom: 1rem; color: var(--bracket-color); font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">' + membership + '</div>';
+        
+        // Show Quantity rows horizontally
+        s += '<div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 1rem; justify-content: center;">';
+        for (let qtyIdx = 0; qtyIdx < memGrid.length; qtyIdx++) {
+            let quantity = qtyIdx === 0 ? 'Less' : (qtyIdx === memGrid.length - 1 ? 'More' : 'Mid');
+            const qtyGrid = memGrid[qtyIdx];
+            
+            // Inner Quantity Card (Soft backdrop)
+            s += '<div style="border: 1px solid rgba(128, 128, 128, 0.1); padding: 0.75rem; border-radius: 12px; background: rgba(128, 128, 128, 0.04);">';
+            s += '<div style="text-align: center; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.85rem; opacity: 0.8;">QTY: ' + quantity.toUpperCase() + '</div>';
+            
+            // Show Time slices
+            s += '<div style="display: flex; flex-direction: row; gap: 0.5rem;">';
+            for (let timeIdx = 0; timeIdx < qtyGrid.length; timeIdx++) {
+                let timeLabel = 'T' + (timeIdx + 1);
+                const timeGrid = qtyGrid[timeIdx];
+                
+                s += '<div style="text-align: center; display: flex; flex-direction: column; align-items: center;">';
+                s += '<div style="font-size: 0.7rem; margin-bottom: 0.3rem; opacity: 0.5; font-weight: 500;">' + timeLabel + '</div>';
+                s += createExplanation3D(timeGrid, filler, pattern);
+                s += '</div>';
+            }
+            s += '</div>'; // End time slices
+            s += '</div>'; // End quantity
+        }
+        s += '</div>'; // End quantity rows
+        s += '</div>'; // End membership
     }
     s += '</div>';
     return s;
@@ -315,43 +360,50 @@ function createExplanation(question) {
     }
 }
 
-function createExplanationPopup(question, e) {
+function createExplanationPopup(question, e, isPinned = false) {
     const popup = document.createElement("div");
     popup.className = "explanation-popup";
+    popup.dataset.pinned = isPinned ? "true" : "false";
     popup.style.position = "fixed";
     popup.style.top = "50%";
     popup.style.left = "50%";
     popup.style.transform = "translate(-50%, -50%)";
-    popup.style.zIndex = "1000";
-    popup.style.padding = "20px";
+    popup.style.zIndex = "99999";
+    popup.style.padding = "30px 24px";
     popup.style.backgroundColor = "var(--background-color)";
-    popup.style.borderRadius = "8px";
-    popup.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.2)";
+    popup.style.borderRadius = "16px";
+    popup.style.boxShadow = "0 10px 40px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(128, 128, 128, 0.15)";
     popup.style.textAlign = "center";
-    popup.style.pointerEvents = "none";
+    popup.style.pointerEvents = isPinned ? "auto" : "none";
 
-    // Mixed mode needs more space and scrolling
-    const isMixed = question.type === 'mixed' || question.category?.startsWith('Mixed:');
-    if (isMixed) {
-        popup.style.width = "95vw";
-        popup.style.maxWidth = "1200px";
-        popup.style.maxHeight = "95vh";
-        popup.style.overflow = "auto";
-    } else {
-        popup.style.width = "fit-content";
-        popup.style.maxWidth = "98vw";
-        popup.style.maxHeight = "98vh";
-        popup.style.overflow = "hidden";
+    // Pinned popups get a visible border
+    if (isPinned) {
+        popup.style.border = "2px solid var(--bracket-color)";
     }
+
+    // All popups need scrolling for large content (especially 5D/6D)
+    const isMixed = question.type === 'mixed' || question.category?.startsWith('Mixed:');
+    const isMultiDim = question.category?.includes('FIVE D') || question.category?.includes('SIX D');
+    popup.style.width = isMixed || isMultiDim ? "98vw" : "fit-content";
+    popup.style.maxWidth = isMultiDim ? "1800px" : "1400px";
+    popup.style.maxHeight = "95vh";
+    popup.style.overflow = "auto";
 
     const content = document.createElement("pre");
     content.innerHTML = createExplanation(question);
     content.style.margin = "0";
-    if (isMixed) {
-        content.style.maxHeight = "calc(95vh - 40px)";
-        content.style.overflow = "auto";
-    }
     popup.appendChild(content);
+
+    // Add close hint for pinned popups
+    if (isPinned) {
+        const closeHint = document.createElement("div");
+        closeHint.textContent = "Click anywhere to close";
+        closeHint.style.fontSize = "0.75rem";
+        closeHint.style.opacity = "0.6";
+        closeHint.style.marginTop = "8px";
+        closeHint.style.pointerEvents = "none";
+        popup.appendChild(closeHint);
+    }
 
     document.body.appendChild(popup);
 }

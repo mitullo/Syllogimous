@@ -88,6 +88,10 @@ const sylCreditsCheckbox = document.getElementById('offcanvas-credits');
 const sylCreditsSidebar = document.getElementById('sidebar-credits');
 
 document.addEventListener('click', (event) => {
+    // Don't close sidebars if explanation popup exists
+    const explanationPopup = document.querySelector('.explanation-popup');
+    if (explanationPopup && sylHistoryCheckbox.checked) return;
+
     if (sylSettingsCheckbox && sylSettingsSidebar &&
         !sylSettingsSidebar.contains(event.target) && event.target !== sylSettingsCheckbox) {
         sylSettingsCheckbox.checked = false;

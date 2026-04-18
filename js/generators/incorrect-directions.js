@@ -2,23 +2,26 @@ class IncorrectDirections {
     // Find alternative incorrect coords that are NOT the simple inverse
     findAlternativeCoords(correctCoord, oppositeCoord) {
         let alternatives = [];
-        // Generate all possible direction combinations within [-1, 0, 1] range
-        for (let x of [-1, 0, 1]) {
-            for (let y of [-1, 0, 1]) {
-                for (let z of [-1, 0, 1]) {
-                    let coord = [x, y, z];
-                    // Skip zero coord, correct coord, and opposite coord
-                    if (arraysEqual(coord, [0, 0, 0])) continue;
-                    if (arraysEqual(coord, correctCoord)) continue;
-                    if (arraysEqual(coord, oppositeCoord)) continue;
-                    // Check it's a valid direction (not all zeros and not the opposite)
-                    if (coord.some(d => d !== 0)) {
-                        alternatives.push(coord);
-                    }
-                }
+        const dimensions = correctCoord.length;
+
+        const generateCoords = (currentCoord) => {
+            if (currentCoord.length === dimensions) {
+                // Skip zero coord, correct coord, and opposite coord
+                if (currentCoord.every(d => d === 0)) return;
+                if (arraysEqual(currentCoord, correctCoord)) return;
+                if (arraysEqual(currentCoord, oppositeCoord)) return;
+                
+                alternatives.push([...currentCoord]);
+                return;
             }
-        }
-        // Shuffle and return a subset
+            for (let d of [-1, 0, 1]) {
+                currentCoord.push(d);
+                generateCoords(currentCoord);
+                currentCoord.pop();
+            }
+        };
+
+        generateCoords([]);
         shuffle(alternatives);
         return alternatives.slice(0, 3);
     }

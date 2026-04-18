@@ -148,20 +148,20 @@ class MixedModeQuestion {
             const fullCoordMap = {};
             for (const word of words) {
                 if (coordMap[word]) {
+                    // Word has its own coordinates from a direction premise - use them
                     fullCoordMap[word] = this.normalizeCoord(coordMap[word]);
-                    continue;
                 }
-
-                // try to find a same-as member with coordinates
-                const same = sameSets[word] || [];
-                let coordFromSame = null;
-                for (const w of same) {
-                    if (coordMap[w]) { coordFromSame = coordMap[w]; break; }
-                }
+            }
+            // Only look up coordinates from same-set members for words that don't have their own
+            for (const word of words) {
+                if (fullCoordMap[word]) continue; // Already has coordinates
                 
-                // Do NOT assign spatial coordinates to words that only have opposite (parity 1) neighbors.
-                if (coordFromSame) {
-                    fullCoordMap[word] = this.normalizeCoord(coordFromSame);
+                const same = sameSets[word] || [];
+                for (const w of same) {
+                    if (coordMap[w]) {
+                        fullCoordMap[word] = this.normalizeCoord(coordMap[w]);
+                        break;
+                    }
                 }
             }
             result.wordCoordMap = fullCoordMap;
@@ -365,29 +365,55 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                             const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, true, conclusionObj);
                             return [finalConclusion, finalIsValid, ['distinction', 'direction']];
                         } else {
-                            // Invalid: change the directional token but attempt to preserve prefixes (e.g., time)
-                            const dirCandidates = ['North-East','South-East','North-West','South-West','North','South','East','West','Above','Below'];
-                            let found = null;
-                            for (const token of dirCandidates) {
-                                if (relation && relation.includes(token)) { found = token; break; }
+                            // Invalid: Generate a proper incorrect coordinate using the correct space generator
+                            const startNode = dirPremise.start;
+                            const endNode = dirPremise.end;
+                            
+                            // Safety check: ensure both nodes have coordinates
+                            if (!coordMap[startNode] || !coordMap[endNode]) {
+                                // Can't generate a valid mixed conclusion without coordinates
+                                // Skip this premise and let the code fall through to simple distinction
+                                continue;
                             }
-                            let conclusionObj;
-                            if (found) {
-                                const alternatives = dirCandidates.filter(d => d !== found);
-                                const wrongToken = pickRandomItems(alternatives, 1).picked[0];
-                                const wrongRelation = relation.replace(found, wrongToken);
-                                const wrongReverse = reverse.replace(this.oppositeDirection(found), this.oppositeDirection(wrongToken));
-                                conclusionObj = (dirPremise.start === original)
-                                    ? { start: equivWord, end: otherWord, relation: wrongRelation, reverse: wrongReverse, relationMinimal: '?', reverseMinimal: '?' }
-                                    : { start: otherWord, end: equivWord, relation: wrongRelation, reverse: wrongReverse, relationMinimal: '?', reverseMinimal: '?' };
+                            
+                            // Find the actual vector from endNode to startNode
+                            const vec = diffCoords(coordMap[endNode], coordMap[startNode]);
+                            const actualCoord = this.normalizeCoord(vec);
+                            
+                            // If both nodes are at the same position, we can't create a direction conclusion
+                            if (actualCoord.every(d => d === 0)) {
+                                // Can't generate a valid mixed conclusion - skip and fall through to simple distinction
+                                continue;
+                            }
+                            
+                            let generator;
+                            if (actualCoord.length === 4) generator = new Direction4D();
+                            else if (actualCoord.length === 3) generator = new Direction3D();
+                            else generator = new Direction2D();
+                            
+                            let availableDirs = dirCoords.slice(1);
+                            if (actualCoord.length === 4) availableDirs = dirCoords4D.filter(c => !arraysEqual(c, [0,0,0,0]));
+                            else if (actualCoord.length === 3) availableDirs = dirCoords3D.filter(c => !arraysEqual(c, [0,0,0]));
+                            
+                            // Pick a wrong coord
+                            let wrongCoord;
+                            const avoidOpposite = savedata.enableHarderConclusions;
+                            const oppositeCoord = actualCoord.map(x => -x);
+                            
+                            if (avoidOpposite) {
+                                const validWrongDirs = availableDirs.filter(c => !arraysEqual(c, actualCoord) && !arraysEqual(c, oppositeCoord));
+                                wrongCoord = validWrongDirs.length > 0 
+                                    ? validWrongDirs[Math.floor(Math.random() * validWrongDirs.length)] 
+                                    : oppositeCoord; // fallback
                             } else {
-                                const wrongToken = pickRandomItems(['North','South','East','West'],1).picked[0];
-                                const wrongRelation = `is ${wrongToken} of`;
-                                const wrongReverse = `is ${this.oppositeDirection(wrongToken)} of`;
-                                conclusionObj = (dirPremise.start === original)
-                                    ? { start: equivWord, end: otherWord, relation: wrongRelation, reverse: wrongReverse, relationMinimal: '?', reverseMinimal: '?' }
-                                    : { start: otherWord, end: equivWord, relation: wrongRelation, reverse: wrongReverse, relationMinimal: '?', reverseMinimal: '?' };
+                                const validWrongDirs = availableDirs.filter(c => !arraysEqual(c, actualCoord));
+                                wrongCoord = validWrongDirs[Math.floor(Math.random() * validWrongDirs.length)];
                             }
+                            
+                            const newStartNode = (dirPremise.start === original) ? equivWord : dirPremise.start;
+                            const newEndNode = (dirPremise.end === original) ? equivWord : dirPremise.end;
+                            
+                            const conclusionObj = generator.createDirectionStatement(newEndNode, newStartNode, wrongCoord);
                             const conclusion = createBasicPremiseHTML(conclusionObj);
                             const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, false, conclusionObj);
                             return [finalConclusion, finalIsValid, ['distinction', 'direction']];
