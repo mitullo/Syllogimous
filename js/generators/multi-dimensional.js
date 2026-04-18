@@ -130,17 +130,17 @@ function createMultiDim5DGenerator(length) {
                     premises.push(premise);
                     
                     neighbors[baseWord] = neighbors[baseWord] ?? [];
-                    neighbors[baseWord].push(nextWord);
+neighbors[baseWord].push(nextWord);
+neighbors[nextWord] = neighbors[nextWord] ?? [];
+neighbors[nextWord].push(baseWord);
                 }
 
-                const startIdx = Math.floor(Math.random() * (length - 1));
-                const endIdx = startIdx + 1 + Math.floor(Math.random() * (length - startIdx - 1));
-                const startWord = words[startIdx];
-                const endWord = words[endIdx];
-                
-                // Fixed: Subcoords evaluates B - A. To get End - Start, pass Start then End.
-                const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
-                const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+                const pairChooser = new DirectionPairChooser();
+const pairResult = pairChooser.pickTwoDistantWords(neighbors);
+const [startWord, endWord] = pairResult ?? [words[0], words[length]];
+
+const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
+const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
                 
                 let isValid = coinFlip();
                 let conclusionObj;
@@ -216,16 +216,17 @@ function createMultiDim6DGenerator(length) {
                     premises.push(premise);
                     
                     neighbors[baseWord] = neighbors[baseWord] ?? [];
-                    neighbors[baseWord].push(nextWord);
+neighbors[baseWord].push(nextWord);
+neighbors[nextWord] = neighbors[nextWord] ?? [];
+neighbors[nextWord].push(baseWord);
                 }
 
-                const startIdx = Math.floor(Math.random() * (length - 1));
-                const endIdx = startIdx + 1 + Math.floor(Math.random() * (length - startIdx - 1));
-                const startWord = words[startIdx];
-                const endWord = words[endIdx];
-                
-                const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
-                const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+                const pairChooser = new DirectionPairChooser();
+const pairResult = pairChooser.pickTwoDistantWords(neighbors);
+const [startWord, endWord] = pairResult ?? [words[0], words[length]];
+
+const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
+const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
                 
                 let isValid = coinFlip();
                 let conclusionObj;
