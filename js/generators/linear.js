@@ -145,9 +145,9 @@ class LinearQuestion {
         const words = createStimuli(length + 1);
 
         if (this.isBacktrackingEnabled()) {
-            [premises, conclusion, isValid, buckets, bucketMap] = this.buildBacktrackingMap(words);
+            [premises, conclusion, isValid, buckets, bucketMap, this.neighbors] = this.buildBacktrackingMap(words);
         } else {
-            [premises, conclusion, isValid] = this.buildLinearMap(words);
+            [premises, conclusion, isValid, this.neighbors] = this.buildLinearMap(words);
         }
 
         premises = scramble(premises);
@@ -172,12 +172,19 @@ class LinearQuestion {
         let premises = [];
         let conclusion;
         let isValid;
+        const neighbors = {};
 
         for (let i = 0; i < words.length - 1; i++) {
             const curr = words[i];
             const next = words[i + 1];
 
             premises.push(this.generator.createLinearPremise(curr, next));
+            
+            // Build neighbors map for multiple conclusions
+            neighbors[curr] = neighbors[curr] ?? [];
+            neighbors[next] = neighbors[next] ?? [];
+            neighbors[curr].push(next);
+            neighbors[next].push(curr);
         }
 
         if (savedata.widePremises) {
@@ -193,10 +200,14 @@ class LinearQuestion {
             conclusionObj = this.generator.createLinearPremise(words[j], words[i]);
             isValid = i > j;
         }
-        conclusion = createBasicPremiseHTML(conclusionObj);
+        const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+        conclusion = premiseResult.html;
+        if (premiseResult.isInverted) {
+            isValid = !isValid;
+        }
         [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj);
 
-        return [premises, conclusion, isValid];
+        return [premises, conclusion, isValid, neighbors];
     }
 
 
@@ -302,7 +313,7 @@ class LinearQuestion {
             conclusion = this.generator.createBacktrackingLinearPremise(a, b, options, [comparison], isValid);
         }
 
-        return [premises, conclusion, isValid, buckets, bucketMap];
+        return [premises, conclusion, isValid, buckets, bucketMap, neighbors];
     }
 
     indexOfWord(word) {
@@ -363,8 +374,72 @@ class LinearQuestion {
         let finalIsValid = this.isValid;
         if (this.isBacktrackingEnabled() && typeof this.conclusion === 'object' && this.conclusion !== null) {
             const conclusionObj = this.conclusion;
-            finalConclusion = createBasicPremiseHTML(conclusionObj);
+            const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+            finalConclusion = premiseResult.html;
+            if (premiseResult.isInverted) {
+                finalIsValid = !finalIsValid;
+            }
             [finalConclusion, finalIsValid] = applyConclusionNegation(finalConclusion, finalIsValid, conclusionObj);
+        }
+
+        // Generate multiple conclusions if mode is enabled (only for non-backtracking)
+        const numConclusions = (savedata.multipleConclusionsMode && savedata.numConclusions > 1 && !this.isBacktrackingEnabled())
+            ? savedata.numConclusions
+            : 1;
+
+        const conclusionsArr = [];
+        if (numConclusions > 1 && this.neighbors) {
+            const usedConclusionTexts = new Set();
+            const usedPairKeys = new Set();
+            const pairChooser = new DirectionPairChooser();
+
+            let generatedCount = 0;
+            // Always run to completion - use fallback for pairs when unique ones exhausted
+            while (generatedCount < numConclusions) {
+                const [startWord, endWord] = getUniquePairOrFallback(this.neighbors, pairChooser, usedPairKeys);
+
+                if (!startWord || !endWord) {
+                    generatedCount++; // Prevent infinite loop
+                    continue;
+                }
+
+                // Generate conclusion using same logic as generate()
+                const idxA = this.bucket.indexOf(startWord);
+                const idxB = this.bucket.indexOf(endWord);
+                let conclusionObj, conclusionIsValid;
+                if (coinFlip()) {
+                    conclusionObj = this.generator.createLinearPremise(startWord, endWord);
+                    conclusionIsValid = idxA < idxB;
+                } else {
+                    conclusionObj = this.generator.createLinearPremise(endWord, startWord);
+                    conclusionIsValid = idxA > idxB;
+                }
+                const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                let conclusionHTML = premiseResult.html;
+                if (premiseResult.isInverted) {
+                    conclusionIsValid = !conclusionIsValid;
+                }
+                [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj);
+
+                // Always add conclusion (may have duplicates if unique ones exhausted)
+                usedConclusionTexts.add(conclusionHTML);
+
+                conclusionsArr.push({
+                    conclusion: conclusionHTML,
+                    isValid: conclusionIsValid,
+                    startWord,
+                    endWord,
+                });
+                generatedCount++;
+            }
+        }
+
+        // If no multiple conclusions generated, use primary
+        if (conclusionsArr.length === 0) {
+            conclusionsArr.push({
+                conclusion: finalConclusion,
+                isValid: finalIsValid,
+            });
         }
 
         return {
@@ -374,8 +449,11 @@ class LinearQuestion {
             ...(this.bucket && { bucket: this.bucket }),
             ...(this.buckets && { buckets: this.buckets, modifiers: ['180'] }),
             premises: this.premises,
-            isValid: finalIsValid,
-            conclusion: finalConclusion,
+            isValid: conclusionsArr[0].isValid,
+            conclusion: conclusionsArr[0].conclusion,
+            conclusions: conclusionsArr,
+            currentConclusionIndex: 0,
+            userAnswers: [],
             ...(savedata.widePremises && { plen: length }),
             ...(countdown && { countdown }),
         }

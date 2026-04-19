@@ -117,6 +117,49 @@ class MixedModeQuestion {
             return null;
         }
 
+        // Generate multiple conclusions if mode is enabled
+        const numConclusions = (savedata.multipleConclusionsMode && savedata.numConclusions > 1)
+            ? savedata.numConclusions
+            : 1;
+
+        const conclusionsArr = [];
+        const usedConclusionTexts = new Set();
+
+        // Primary conclusion
+        conclusionsArr.push({
+            conclusion,
+            isValid,
+        });
+        usedConclusionTexts.add(conclusion);
+
+        // Generate additional mixed conclusions
+        let generatedCount = 1; // Start at 1 since primary is already added
+        while (generatedCount < numConclusions) {
+            let attempts = 0;
+            const [addConclusion, addIsValid] = this.createMixedConclusion(
+                words, allPremises, coordMap, sameSets, dsuBucketMap, neighbors, selectedModes
+            );
+
+            if (!addConclusion) {
+                attempts++;
+                if (attempts < 5) {
+                    continue; // retry without incrementing generatedCount
+                }
+                // Max attempts reached, skip this conclusion
+                generatedCount++; // Prevent infinite loop
+                continue;
+            }
+
+            // Always add conclusion (may have duplicates if unique ones exhausted)
+            usedConclusionTexts.add(addConclusion);
+
+            conclusionsArr.push({
+                conclusion: addConclusion,
+                isValid: addIsValid,
+            });
+            generatedCount++;
+        }
+
         // Format premises
         let formattedPremises = allPremises.map((p, i) => createPremiseHTML(p, true, i));
 
@@ -134,9 +177,12 @@ class MixedModeQuestion {
             category: `Mixed: ${typeNames}`,
             type: 'mixed',
             startedAt: new Date().getTime(),
-            isValid,
+            isValid: conclusionsArr[0].isValid,
             premises: formattedPremises,
-            conclusion,
+            conclusion: conclusionsArr[0].conclusion,
+            conclusions: conclusionsArr,
+            currentConclusionIndex: 0,
+            userAnswers: [],
             mixedTypes,
             ...(savedata.widePremises && { plen: length }),
             ...(countdown && { countdown }),
@@ -361,8 +407,13 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                             const conclusionObj = (dirPremise.start === original)
                                 ? { start: equivWord, end: otherWord, relation, reverse, relationMinimal: relationMin, reverseMinimal: reverseMin }
                                 : { start: otherWord, end: equivWord, relation, reverse, relationMinimal: relationMin, reverseMinimal: reverseMin };
-                            const conclusion = createBasicPremiseHTML(conclusionObj);
-                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, true, conclusionObj);
+                            const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                            let conclusion = premiseResult.html;
+                            let isValid = true;
+                            if (premiseResult.isInverted) {
+                                isValid = !isValid;
+                            }
+                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
                             return [finalConclusion, finalIsValid, ['distinction', 'direction']];
                         } else {
                             // Invalid: Generate a proper incorrect coordinate using the correct space generator
@@ -414,8 +465,13 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                             const newEndNode = (dirPremise.end === original) ? equivWord : dirPremise.end;
                             
                             const conclusionObj = generator.createDirectionStatement(newEndNode, newStartNode, wrongCoord);
-                            const conclusion = createBasicPremiseHTML(conclusionObj);
-                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, false, conclusionObj);
+                            const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                            let conclusion = premiseResult.html;
+                            let isValid = false;
+                            if (premiseResult.isInverted) {
+                                isValid = !isValid;
+                            }
+                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
                             return [finalConclusion, finalIsValid, ['distinction', 'direction']];
                         }
                     }
@@ -429,13 +485,23 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
             const sameBucket = bucketMap[a] === bucketMap[b];
             if (coinFlip()) {
                 const conclusionObj = createSamePremise(a, b);
-                const conclusion = createBasicPremiseHTML(conclusionObj, false);
-                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, sameBucket, conclusionObj);
+                const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                let conclusion = premiseResult.html;
+                let isValid = sameBucket;
+                if (premiseResult.isInverted) {
+                    isValid = !isValid;
+                }
+                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
                 return [finalConclusion, finalIsValid, ['distinction']];
             } else {
                 const conclusionObj = createOppositePremise(a, b);
-                const conclusion = createBasicPremiseHTML(conclusionObj, false);
-                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, !sameBucket, conclusionObj);
+                const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                let conclusion = premiseResult.html;
+                let isValid = !sameBucket;
+                if (premiseResult.isInverted) {
+                    isValid = !isValid;
+                }
+                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
                 return [finalConclusion, finalIsValid, ['distinction']];
             }
         }
@@ -454,8 +520,13 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
 
                 if (coinFlip()) {
                     const conclusionObj = generator.createDirectionStatement(a, b, actualCoord);
-                    const conclusion = createBasicPremiseHTML(conclusionObj);
-                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, true, conclusionObj);
+                    const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                    let conclusion = premiseResult.html;
+                    let isValid = true;
+                    if (premiseResult.isInverted) {
+                        isValid = !isValid;
+                    }
+                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
                     return [finalConclusion, finalIsValid, ['direction']];
                 } else {
                     let availableDirs = dirCoords.slice(1);
@@ -464,8 +535,13 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
 
                     const wrongCoord = availableDirs[Math.floor(Math.random() * availableDirs.length)];
                     const conclusionObj = generator.createDirectionStatement(a, b, wrongCoord);
-                    const conclusion = createBasicPremiseHTML(conclusionObj);
-                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, false, conclusionObj);
+                    const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                    let conclusion = premiseResult.html;
+                    let isValid = false;
+                    if (premiseResult.isInverted) {
+                        isValid = !isValid;
+                    }
+                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
                     return [finalConclusion, finalIsValid, ['direction']];
                 }
             }

@@ -1,10 +1,10 @@
 function createNonsenseWord() {
-    const vowels = ['A', 'E', 'I', 'O', 'U'], consonants = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z'];
+    const vowels = ['A', 'E', 'I', 'O', 'U'], consonants = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W'];
     for (string = ''; string.length < savedata.nonsenseWordLength;) {
         if ((string.length + 1) % 2) 
-            string += consonants[Math.floor(Math.random() * 21)];
+            string += consonants[Math.floor(Math.random() * consonants.length)];
         else 
-            string += vowels[Math.floor(Math.random() * 5)];
+            string += vowels[Math.floor(Math.random() * vowels.length)];
 
         if (string.length == savedata.nonsenseWordLength) {
             if (bannedWords.some(d => string.includes(d))) {
@@ -17,7 +17,7 @@ function createNonsenseWord() {
 }
 
 function createGarbageWord() {
-    const consonants = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Z'];
+    const consonants = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Z'];
     let string = '';
     while (string.length < savedata.garbageWordLength) {
         const c = consonants[Math.floor(Math.random() * consonants.length)]

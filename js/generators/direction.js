@@ -274,6 +274,7 @@ class DirectionQuestion {
         let endWord;
 
         let conclusion;
+        let isValid;
         let conclusionCoord;
         let diffCoord;
         let [wordCoordMap, neighbors, premises, usedDirCoords] = [];
@@ -304,7 +305,7 @@ class DirectionQuestion {
             if (this.generator.shouldUseAnchor() && anchorWords) {
                 // For Anchor Space v2, also generate pattern for display
                 if (this.generator.getName() === "Anchor Space v2") {
-                    pattern = this.generator.generatePattern(wordCoordMap, anchorWords);
+                    pattern = this.generator.getPattern(wordCoordMap, anchorWords);
                 }
                 // Build constrained neighbor map from only words in premises
                 const premiseNeighbors = {};
@@ -342,7 +343,7 @@ class DirectionQuestion {
         let operations;
         let hardModeDimensions;
         if (numTransforms > 0) {
-            [wordCoordMap, operations, hardModeDimensions] = new SpaceHardMode(numTransforms).basicHardMode(wordCoordMap, startWord, endWord, conclusionCoord);
+            [wordCoordMap, operations, hardModeDimensions] = new SpaceHardMode(numTransforms, anchorWords || []).basicHardMode(wordCoordMap, startWord, endWord, conclusionCoord);
             [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
             if (numInterleaved > 0) {
                 premises.push(...operations);
@@ -351,45 +352,102 @@ class DirectionQuestion {
             }
         }
 
-        let isValid;
-        let conclusionObj;
-        if (coinFlip()) { // correct
-            isValid = true;
-            conclusionObj = this.generator.createDirectionStatement(startWord, endWord, conclusionCoord);
-        }
-        else {            // wrong
-            isValid = false;
-            let incorrectCoord;
-            
-            // Check for interference (sophisticated false conclusion)
-            // For 4D+: keep spatial dimensions correct, only change higher dimensions
-            const interferenceLevel = this.getInterferenceLevel();
-            const coordLength = conclusionCoord.length;
-            if (interferenceLevel > 0 && coordLength > 3 && Math.random() * 100 < interferenceLevel) {
-                // Create sophisticated false conclusion: spatial matches, higher dimension wrong
-                incorrectCoord = [...conclusionCoord];
-                // Change only the time dimension (index 3) to a different valid value
-                const currentTime = incorrectCoord[3];
-                const timeOptions = [-1, 0, 1].filter(t => t !== currentTime);
-                incorrectCoord[3] = timeOptions[Math.floor(Math.random() * timeOptions.length)];
-            } else if (interferenceLevel > 0 && coordLength === 3 && Math.random() * 100 < interferenceLevel) {
-                // 3D interference: keep X and Y correct, only change Z (above/below)
-                incorrectCoord = [...conclusionCoord];
-                const currentZ = incorrectCoord[2];
-                const zOptions = [-1, 0, 1].filter(z => z !== currentZ);
-                incorrectCoord[2] = zOptions[Math.floor(Math.random() * zOptions.length)];
+        // Generate multiple conclusions if mode is enabled
+        const numConclusions = (savedata.multipleConclusionsMode && savedata.numConclusions > 1)
+            ? savedata.numConclusions
+            : 1;
+
+        const conclusionsArr = [];
+        const usedConclusionTexts = new Set();
+        const usedPairKeys = new Set();
+
+        let generatedCount = 0;
+        let isFirstConclusion = true;
+
+        // Always run to completion - use fallback for pairs when unique ones exhausted
+        while (generatedCount < numConclusions) {
+            let sw, ew, dCoord, cCoord;
+
+            // For first conclusion, use the already-selected pair
+            if (isFirstConclusion) {
+                sw = startWord;
+                ew = endWord;
+                dCoord = diffCoord;
+                cCoord = conclusionCoord;
+                isFirstConclusion = false;
             } else {
-                incorrectCoord = this.incorrectDirections.chooseIncorrectCoord(usedDirCoords, conclusionCoord, diffCoord, hardModeDimensions);
+                // Get pair with fallback when unique ones exhausted
+                [sw, ew] = getUniquePairOrFallback(neighbors, this.pairChooser, usedPairKeys);
+
+                if (!sw || !ew) {
+                    generatedCount++; // Prevent infinite loop
+                    continue;
+                }
+
+                [dCoord, cCoord] = getConclusionCoords(wordCoordMap, sw, ew);
+                if (cCoord.slice(0, 3).every(c => c === 0)) {
+                    generatedCount++; // Prevent infinite loop
+                    continue;
+                }
             }
-            conclusionObj = this.generator.createDirectionStatement(startWord, endWord, incorrectCoord);
+
+            let conclusionIsValid;
+            let conclusionHTML;
+            let conclusionObj;
+            if (coinFlip()) { // correct
+                conclusionIsValid = true;
+                conclusionObj = this.generator.createDirectionStatement(sw, ew, cCoord);
+            } else { // wrong
+                conclusionIsValid = false;
+                let incorrectCoord;
+
+                const interferenceLevel = this.getInterferenceLevel();
+                const coordLength = cCoord.length;
+                if (interferenceLevel > 0 && coordLength > 3 && Math.random() * 100 < interferenceLevel) {
+                    incorrectCoord = [...cCoord];
+                    const currentTime = incorrectCoord[3];
+                    const timeOptions = [-1, 0, 1].filter(t => t !== currentTime);
+                    incorrectCoord[3] = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+                } else if (interferenceLevel > 0 && coordLength === 3 && Math.random() * 100 < interferenceLevel) {
+                    incorrectCoord = [...cCoord];
+                    const currentZ = incorrectCoord[2];
+                    const zOptions = [-1, 0, 1].filter(z => z !== currentZ);
+                    incorrectCoord[2] = zOptions[Math.floor(Math.random() * zOptions.length)];
+                } else {
+                    incorrectCoord = this.incorrectDirections.chooseIncorrectCoord(usedDirCoords, cCoord, dCoord, hardModeDimensions);
+                }
+                conclusionObj = this.generator.createDirectionStatement(sw, ew, incorrectCoord);
+            }
+
+            const premiseResult = createPremiseHTML(conclusionObj, true, 0, pattern);
+            conclusionHTML = premiseResult.html;
+            // Flip validity if visual inversion was applied
+            if (premiseResult.isInverted) {
+                conclusionIsValid = !conclusionIsValid;
+            }
+            [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj, pattern);
+
+            // Always add conclusion (may have duplicates if unique ones exhausted)
+            usedConclusionTexts.add(conclusionHTML);
+
+            conclusionsArr.push({
+                conclusion: conclusionHTML,
+                isValid: conclusionIsValid,
+                startWord: sw,
+                endWord: ew,
+            });
+            generatedCount++;
         }
+
+        // Primary conclusion for backward compatibility
+        const primaryConclusion = conclusionsArr[0] ?? { conclusion: '', isValid: false };
+        isValid = primaryConclusion.isValid;
+        conclusion = primaryConclusion.conclusion;
 
         if (numInterleaved === 0) {
             premises = scramble(premises);
         }
         premises = premises.map((p, i) => createPremiseHTML(p, true, i, pattern));
-        conclusion = createBasicPremiseHTML(conclusionObj, true, null, pattern);
-        [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj, pattern);
         const countdown = this.generator.getCountdown();
         const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
         let modifiers = [];
@@ -424,6 +482,9 @@ class DirectionQuestion {
             premises,
             operations,
             conclusion,
+            conclusions: conclusionsArr,
+            currentConclusionIndex: 0,
+            userAnswers: [],
             ...(countdown && { countdown }),
             ...(pattern && { pattern }),
         }
@@ -856,20 +917,62 @@ function createAnchorSpaceGenerator(length) {
 
 class AnchorSpaceV2 {
     constructor() {
-        this.shapeColors = [
-            { name: 'Red', fill: '#e74c3c', stroke: '#c0392b' },
-            { name: 'Blue', fill: '#3498db', stroke: '#2980b9' },
-            { name: 'Green', fill: '#2ecc71', stroke: '#27ae60' },
-            { name: 'Yellow', fill: '#f1c40f', stroke: '#f39c12' },
-            { name: 'Purple', fill: '#9b59b6', stroke: '#8e44ad' },
-            { name: 'Orange', fill: '#e67e22', stroke: '#d35400' },
-            { name: 'Cyan', fill: '#1abc9c', stroke: '#16a085' },
-            { name: 'Pink', fill: '#fd79a8', stroke: '#e84393' }
+        this.patternKey = 'anchorSpaceV2Pattern_v1';
+        // More distinct colors using HSL - evenly spaced around hue wheel
+        // Red(0), Yellow(60), Green(120), Cyan(180), Blue(240), Magenta(300), Orange(30), Chartreuse(90)
+        this.distinctColors = [
+            { name: 'Red', fill: 'hsl(0, 70%, 50%)', stroke: 'hsl(0, 70%, 35%)' },
+            { name: 'Yellow', fill: 'hsl(60, 70%, 50%)', stroke: 'hsl(60, 70%, 35%)' },
+            { name: 'Green', fill: 'hsl(120, 70%, 50%)', stroke: 'hsl(120, 70%, 35%)' },
+            { name: 'Cyan', fill: 'hsl(180, 70%, 50%)', stroke: 'hsl(180, 70%, 35%)' },
+            { name: 'Blue', fill: 'hsl(240, 70%, 60%)', stroke: 'hsl(240, 70%, 45%)' },
+            { name: 'Magenta', fill: 'hsl(300, 70%, 50%)', stroke: 'hsl(300, 70%, 35%)' },
+            { name: 'Orange', fill: 'hsl(30, 70%, 50%)', stroke: 'hsl(30, 70%, 35%)' },
+            { name: 'Pink', fill: 'hsl(330, 70%, 60%)', stroke: 'hsl(330, 70%, 45%)' }
         ];
+        // Legacy fallback colors for compatibility
+        this.shapeColors = this.distinctColors;
+    }
+
+    // Get stored pattern or generate new one
+    getPattern(wordCoordMap, anchorWords) {
+        // If fixed positions enabled, try to load existing pattern
+        if (savedata.anchorSpaceFixedPositions) {
+            const saved = localStorage.getItem(this.patternKey);
+            if (saved) {
+                const pattern = JSON.parse(saved);
+                // Update coordinates in case wordCoordMap changed
+                const updatedPattern = {};
+                for (const shapeId in pattern) {
+                    if (wordCoordMap[shapeId]) {
+                        updatedPattern[shapeId] = {
+                            ...pattern[shapeId],
+                            coord: wordCoordMap[shapeId]
+                        };
+                    }
+                }
+                return updatedPattern;
+            }
+        }
+
+        // Generate new pattern
+        const pattern = this.generatePattern(wordCoordMap, anchorWords);
+
+        // Save if fixed positions enabled
+        if (savedata.anchorSpaceFixedPositions) {
+            localStorage.setItem(this.patternKey, JSON.stringify(pattern));
+        }
+
+        return pattern;
+    }
+
+    // Reset stored pattern (call when disabling fixed positions)
+    resetPattern() {
+        localStorage.removeItem(this.patternKey);
     }
 
     getShapeSVG(index, x, y, size) {
-        const color = this.shapeColors[index % this.shapeColors.length];
+        const color = this.distinctColors[index % this.distinctColors.length];
         const shapes = [
             // Circle
             `<circle cx="${x}" cy="${y}" r="${size/2}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="2"/>`,
@@ -896,7 +999,7 @@ class AnchorSpaceV2 {
         const shapeNames = ['circle', 'square', 'triangle', 'diamond', 'hexagon', 'star'];
 
         // Shuffle colors and shapes for random assignment
-        const shuffledColors = shuffle([...this.shapeColors]);
+        const shuffledColors = shuffle([...this.distinctColors]);
         const shuffledShapes = shuffle([...shapeNames]);
 
         // Assign colors and shapes to ALL shape IDs

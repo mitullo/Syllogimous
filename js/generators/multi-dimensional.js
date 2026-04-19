@@ -136,41 +136,87 @@ neighbors[nextWord].push(baseWord);
                 }
 
                 const pairChooser = new DirectionPairChooser();
-const pairResult = pairChooser.pickTwoDistantWords(neighbors);
-const [startWord, endWord] = pairResult ?? [words[0], words[length]];
+                const conclusionsArr = [];
+                const usedPairsSet = new Set();
+                const usedConclusionTexts = new Set();
 
-const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
-const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
-                
-                let isValid = coinFlip();
-                let conclusionObj;
+                const numConclusions = (savedata.multipleConclusionsMode && savedata.numConclusions > 1)
+                    ? savedata.numConclusions
+                    : 1;
 
-                if (isValid) {
-                    conclusionObj = createMultiDimStatement(startWord, endWord, normalizedDiff, 5);
-                } else {
-                    const wrongCoord = [...normalizedDiff];
-                    const interferenceLevel = savedata.space5DInterference || 0;
-                    
-                    if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
-                        const currentVal = wrongCoord[3];
-                        const options = [-1, 0, 1].filter(v => v !== currentVal);
-                        wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
-                    } else {
-                        const axisToChange = Math.floor(Math.random() * 5);
-                        const currentVal = wrongCoord[axisToChange];
-                        const options = [-1, 0, 1].filter(v => v !== currentVal);
-                        wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
+                let generatedCount = 0;
+                while (generatedCount < numConclusions) {
+                    let sw, ew;
+                    let attempts = 0;
+
+                    do {
+                        const pr = pairChooser.pickTwoDistantWords(neighbors);
+                        if (!pr) break;
+                        [sw, ew] = pr;
+                        attempts++;
+                    } while (usedPairsSet.has(`${sw}-${ew}`) && attempts < 5);
+
+                    if (!sw || !ew) {
+                        generatedCount++; // Prevent infinite loop
+                        continue;
                     }
-                    conclusionObj = createMultiDimStatement(startWord, endWord, wrongCoord, 5);
+                    usedPairsSet.add(`${sw}-${ew}`);
+
+                    const diff = subCoords(wordCoordMap[sw], wordCoordMap[ew]);
+                    const normDiff = diff.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+
+                    let conclusionIsValid = coinFlip();
+                    let conclusionObj;
+
+                    if (conclusionIsValid) {
+                        conclusionObj = createMultiDimStatement(sw, ew, normDiff, 5);
+                    } else {
+                        const wrongCoord = [...normDiff];
+                        const interferenceLevel = savedata.space5DInterference || 0;
+
+                        if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
+                            const currentVal = wrongCoord[3];
+                            const options = [-1, 0, 1].filter(v => v !== currentVal);
+                            wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
+                        } else {
+                            const axisToChange = Math.floor(Math.random() * 5);
+                            const currentVal = wrongCoord[axisToChange];
+                            const options = [-1, 0, 1].filter(v => v !== currentVal);
+                            wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
+                        }
+                        conclusionObj = createMultiDimStatement(sw, ew, wrongCoord, 5);
+                    }
+
+                    const premiseResult = createPremiseHTML(conclusionObj, true, length);
+                    let conclusionHTML = premiseResult.html;
+                    if (premiseResult.isInverted) {
+                        conclusionIsValid = !conclusionIsValid;
+                    }
+                    [conclusionHTML, conclusionIsValid] = applyConclusionNegation(
+                        conclusionHTML, conclusionIsValid, conclusionObj
+                    );
+
+                    // Always add conclusion (may have duplicates if unique ones exhausted)
+                    usedConclusionTexts.add(conclusionHTML);
+
+                    conclusionsArr.push({
+                        conclusion: conclusionHTML,
+                        isValid: conclusionIsValid,
+                        startWord: sw,
+                        endWord: ew,
+                    });
+                    generatedCount++;
                 }
 
-                let conclusion = createPremiseHTML(conclusionObj, true, length);
-                [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj);
+                const primary = conclusionsArr[0] ?? { conclusion: '', isValid: false };
 
                 return {
                     premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
-                    conclusion: conclusion,
-                    isValid: isValid,
+                    conclusion: primary.conclusion,
+                    isValid: primary.isValid,
+                    conclusions: conclusionsArr,
+                    currentConclusionIndex: 0,
+                    userAnswers: [],
                     plen: length,
                     type: "space-five-d",
                     category: "SPACE FIVE D",
@@ -222,41 +268,87 @@ neighbors[nextWord].push(baseWord);
                 }
 
                 const pairChooser = new DirectionPairChooser();
-const pairResult = pairChooser.pickTwoDistantWords(neighbors);
-const [startWord, endWord] = pairResult ?? [words[0], words[length]];
+                const conclusionsArr = [];
+                const usedPairsSet = new Set();
+                const usedConclusionTexts = new Set();
 
-const diffCoord = subCoords(wordCoordMap[startWord], wordCoordMap[endWord]);
-const normalizedDiff = diffCoord.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
-                
-                let isValid = coinFlip();
-                let conclusionObj;
+                const numConclusions = (savedata.multipleConclusionsMode && savedata.numConclusions > 1)
+                    ? savedata.numConclusions
+                    : 1;
 
-                if (isValid) {
-                    conclusionObj = createMultiDimStatement(startWord, endWord, normalizedDiff, 6);
-                } else {
-                    const wrongCoord = [...normalizedDiff];
-                    const interferenceLevel = savedata.space6DInterference || 0;
-                    
-                    if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
-                        const currentVal = wrongCoord[3];
-                        const options = [-1, 0, 1].filter(v => v !== currentVal);
-                        wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
-                    } else {
-                        const axisToChange = Math.floor(Math.random() * 6);
-                        const currentVal = wrongCoord[axisToChange];
-                        const options = [-1, 0, 1].filter(v => v !== currentVal);
-                        wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
+                let generatedCount = 0;
+                while (generatedCount < numConclusions) {
+                    let sw, ew;
+                    let attempts = 0;
+
+                    do {
+                        const pr = pairChooser.pickTwoDistantWords(neighbors);
+                        if (!pr) break;
+                        [sw, ew] = pr;
+                        attempts++;
+                    } while (usedPairsSet.has(`${sw}-${ew}`) && attempts < 5);
+
+                    if (!sw || !ew) {
+                        generatedCount++; // Prevent infinite loop
+                        continue;
                     }
-                    conclusionObj = createMultiDimStatement(startWord, endWord, wrongCoord, 6);
+                    usedPairsSet.add(`${sw}-${ew}`);
+
+                    const diff = subCoords(wordCoordMap[sw], wordCoordMap[ew]);
+                    const normDiff = diff.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+
+                    let conclusionIsValid = coinFlip();
+                    let conclusionObj;
+
+                    if (conclusionIsValid) {
+                        conclusionObj = createMultiDimStatement(sw, ew, normDiff, 6);
+                    } else {
+                        const wrongCoord = [...normDiff];
+                        const interferenceLevel = savedata.space6DInterference || 0;
+
+                        if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
+                            const currentVal = wrongCoord[3];
+                            const options = [-1, 0, 1].filter(v => v !== currentVal);
+                            wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
+                        } else {
+                            const axisToChange = Math.floor(Math.random() * 6);
+                            const currentVal = wrongCoord[axisToChange];
+                            const options = [-1, 0, 1].filter(v => v !== currentVal);
+                            wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
+                        }
+                        conclusionObj = createMultiDimStatement(sw, ew, wrongCoord, 6);
+                    }
+
+                    const premiseResult = createPremiseHTML(conclusionObj, true, length);
+                    let conclusionHTML = premiseResult.html;
+                    if (premiseResult.isInverted) {
+                        conclusionIsValid = !conclusionIsValid;
+                    }
+                    [conclusionHTML, conclusionIsValid] = applyConclusionNegation(
+                        conclusionHTML, conclusionIsValid, conclusionObj
+                    );
+
+                    // Always add conclusion (may have duplicates if unique ones exhausted)
+                    usedConclusionTexts.add(conclusionHTML);
+
+                    conclusionsArr.push({
+                        conclusion: conclusionHTML,
+                        isValid: conclusionIsValid,
+                        startWord: sw,
+                        endWord: ew,
+                    });
+                    generatedCount++;
                 }
 
-                let conclusion = createPremiseHTML(conclusionObj, true, length);
-                [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj);
+                const primary = conclusionsArr[0] ?? { conclusion: '', isValid: false };
 
                 return {
                     premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
-                    conclusion: conclusion,
-                    isValid: isValid,
+                    conclusion: primary.conclusion,
+                    isValid: primary.isValid,
+                    conclusions: conclusionsArr,
+                    currentConclusionIndex: 0,
+                    userAnswers: [],
                     plen: length,
                     type: "space-six-d",
                     category: "SPACE SIX D",

@@ -1,8 +1,13 @@
 class SpaceHardMode {
-    constructor(numTransforms) {
+    constructor(numTransforms, anchorWords = []) {
         this.numTransforms = numTransforms;
+        this.anchorWords = anchorWords;
     }
-    
+
+    isAnchorWord(word) {
+        return savedata.anchorSpaceFixedPositions && this.anchorWords.includes(word);
+    }
+
     basicHardMode(wordCoordMap, startWord, endWord, originalConclusionCoord) {
         let newWordMap;
         let newDiffCoord;
@@ -85,6 +90,10 @@ class SpaceHardMode {
         let rightDimensions = [];
 
         const bannedFromPool = new Set([leftStart, rightStart]);
+        // When fixed anchors enabled, exclude anchor words from transform pool
+        if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
+            this.anchorWords.forEach(w => bannedFromPool.add(w));
+        }
         const pool = Object.keys(wordCoordMap).filter(word => !bannedFromPool.has(word));
         const dimensionPool = wordCoordMap[leftStart].map((c, i) => i);
 
@@ -249,7 +258,10 @@ class SpaceHardMode {
                 }
 
                 const command = pickRandomItems(cpool, 1).picked[0];
-                wordCoordMap[b] = command.call(null, a, b, dimension);
+                // Skip transform if target word is a fixed anchor
+                if (!this.isAnchorWord(b)) {
+                    wordCoordMap[b] = command.call(null, a, b, dimension);
+                }
                 usedCommands.push(command);
                 cpool = commandPool;
             }

@@ -33,7 +33,7 @@ function createBasicPremiseHTML(premise, allowReversal=true, forceMinimal=null, 
         if (pattern && pattern[word]) {
             // It's a shape ID, render as SVG
             const { shape, color } = pattern[word];
-            const size = 20;
+            const size = 28;
             const svg = createShapeSVG(shape, color, size/2, size/2, size);
             return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="vertical-align: middle; display: inline-block;">${svg}</svg>`;
         }
@@ -55,7 +55,8 @@ function createBasicPremiseHTML(premise, allowReversal=true, forceMinimal=null, 
       `<span class="subject">${end}</span> <span class="relation"><span class="is-negated">${relation}</span></span> <span class="subject">${start}</span>`,
       ];
     }
-    return pickNegatable(ps);
+    const result = pickNegatable(ps);
+    return result;
 }
 
 function createWidePremiseHTML(premise, allowReversal=true, forceMinimal=null, pattern=null) {
@@ -69,7 +70,7 @@ function createWidePremiseHTML(premise, allowReversal=true, forceMinimal=null, p
     const renderSubject = (word) => {
         if (pattern && pattern[word]) {
             const { shape, color } = pattern[word];
-            const size = 20;
+            const size = 28;
             const svg = createShapeSVG(shape, color, size/2, size/2, size);
             return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="vertical-align: middle; display: inline-block;">${svg}</svg>`;
         }
@@ -164,7 +165,7 @@ function createNegatedConclusionHTML(premise, allowReversal=true, forceMinimal=n
     const renderSubject = (word) => {
         if (pattern && pattern[word]) {
             const { shape, color } = pattern[word];
-            const size = 20;
+            const size = 28;
             const svg = createShapeSVG(shape, color, size/2, size/2, size);
             return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="vertical-align: middle; display: inline-block;">${svg}</svg>`;
         }

@@ -127,17 +127,58 @@ class DistinctionQuestion {
     create(length) {
         this.generate(length);
 
-        let [startWord, endWord] = new DirectionPairChooser().pickTwoDistantWords(this.neighbors);
-        let conclusionObj;
-        if (coinFlip()) {
-            conclusionObj = createSamePremise(startWord, endWord);
-            this.isValid = this.bucketMap[startWord] === this.bucketMap[endWord];
-        } else {
-            conclusionObj = createOppositePremise(startWord, endWord);
-            this.isValid = this.bucketMap[startWord] !== this.bucketMap[endWord];
+        // Generate multiple conclusions if mode is enabled
+        const numConclusions = (savedata.multipleConclusionsMode && savedata.numConclusions > 1)
+            ? savedata.numConclusions
+            : 1;
+
+        const conclusionsArr = [];
+        const usedConclusionTexts = new Set();
+        const usedPairKeys = new Set();
+        const pairChooser = new DirectionPairChooser();
+
+        let generatedCount = 0;
+        // Always run to completion - use fallback for pairs when unique ones exhausted
+        while (generatedCount < numConclusions) {
+            const [startWord, endWord] = getUniquePairOrFallback(this.neighbors, pairChooser, usedPairKeys);
+
+            if (!startWord || !endWord) {
+                generatedCount++; // Prevent infinite loop
+                continue;
+            }
+
+            let conclusionObj;
+            let conclusionIsValid;
+            if (coinFlip()) {
+                conclusionObj = createSamePremise(startWord, endWord);
+                conclusionIsValid = this.bucketMap[startWord] === this.bucketMap[endWord];
+            } else {
+                conclusionObj = createOppositePremise(startWord, endWord);
+                conclusionIsValid = this.bucketMap[startWord] !== this.bucketMap[endWord];
+            }
+            const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+            let conclusionHTML = premiseResult.html;
+            if (premiseResult.isInverted) {
+                conclusionIsValid = !conclusionIsValid;
+            }
+            [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj);
+
+            // Always add conclusion (may have duplicates if unique ones exhausted)
+            usedConclusionTexts.add(conclusionHTML);
+
+            conclusionsArr.push({
+                conclusion: conclusionHTML,
+                isValid: conclusionIsValid,
+                startWord,
+                endWord,
+            });
+            generatedCount++;
         }
-        this.conclusion = createBasicPremiseHTML(conclusionObj, false);
-        [this.conclusion, this.isValid] = applyConclusionNegation(this.conclusion, this.isValid, conclusionObj);
+
+        // Primary conclusion for backward compatibility
+        const primary = conclusionsArr[0] ?? { conclusion: '', isValid: false };
+        this.conclusion = primary.conclusion;
+        this.isValid = primary.isValid;
 
         const countdown = this.getCountdown();
         return {
@@ -148,6 +189,9 @@ class DistinctionQuestion {
             premises: this.premises,
             isValid: this.isValid,
             conclusion: this.conclusion,
+            conclusions: conclusionsArr,
+            currentConclusionIndex: 0,
+            userAnswers: [],
             ...(savedata.widePremises && { plen: length }),
             ...(countdown && { countdown }),
         };

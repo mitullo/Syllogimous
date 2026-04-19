@@ -236,6 +236,10 @@ function throwSvgsOnPage() {
 }
 
 function renderJunkEmojisText(text, pattern = null) {
+    // Handle object input from createPremiseHTML (which returns {html, isInverted})
+    if (typeof text === 'object' && text !== null && text.html !== undefined) {
+        text = text.html;
+    }
     // First, replace pattern words with their shape icons (for Anchor Space v2)
     text = replaceWordsWithPatternShapes(text, pattern);
 
@@ -353,6 +357,13 @@ function renderJunkEmojis(question) {
 
     if (question.conclusion) {
         question.conclusion = renderJunkEmojisText(question.conclusion, question.pattern);
+    }
+
+    if (question.conclusions) {
+        question.conclusions = question.conclusions.map(c => ({
+            ...c,
+            conclusion: renderJunkEmojisText(c.conclusion, question.pattern)
+        }));
     }
 
     return question;

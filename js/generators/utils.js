@@ -89,14 +89,16 @@ function getPremisesFor(key, defaultQuota) {
 
 function pickNegatable(cs) {
     if (!savedata.enableNegation) {
-        return cs[0];
+        return { html: cs[0], isInverted: false };
     }
     const freq = savedata.negationFrequency || 50;
     // For 50% frequency, use random pick. Otherwise, weighted choice based on frequency
     if (Math.random() * 100 < freq) {
-        return pickRandomItems(cs, 1).picked[0];
+        const picked = pickRandomItems(cs, 1).picked[0];
+        // cs[1] is the inverted version (with is-negated span)
+        return { html: picked, isInverted: picked === cs[1] };
     }
-    return cs[0];
+    return { html: cs[0], isInverted: false };
 }
 
 function interleaveArrays(arr1, arr2) {
@@ -184,4 +186,87 @@ function normalizeString(input) {
 
 function oneOutOf(n) {
     return Math.random() < 1 / n;
+}
+
+// Helper functions for multiple conclusions uniqueness (sample without replacement)
+// Fisher-Yates shuffle that returns a new array (non-mutating)
+function shuffleCopy(array) {
+    const arr = array.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+// Pick unique subset from pool without replacement
+function pickUniqueSubset(pool, size, usedKeys, normalizeFn = items => items.join('|')) {
+    if (!Array.isArray(pool) || pool.length < size) return null;
+
+    for (let attempts = 0; attempts < 20; attempts++) {
+        const picked = shuffleCopy(pool).slice(0, size);
+        const key = normalizeFn(picked);
+        if (!usedKeys.has(key)) {
+            usedKeys.add(key);
+            return picked;
+        }
+    }
+
+    return shuffleCopy(pool).slice(0, size);
+}
+
+// Build unique pairs from neighbors using pairChooser
+function buildUniquePairs(neighbors, pairChooser, maxPairs = 20) {
+    const pairs = [];
+    const seen = new Set();
+
+    for (let i = 0; i < maxPairs; i++) {
+        const pr = pairChooser.pickTwoDistantWords(neighbors);
+        if (!pr) continue;
+
+        const [a, b] = pr;
+        const key = [a, b].sort().join('|');
+        if (seen.has(key)) continue;
+
+        seen.add(key);
+        pairs.push([a, b]);
+    }
+
+    return shuffleCopy(pairs);
+}
+
+// Fallback helper functions for consistent multiple conclusions generation
+// Always returns a subset, preferring unique but falling back to any random subset
+function pickUniqueSubsetOrFallback(pool, size, usedKeys, normalizeFn = items => items.join('|'), maxAttempts = 50) {
+    if (!Array.isArray(pool) || pool.length < size) return null;
+
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+        const picked = shuffleCopy(pool).slice(0, size);
+        const key = normalizeFn(picked);
+        if (!usedKeys.has(key)) {
+            usedKeys.add(key);
+            return picked;
+        }
+    }
+
+    // Fallback: return any random subset (may repeat)
+    return shuffleCopy(pool).slice(0, size);
+}
+
+// Always returns a pair, preferring unique but falling back to any random pair
+function getUniquePairOrFallback(neighbors, pairChooser, usedPairKeys, maxAttempts = 20) {
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+        const pr = pairChooser.pickTwoDistantWords(neighbors);
+        if (!pr) continue;
+
+        const [a, b] = pr;
+        const key = [a, b].sort().join('|');
+        if (!usedPairKeys.has(key)) {
+            usedPairKeys.add(key);
+            return pr;
+        }
+    }
+
+    // Fallback: plain random pair (may repeat)
+    return pairChooser.pickTwoDistantWords(neighbors);
 }

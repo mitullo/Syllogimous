@@ -40,7 +40,15 @@ let appState = {
 
     "uiDensity": "normal",
 
-    "bracketColor": "#1798B0",
+    "multipleConclusionsMode": false,
+
+    "numConclusions": 3,
+
+    "timeBonusPerConclusionEnabled": false,
+
+    "timeBonusPerConclusion": 3,
+
+    "bracketColor": "#217fe4",
 
     "colorWords": false,
 
@@ -295,6 +303,8 @@ let savedata = {
     "autoProgressionTimeDrop": 5,
 
     "autoProgressionTimeBump": 5,
+
+    "anchorSpaceFixedPositions": false,
 
 };
 
@@ -560,6 +570,14 @@ const compressedSettings = {
 
     "invertedMinimalMode": "invMin",
 
+    "multipleConclusionsMode": "multiConc",
+
+    "numConclusions": "numConc",
+
+    "timeBonusPerConclusionEnabled": "timeBonusEnabled",
+
+    "timeBonusPerConclusion": "timeBonus",
+
     "dailyProgressGoal": "dGoal",
 
     "weeklyProgressGoal": "wGoal",
@@ -678,11 +696,16 @@ const keySettingMap = {
     "p-anc-v2-time": "overrideAnchorSpaceV2Time",
     "p-anc-v2-weight": "overrideAnchorSpaceV2Weight",
     "p-anc-v2-scramble": "overrideAnchorSpaceV2Scramble",
+    "p-anc-v2-fixed": "anchorSpaceFixedPositions",
     "p-46": "spoilerConclusion",
     "p-47": "enableBacktrackingLinear",
     "p-48": "minimalMode",
     "p-48-half": "halfMinimalMode",
     "p-48-inverted": "invertedMinimalMode",
+    "p-multi-conc": "multipleConclusionsMode",
+    "p-num-conc": "numConclusions",
+    "p-time-bonus-enabled": "timeBonusPerConclusionEnabled",
+    "p-time-bonus-amount": "timeBonusPerConclusion",
     "p-49": "autoProgressionTrailing",
     "p-50": "autoProgressionPercentSuccess",
     "p-51": "autoProgressionPercentFail",

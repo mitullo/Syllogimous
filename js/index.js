@@ -188,9 +188,29 @@ function registerEventHandlers() {
 
         if (input.type === "checkbox") {
 
-            input.addEventListener("input", evt => {
+            input.addEventListener("change", evt => {
 
                 savedata[value] = !!input.checked;
+
+                // Reset anchor pattern when disabling fixed positions
+                if (key === "p-anc-v2-fixed" && !input.checked) {
+                    const anchorSpace = new AnchorSpaceV2();
+                    anchorSpace.resetPattern();
+                }
+
+                // Set default numConclusions when enabling multiple conclusions mode
+                if (key === "p-multi-conc" && input.checked && !savedata.numConclusions) {
+                    savedata.numConclusions = 3;
+                    const numInput = document.getElementById("p-num-conc");
+                    if (numInput) numInput.value = 3;
+                }
+
+                // Set default time bonus when enabling time bonus per conclusion
+                if (key === "p-time-bonus-enabled" && input.checked && !savedata.timeBonusPerConclusion) {
+                    savedata.timeBonusPerConclusion = 3;
+                    const bonusInput = document.getElementById("p-time-bonus-amount");
+                    if (bonusInput) bonusInput.value = 3;
+                }
 
                 refresh();
 
@@ -434,7 +454,11 @@ function displayInit() {
 
         isPatternMemorizationPhase = true;
 
-        displayText.innerHTML = renderPatternDisplay(q.pattern, q.premises, q.operations, q.conclusion, easy, halfMinimal);
+        const isMultiPattern = savedata.multipleConclusionsMode && q.conclusions && q.conclusions.length > 1;
+        const currentIdxPattern = isMultiPattern ? (q.currentConclusionIndex || 0) : 0;
+        const currentConcPattern = isMultiPattern && q.conclusions[currentIdxPattern] ? q.conclusions[currentIdxPattern].conclusion : q.conclusion;
+        const concLabelPattern = isMultiPattern ? `Conclusion ${currentIdxPattern + 1} of ${q.conclusions.length}` : 'Conclusion';
+        displayText.innerHTML = renderPatternDisplay(q.pattern, q.premises, q.operations, currentConcPattern, easy, halfMinimal, concLabelPattern);
 
         // Hide TRUE/FALSE buttons during pattern memorization
 
@@ -458,7 +482,11 @@ function displayInit() {
 
                 isPatternMemorizationPhase = false;
 
-                showPremisesAfterPattern(q.premises, q.operations, q.conclusion, easy, halfMinimal);
+                const isMulti = savedata.multipleConclusionsMode && q.conclusions && q.conclusions.length > 1;
+                const currentIdx = isMulti ? (q.currentConclusionIndex || 0) : 0;
+                const currentConc = isMulti && q.conclusions[currentIdx] ? q.conclusions[currentIdx].conclusion : q.conclusion;
+                const concLabel = isMulti ? `Conclusion ${currentIdx + 1} of ${q.conclusions.length}` : 'Conclusion';
+                showPremisesAfterPattern(q.premises, q.operations, currentConc, easy, halfMinimal, concLabel);
 
             });
 
@@ -466,7 +494,11 @@ function displayInit() {
 
     } else {
 
-        displayText.innerHTML = buildPremisesHTML(q.premises, q.operations, q.conclusion, easy, halfMinimal);
+        const isMulti = savedata.multipleConclusionsMode && q.conclusions && q.conclusions.length > 1;
+        const currentIdx = isMulti ? (q.currentConclusionIndex || 0) : 0;
+        const currentConc = isMulti && q.conclusions[currentIdx] ? q.conclusions[currentIdx].conclusion : q.conclusion;
+        const concLabel = isMulti ? `Conclusion ${currentIdx + 1} of ${q.conclusions.length}` : 'Conclusion';
+        displayText.innerHTML = buildPremisesHTML(q.premises, q.operations, currentConc, easy, halfMinimal, concLabel);
 
     }
 
@@ -570,11 +602,11 @@ function displayInit() {
 
 
 
-function renderPatternDisplay(pattern, premises, operations, conclusion, easy, halfMinimal) {
+function renderPatternDisplay(pattern, premises, operations, conclusion, easy, halfMinimal, conclusionLabel) {
 
     const entries = Object.entries(pattern);
 
-    if (entries.length === 0) return buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal);
+    if (entries.length === 0) return buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, conclusionLabel);
 
 
 
@@ -690,7 +722,7 @@ function renderPatternDisplay(pattern, premises, operations, conclusion, easy, h
 
         <div id="premises-phase" style="display: none;">
 
-            ${buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal)}
+            ${buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, conclusionLabel)}
 
         </div>
 
@@ -792,7 +824,7 @@ function createShapeSVG(shape, color, x, y, size) {
 
 
 
-function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMinimal) {
+function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMinimal, conclusionLabel) {
 
     const patternPhase = document.querySelector('.pattern-memorization-phase');
 
@@ -806,6 +838,8 @@ function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMi
 
     if (premisesPhase) {
 
+        // Update the premises phase content with the correct conclusion label
+        premisesPhase.innerHTML = buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, conclusionLabel);
         premisesPhase.style.display = 'block';
 
     }
@@ -818,7 +852,9 @@ function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMi
 
     if (savedata.anchorSpaceV2PauseTimer && timerToggled && !timerRunning) {
 
-        startCountDown();
+        setTimeout(() => {
+            startCountDown();
+        }, 500);
 
     }
 
@@ -826,7 +862,9 @@ function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMi
 
 
 
-function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal) {
+function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, conclusionLabel) {
+
+    const label = conclusionLabel || 'Conclusion';
 
     return [
 
@@ -838,7 +876,7 @@ function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal) 
 
         ...(operations ? operations.map(o => `<div class="formatted-operation">${o}</div>`) : []),
 
-        '<div class="postamble">Conclusion</div>',
+        `<div class="postamble">${label}</div>`,
 
         '<div class="formatted-conclusion">'+conclusion+'</div>',
 
@@ -914,9 +952,9 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-density').value = appState.uiDensity;
 
-    document.getElementById('p-bracket-color').value = appState.bracketColor || '#1798B0';
+    document.getElementById('p-bracket-color').value = appState.bracketColor || '#217fe4';
 
-    document.getElementById('p-bracket-color-picker').value = appState.bracketColor || '#1798B0';
+    document.getElementById('p-bracket-color-picker').value = appState.bracketColor || '#217fe4';
 
     document.getElementById('p-color-words').checked = appState.colorWords;
 
@@ -930,9 +968,11 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-conclusion-style').value = appState.conclusionStyle || 'minimal';
 
-    document.getElementById('p-conclusion-color').value = appState.conclusionColor || '#ffffff';
+    const defaultConclusionInputColor = appState.darkMode ? '#ffffff' : '#000000';
 
-    document.getElementById('p-conclusion-color-picker').value = appState.conclusionColor || '#ffffff';
+    document.getElementById('p-conclusion-color').value = appState.conclusionColor || defaultConclusionInputColor;
+
+    document.getElementById('p-conclusion-color-picker').value = appState.conclusionColor || defaultConclusionInputColor;
 
     document.getElementById('p-button-style').value = appState.buttonStyle;
 
@@ -1276,7 +1316,7 @@ function applyAppearanceSettings() {
 
     // Theme color - sets glow, borders, buttons, and bracket colors
 
-    const themeColor = appState.bracketColor || '#1798B0';
+    const themeColor = appState.bracketColor || '#217fe4';
 
     root.style.setProperty('--theme-color', themeColor);
 
@@ -1314,7 +1354,7 @@ function applyAppearanceSettings() {
 
     }
 
-    const rgb = hexToRgb(themeColor) || { r: 23, g: 152, b: 176 };
+    const rgb = hexToRgb(themeColor) || { r: 33, g: 127, b: 228 };
 
     root.style.setProperty('--accent-color', themeColor);
 
@@ -1366,9 +1406,11 @@ function applyAppearanceSettings() {
 
 
 
-    // Conclusion color
+    // Conclusion color - defaults to white in dark mode, black in light mode
 
-    const conclusionColor = appState.conclusionColor || '#ffffff';
+    const defaultConclusionColor = appState.darkMode ? '#ffffff' : '#000000';
+
+    const conclusionColor = appState.conclusionColor || defaultConclusionColor;
 
     root.style.setProperty('--conclusion-color', conclusionColor);
 
@@ -1426,7 +1468,21 @@ function handleFastUiChange(event) {
 
 function handleDarkModeChange(event) {
 
-    appState.darkMode = event.target.checked;
+    const isDarkMode = event.target.checked;
+
+    // Reset conclusion color to mode-appropriate default when switching
+
+    const oldDefault = isDarkMode ? '#000000' : '#ffffff';
+
+    const newDefault = isDarkMode ? '#ffffff' : '#000000';
+
+    if (appState.conclusionColor === oldDefault || !appState.conclusionColor) {
+
+        appState.conclusionColor = newDefault;
+
+    }
+
+    appState.darkMode = isDarkMode;
 
     refresh();
 
@@ -1736,70 +1792,149 @@ let timerDuration = 0;
 
 let timerAnimationFrame = null;
 
+// Visual-only tween used when bonus time is added
+let timerBonusAnimation = null;
+
+function getTimerPctFromElapsed(elapsed) {
+    if (!timerDuration || timerDuration <= 0) return 100;
+
+    const clampedElapsed = Math.max(0, Math.min(elapsed, timerDuration));
+    const t = clampedElapsed / timerDuration;
+
+    let pct;
+
+    if (appState.timerAnimation === 'stepEaseOut') {
+        const totalSeconds = timerDuration / 1000;
+        const stepped = t * totalSeconds;
+        const currentSecond = Math.floor(stepped);
+        const secondProgress = stepped % 1;
+        const easedSecondProgress = 1 - Math.pow(1 - Math.min(secondProgress, 0.95), 3);
+
+        pct = (1 - (currentSecond + easedSecondProgress) / totalSeconds) * 100;
+    } else {
+        const easingFn = easingFunctions[appState.timerAnimation] || easingFunctions.easeOutCubic;
+        const easedT = easingFn(t);
+        pct = (1 - easedT) * 100;
+    }
+
+    return Math.max(0, Math.min(100, pct));
+}
+
+function getActualElapsed(now) {
+    return Math.max(0, now - timerStartTime);
+}
+
+function getVisualElapsed(now) {
+    const actualElapsed = getActualElapsed(now);
+
+    if (!timerBonusAnimation) return actualElapsed;
+
+    const animElapsed = now - timerBonusAnimation.startedAt;
+    const progress = Math.min(animElapsed / timerBonusAnimation.duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+
+    const visualElapsed =
+        timerBonusAnimation.fromElapsed +
+        (timerBonusAnimation.toElapsed - timerBonusAnimation.fromElapsed) * eased;
+
+    if (progress >= 1) {
+        timerBonusAnimation = null;
+        return actualElapsed;
+    }
+
+    return visualElapsed;
+}
 
 
 function startCountDown() {
-
     timerRunning = true;
 
     if (question) {
-
         question.startedAt = new Date().getTime();
-
     }
 
-    timerDuration = findStartingTimerCount() * 1000; // convert to ms
-
+    timerDuration = findStartingTimerCount() * 1000;
     timerStartTime = performance.now();
+    timerBonusAnimation = null;
 
-    renderTimerBar();
+    renderTimerBar(timerStartTime);
 
-    animateTimerBarSmooth();
-
+    if (timerAnimationFrame) {
+        cancelAnimationFrame(timerAnimationFrame);
+    }
+    timerAnimationFrame = requestAnimationFrame(animateTimerBarSmooth);
 }
 
 
 
 function stopCountDown() {
-
     timerRunning = false;
+    timerBonusAnimation = null;
 
     if (timerAnimationFrame) {
-
         cancelAnimationFrame(timerAnimationFrame);
-
         timerAnimationFrame = null;
-
     }
 
     timerBar.style.width = '100%';
+}
 
+// Add time bonus to the current question timer (for multiple conclusions)
+function addTimeBonusToTimer(bonusSeconds) {
+    if (!bonusSeconds || bonusSeconds <= 0) return;
+    if (!question) return;
+    if (!timerRunning || !timerStartTime) return;
+
+    const now = performance.now();
+
+    // Capture current visual state before changing the real timer
+    const beforeElapsed = getVisualElapsed(now);
+    const currentRemaining = Math.max(0, timerDuration - beforeElapsed);
+
+    // Calculate the maximum bonus that won't exceed original duration
+    const maxBonus = timerDuration - currentRemaining;
+    const actualBonus = Math.min(bonusSeconds, maxBonus / 1000);
+
+    if (actualBonus <= 0) return; // Already at or above full duration
+
+    // FIX: adding bonus means moving start time forward, not backward
+    timerStartTime += (actualBonus * 1000);
+
+    const afterElapsed = getActualElapsed(now);
+
+    // Animate the bar to the new fuller state
+    timerBonusAnimation = {
+        startedAt: now,
+        duration: 450,
+        fromElapsed: beforeElapsed,
+        toElapsed: afterElapsed
+    };
+
+    renderTimerBar(now);
+
+    if (!timerAnimationFrame) {
+        timerAnimationFrame = requestAnimationFrame(animateTimerBarSmooth);
+    }
 }
 
 
 
-function renderTimerBar() {
-
+function renderTimerBar(now = performance.now()) {
     const [mode, startingTimerCount] = findStartingTimerState();
 
     if (mode === 'override') {
-
         timerBar.classList.add('override');
-
         customTimeInfo.classList.add('visible');
-
         customTimeInfo.innerHTML =  '' + startingTimerCount + 's';
-
     } else {
-
         timerBar.classList.remove('override');
-
         customTimeInfo.classList.remove('visible');
-
         customTimeInfo.innerHTML = '';
-
     }
 
+    const visualElapsed = getVisualElapsed(now);
+    const pct = getTimerPctFromElapsed(visualElapsed);
+    timerBar.style.width = pct + '%';
 }
 
 
@@ -1854,68 +1989,21 @@ const easingFunctions = {
 
 
 
-function animateTimerBarSmooth() {
-
+function animateTimerBarSmooth(now) {
     if (!timerRunning) return;
 
-    
+    const actualElapsed = getActualElapsed(now);
+    const remaining = Math.max(0, timerDuration - actualElapsed);
 
-    const elapsed = performance.now() - timerStartTime;
-
-    const remaining = Math.max(0, timerDuration - elapsed);
-
-    const t = 1 - (remaining / timerDuration); // normalized progress (0 to 1)
-
-    
-
-    let pct;
-
-    
-
-    if (appState.timerAnimation === 'stepEaseOut') {
-
-        // Step tick: smooth ease-out within each second, then hold
-
-        const totalSeconds = timerDuration / 1000;
-
-        const currentSecond = Math.floor(t * totalSeconds);
-
-        const secondProgress = (t * totalSeconds) % 1;
-
-        // Ease-out within the second, but don't go past the next tick point
-
-        const easedSecondProgress = 1 - Math.pow(1 - Math.min(secondProgress, 0.95), 3);
-
-        pct = (1 - (currentSecond + easedSecondProgress) / totalSeconds) * 100;
-
-    } else {
-
-        // Standard easing functions
-
-        const easingFn = easingFunctions[appState.timerAnimation] || easingFunctions.easeOutCubic;
-
-        const easedT = easingFn(t);
-
-        pct = (1 - easedT) * 100;
-
-    }
-
-    
-
-    timerBar.style.width = pct + '%';
-
-    
+    renderTimerBar(now);
 
     if (remaining > 0) {
-
         timerAnimationFrame = requestAnimationFrame(animateTimerBarSmooth);
-
     } else {
-
+        timerBonusAnimation = null;
+        timerAnimationFrame = null;
         timeElapsed();
-
     }
-
 }
 
 
@@ -2186,11 +2274,27 @@ function init() {
 
     if (timerToggled) {
 
-        startCountDown();
+        // Delay timer start so premises can be seen at full time first
+        setTimeout(() => {
+            startCountDown();
+        }, 500);
 
     } else {
 
-        renderTimerBar();
+        // Reset timer bar to full width when timer is not active
+        const [mode, startingTimerCount] = findStartingTimerState();
+
+        if (mode === 'override') {
+            timerBar.classList.add('override');
+            customTimeInfo.classList.add('visible');
+            customTimeInfo.innerHTML = '' + startingTimerCount + 's';
+        } else {
+            timerBar.classList.remove('override');
+            customTimeInfo.classList.remove('visible');
+            customTimeInfo.innerHTML = '';
+        }
+
+        timerBar.style.width = '100%';
 
     }
 
@@ -2378,6 +2482,40 @@ function fastFeedback(cb, className) {
 
 
 
+// Show per-conclusion feedback (doesn't interfere with processingAnswer state)
+// isIntermediate: if true, use faster timing for multi-conclusion mode
+function showConclusionResult(isCorrect, callback, isIntermediate = false) {
+    playSound(isCorrect ? 'success' : 'failure');
+
+    // Match original timing from oldindex.js
+    // wowFeedbackRight/Wrong/Missed used 1000ms
+    // fastFeedback used 350ms
+    let delay;
+    if (savedata.fastUi) {
+        delay = 350; // Original fastFeedback timing
+    } else if (isIntermediate) {
+        delay = 550; // Brief feedback between conclusions
+    } else {
+        delay = 1000; // Match original wowFeedback timing for final conclusion
+    }
+
+    if (appState.fastUi) {
+        removeFastFeedback();
+        gameArea.classList.add(isCorrect ? 'right' : 'wrong');
+        setTimeout(() => {
+            removeFastFeedback();
+            if (callback) callback();
+        }, delay);
+    } else {
+        const feedbackEl = isCorrect ? feedbackRight : feedbackWrong;
+        feedbackEl.classList.add("active");
+        setTimeout(() => {
+            feedbackEl.classList.remove("active");
+            if (callback) callback();
+        }, delay);
+    }
+}
+
 function wowFeedbackRight(cb) {
 
     playSound('success');
@@ -2463,21 +2601,13 @@ function wowFeedbackMissed(cb) {
 
 
 function wowFeedback() {
-
     if (question.correctness === 'right') {
-
         wowFeedbackRight(init);
-
     } else if (question.correctness === 'wrong') {
-
         wowFeedbackWrong(init);
-
     } else {
-
         wowFeedbackMissed(init);
-
     }
-
 }
 
 
@@ -2499,84 +2629,158 @@ function storeQuestionAndSave() {
 
 
 function checkIfTrue() {
-
-    trueButton.blur();
-
-    if (processingAnswer) {
-
-        return;
-
-    }
-
-    processingAnswer = true;
-
-    question.answerUser = true;
-
-    if (question.isValid) {
-
-        appState.score++;
-
-        question.correctness = 'right';
-
-    } else {
-
-        appState.score--;
-
-        question.correctness = 'wrong';
-
-    }
-
-    question.answeredAt = new Date().getTime();
-
-    storeQuestionAndSave();
-
-    renderHQL(true);
-
-    wowFeedback();
-
+    handleConclusionAnswer(true);
 }
-
-
 
 function checkIfFalse() {
-
-    falseButton.blur();
-
-    if (processingAnswer) {
-
-        return;
-
-    }
-
-    processingAnswer = true;
-
-    question.answerUser = false;
-
-    if (!question.isValid) {
-
-        appState.score++;
-
-        question.correctness = 'right';
-
-    } else {
-
-        appState.score--;
-
-        question.correctness = 'wrong';
-
-    }
-
-    question.answeredAt = new Date().getTime();
-
-    storeQuestionAndSave();
-
-    renderHQL(true);
-
-    wowFeedback();
-
+    handleConclusionAnswer(false);
 }
 
+// Single state machine for all answer handling
+function handleConclusionAnswer(userAnswer) {
+    if (processingAnswer) return;
 
+    trueButton.blur();
+    falseButton.blur();
+    processingAnswer = true;
+
+    const q = question;
+    const isMulti = savedata.multipleConclusionsMode && q.conclusions && q.conclusions.length > 1;
+
+    if (!isMulti) {
+        // Single conclusion mode - simple path
+        const isCorrect = userAnswer === q.isValid;
+        q.answerUser = userAnswer;
+        if (isCorrect) {
+            appState.score++;
+            q.correctness = 'right';
+        } else {
+            appState.score--;
+            q.correctness = 'wrong';
+        }
+        q.answeredAt = new Date().getTime();
+
+        // Immediately update progress display
+        correctlyAnsweredEl.innerText = appState.score;
+        nextLevelEl.innerText = appState.questions.length + 1;
+
+        // Single conclusion - use original wowFeedback flow (1000ms delay)
+        storeQuestionAndSave();
+        renderHQL(true);
+        wowFeedback();
+        processingAnswer = false;
+        return;
+    }
+
+    // Multiple conclusions mode
+    if (!q.userAnswers) q.userAnswers = [];
+    if (q.currentConclusionIndex === undefined) q.currentConclusionIndex = 0;
+
+    const idx = q.currentConclusionIndex;
+    const current = q.conclusions[idx];
+    if (!current) {
+        processingAnswer = false;
+        return;
+    }
+    const isCorrect = userAnswer === current.isValid;
+
+    q.userAnswers[idx] = userAnswer;
+
+    // Immediately update progress indicator for multiple conclusions
+    updateConclusionProgress(q);
+
+    // Check if this is an intermediate conclusion (not the last one)
+    const isIntermediateConclusion = idx + 1 < q.conclusions.length;
+
+    // Use faster feedback for intermediate conclusions in multi-conclusion mode
+    showConclusionResult(isCorrect, () => {
+        const nextIndex = idx + 1;
+
+        if (nextIndex < q.conclusions.length) {
+            // More conclusions to answer
+            q.currentConclusionIndex = nextIndex;
+
+            // Add time bonus if enabled AND multiple conclusions mode is active
+            if (savedata.timeBonusPerConclusionEnabled && savedata.multipleConclusionsMode) {
+                addTimeBonusToTimer(savedata.timeBonusPerConclusion);
+            }
+
+            refreshDisplayForNextConclusion();
+            processingAnswer = false;
+        } else {
+            // All conclusions answered - calculate final result
+            const numCorrect = q.userAnswers.filter(
+                (ans, i) => ans === q.conclusions[i].isValid
+            ).length;
+            q.numCorrect = numCorrect;
+            q.currentConclusionIndex = nextIndex; // Mark as finished
+
+            // Question passed only if ALL conclusions correct
+            const isQuestionCorrect = numCorrect === q.conclusions.length;
+
+            q.answerUser = isQuestionCorrect;
+            if (isQuestionCorrect) {
+                appState.score++;
+                q.correctness = 'right';
+            } else {
+                appState.score--;
+                q.correctness = 'wrong';
+            }
+            q.answeredAt = new Date().getTime();
+
+            storeQuestionAndSave();
+            renderHQL(true);
+            // Move to next puzzle after final conclusion feedback
+            init();
+            processingAnswer = false;
+        }
+    }, isIntermediateConclusion);
+}
+
+// Refresh display to show next conclusion
+function refreshDisplayForNextConclusion() {
+    const q = question;
+    const isMulti = savedata.multipleConclusionsMode && q.conclusions && q.conclusions.length > 1;
+
+    if (!isMulti) return;
+
+    const currentIdx = q.currentConclusionIndex || 0;
+    const conclusionLabel = `Conclusion ${currentIdx + 1} of ${q.conclusions.length}`;
+    const currentConclusionObj = q.conclusions[currentIdx];
+    if (!currentConclusionObj) return;
+    const currentConclusion = renderJunkEmojisText(currentConclusionObj.conclusion, q.pattern);
+
+    // Update the conclusion label and content
+    const postambleEl = document.querySelector('.postamble');
+    const conclusionEl = document.querySelector('.formatted-conclusion');
+
+    if (postambleEl) {
+        postambleEl.textContent = conclusionLabel;
+    }
+    if (conclusionEl) {
+        conclusionEl.innerHTML = currentConclusion;
+    }
+}
+
+// Update progress indicator immediately during multiple conclusions
+function updateConclusionProgress(q) {
+    if (!q.conclusions || q.conclusions.length <= 1) return;
+
+    const answeredCount = (q.userAnswers || []).filter(ans => ans !== undefined).length;
+    const totalConclusions = q.conclusions.length;
+
+    // Update the score display to show conclusion progress
+    // Format: "X / Y" where X is answered, Y is total conclusions
+    const progressEl = document.querySelector('.correctly-answered');
+    if (progressEl && answeredCount > 0) {
+        // Store original score to restore later
+        if (!q.originalScoreForProgress) {
+            q.originalScoreForProgress = appState.score;
+        }
+        // Show interim progress (e.g., "3/5" for 3rd of 5 conclusions)
+        progressEl.innerText = `${answeredCount}/${totalConclusions}`;
+    }
+}
 
 function timeElapsed() {
 
@@ -2870,13 +3074,26 @@ function createHQLI(question, i) {
 
         </div>
 
-        <div class="hqli-postamble">Conclusion</div>
+        ${(q.conclusions && q.conclusions.length > 1)
+            ? q.conclusions.map((c, i) => {
+                const userAns = (q.userAnswers || [])[i];
+                const wasCorrect = userAns === c.isValid;
+                const concClass = wasCorrect ? 'correct' : 'wrong';
+                const answerText = userAns === true ? 'TRUE' : (userAns === false ? 'FALSE' : '-');
+                const correctText = c.isValid ? 'TRUE' : 'FALSE';
+                return `<div class="hqli-postamble">Conclusion ${i + 1} of ${q.conclusions.length} — You: ${answerText} (correct: ${correctText})</div>
+        <div class="hqli-conclusion ${concClass}">${c.conclusion}</div>`;
+            }).join('')
+            : `<div class="hqli-postamble">Conclusion</div>
+        <div class="hqli-conclusion">${q.conclusion}</div>`
+        }
 
-        <div class="hqli-conclusion">${q.conclusion}</div>
+        ${(q.conclusions && q.conclusions.length > 1)
+            ? `<div class="hqli-answer-user ${classModifier}">${q.numCorrect || 0}/${q.conclusions.length} correct</div>`
+            : `<div class="hqli-answer-user ${answerUserClassName}">${answerUserDisplay}</div>
 
-        <div class="hqli-answer-user ${answerUserClassName}">${answerUserDisplay}</div>
-
-        <div class="hqli-answer ${answer}">${answerDisplay}</div>
+        <div class="hqli-answer ${answer}">${answerDisplay}</div>`
+        }
 
         ${responseTimeHtml}
 

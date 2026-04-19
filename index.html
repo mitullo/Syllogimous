@@ -1640,7 +1640,7 @@
 
 										<div class="color-presets" style="display: flex; gap: 0.5rem; flex-wrap: wrap; width: 100%;">
 
-											<button type="button" class="color-preset" data-color="#1798B0" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #1798B0; background: #1798B0; cursor: pointer;" title="Cyan Blue"></button>
+											<button type="button" class="color-preset" data-color="#217fe4" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #217fe4; background: #217fe4; cursor: pointer;" title="Blue"></button>
 
 											<button type="button" class="color-preset" data-color="#ff0000" onclick="handlePresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ff0000; background: #ff0000; cursor: pointer;" title="Red"></button>
 
@@ -1664,9 +1664,9 @@
 
 											<span style="font-size: 0.85rem; opacity: 0.7;">Custom:</span>
 
-											<input type="color" id="p-bracket-color-picker" value="#1798B0" onchange="handleBracketColorPickerChange(event)" style="width: 32px; height: 28px; border: none; border-radius: 4px; cursor: pointer; padding: 0; background: transparent;">
+											<input type="color" id="p-bracket-color-picker" value="#217fe4" onchange="handleBracketColorPickerChange(event)" style="width: 32px; height: 28px; border: none; border-radius: 4px; cursor: pointer; padding: 0; background: transparent;">
 
-											<input type="text" id="p-bracket-color" class="select-item" placeholder="#1798B0" value="#1798B0" onchange="handleBracketColorChange(event)" style="width: 8ch; text-align: center; flex: 1;">
+											<input type="text" id="p-bracket-color" class="select-item" placeholder="#217fe4" value="#217fe4" onchange="handleBracketColorChange(event)" style="width: 8ch; text-align: center; flex: 1;">
 
 										</div>
 
@@ -1806,7 +1806,7 @@
 
 											<button type="button" class="color-preset-conclusion" data-color="#ffffff" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ffffff; background: #ffffff; cursor: pointer;" title="White"></button>
 
-											<button type="button" class="color-preset-conclusion" data-color="#1798B0" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #1798B0; background: #1798B0; cursor: pointer;" title="Cyan Blue"></button>
+											<button type="button" class="color-preset-conclusion" data-color="#217fe4" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #217fe4; background: #217fe4; cursor: pointer;" title="Blue"></button>
 
 											<button type="button" class="color-preset-conclusion" data-color="#ff0000" onclick="handleConclusionPresetColorClick(this)" style="width: 24px; height: 24px; border-radius: 4px; border: 2px solid #ff0000; background: #ff0000; cursor: pointer;" title="Red"></button>
 
@@ -2125,6 +2125,74 @@
 												</div>
 
 											</span>
+
+										</div>
+
+									</div>
+
+									<div class="mb-1">
+
+										<div class="ctrl__inner">
+
+											<div>
+
+												<input hidden id="p-multi-conc" type="checkbox">
+
+												<label class="switch" for="p-multi-conc"></label>
+
+											</div>
+
+											<span>Multiple Conclusions</span>
+
+										</div>
+
+										<div style="margin-left: 2rem; margin-top: 0.5rem;">
+
+											<div class="ctrl__inner">
+
+												<span>Number of Conclusions</span>
+
+												<span class="inline-premise-spinner">
+
+													<input id="p-num-conc" type="number" min="1" max="10" value="3" style="width: 5ch"> per question
+
+												</span>
+
+											</div>
+
+										</div>
+
+										<div style="margin-left: 2rem; margin-top: 0.5rem;">
+
+											<div class="ctrl__inner">
+
+												<div>
+
+													<input hidden id="p-time-bonus-enabled" type="checkbox">
+
+													<label class="switch" for="p-time-bonus-enabled"></label>
+
+												</div>
+
+												<span>Time Bonus Per Conclusion</span>
+
+											</div>
+
+										</div>
+
+										<div style="margin-left: 2rem; margin-top: 0.5rem;">
+
+											<div class="ctrl__inner">
+
+												<span>Bonus Amount</span>
+
+												<span class="inline-premise-spinner">
+
+													<input id="p-time-bonus-amount" type="number" min="1" max="15" value="3" style="width: 5ch"> seconds
+
+												</span>
+
+											</div>
 
 										</div>
 
@@ -2563,6 +2631,20 @@
 												</div>
 
 												<label for="p-anc-v2-pause">Pause timer during pattern memorization</label>
+
+											</div>
+
+											<div class="ctrl__inner">
+
+												<div>
+
+													<input hidden id="p-anc-v2-fixed" type="checkbox">
+
+													<label class="switch" for="p-anc-v2-fixed"></label>
+
+												</div>
+
+												<label for="p-anc-v2-fixed">Fix anchor positions</label>
 
 											</div>
 
