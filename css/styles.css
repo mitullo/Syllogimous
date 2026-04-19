@@ -5380,7 +5380,7 @@ button:not(:disabled):hover::after {
 
     background: transparent;
 
-    font-size: calc(var(--step-0) * 0.95);
+    font-size: calc(var(--step-0) * 0.98);
 
 }
 
