@@ -5218,47 +5218,23 @@ table.distinction {
 
 
 
-/* Mobile bracket sizing - prevent overflow */
+/* Mobile bracket sizing - hide on mobile */
 
 @media (max-width: 500px) {
 
-    .border-left {
+    .border-left,
 
-        left: 0;
-
-        width: 0.33rem;
-
-    }
-
-    .border-right {
-
-        right: 0;
-
-        width: 0.33rem;
-
-    }
+    .border-right,
 
     .bracket-lip-top-left,
 
-    .bracket-lip-bottom-left {
-
-        left: 0;
-
-        width: 0.75rem;
-
-        height: 0.33rem;
-
-    }
+    .bracket-lip-bottom-left,
 
     .bracket-lip-top-right,
 
     .bracket-lip-bottom-right {
 
-        right: 0;
-
-        width: 0.75rem;
-
-        height: 0.33rem;
+        display: none;
 
     }
 
