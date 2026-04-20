@@ -5218,6 +5218,54 @@ table.distinction {
 
 
 
+/* Mobile bracket sizing - prevent overflow */
+
+@media (max-width: 500px) {
+
+    .border-left {
+
+        left: -0.5rem;
+
+        width: 0.25rem;
+
+    }
+
+    .border-right {
+
+        right: -0.5rem;
+
+        width: 0.25rem;
+
+    }
+
+    .bracket-lip-top-left,
+
+    .bracket-lip-bottom-left {
+
+        left: -0.5rem;
+
+        width: 0.5rem;
+
+        height: 0.25rem;
+
+    }
+
+    .bracket-lip-top-right,
+
+    .bracket-lip-bottom-right {
+
+        right: -0.5rem;
+
+        width: 0.5rem;
+
+        height: 0.25rem;
+
+    }
+
+}
+
+
+
 /* === Modern UI Improvements === */
 
 
