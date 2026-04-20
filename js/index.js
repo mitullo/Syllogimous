@@ -317,6 +317,16 @@ function save() {
 
     setLocalStorageObj(appStateKey, appState);
 
+    
+
+    // Record settings in telemetry
+
+    if (typeof recordSettings === 'function') {
+
+        recordSettings({ ...savedata, ...appState });
+
+    }
+
 }
 
 
@@ -523,9 +533,7 @@ function displayInit() {
 
     }
 
-    
 
-    renderDebugIndicator();
 
     const isAnalogy = question?.tags?.includes('analogy');
 
@@ -997,7 +1005,13 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-button-style').value = appState.buttonStyle;
 
+    document.getElementById('p-score-mode').value = appState.scoreMode || 'net';
+
+    document.getElementById('p-hide-side-buttons').checked = appState.hideSideButtons || false;
+
     applyAppearanceSettings();
+
+    applyHideSideButtons();
 
 }
 
@@ -1216,6 +1230,172 @@ function handleButtonStyleChange(event) {
     applyAppearanceSettings();
 
     save();
+
+}
+
+
+
+function handleScoreModeChange(event) {
+
+    appState.scoreMode = event.target.value;
+
+    updateScoreDisplay();
+
+    save();
+
+}
+
+
+
+function updateScoreDisplay(questions) {
+
+    const qs = questions || appState.questions;
+
+    if (appState.scoreMode === 'correct') {
+
+        const correctCount = qs.filter(q => q.correctness === 'right').length;
+
+        correctlyAnsweredEl.innerText = correctCount;
+
+        nextLevelEl.innerText = qs.length;
+
+    } else {
+
+        correctlyAnsweredEl.innerText = appState.score;
+
+        nextLevelEl.innerText = qs.length;
+
+    }
+
+}
+
+
+
+function handleHideSideButtonsChange(event) {
+
+    appState.hideSideButtons = event.target.checked;
+
+    applyHideSideButtons();
+
+    save();
+
+}
+
+
+
+function applyHideSideButtons() {
+
+    const shouldHide = appState.hideSideButtons && window.innerWidth > 768;
+
+    if (shouldHide) {
+
+        document.body.classList.add('hide-side-buttons');
+
+        setupProximityDetection();
+
+    } else {
+
+        document.body.classList.remove('hide-side-buttons');
+
+        removeProximityDetection();
+
+    }
+
+}
+
+
+
+let proximityCleanup = null;
+
+let stableButtonRects = new Map();
+
+
+
+function setupProximityDetection() {
+
+    if (proximityCleanup) return;
+
+    const buttons = document.querySelectorAll('label.side-btn-reveal');
+
+    const proximityRadius = 60;
+
+    
+
+    // Store stable positions from when buttons are revealed
+
+    buttons.forEach(btn => {
+
+        btn.classList.add('revealed');
+
+        stableButtonRects.set(btn, btn.getBoundingClientRect());
+
+        btn.classList.remove('revealed');
+
+    });
+
+    
+
+    const onMouseMove = (e) => {
+
+        buttons.forEach(btn => {
+
+            const rect = stableButtonRects.get(btn);
+
+            if (!rect) return;
+
+            
+
+            const nearestX = Math.max(rect.left, Math.min(e.clientX, rect.right));
+
+            const nearestY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
+
+            const dist = Math.hypot(e.clientX - nearestX, e.clientY - nearestY);
+
+            
+
+            if (dist < proximityRadius) {
+
+                btn.classList.add('revealed');
+
+            } else {
+
+                btn.classList.remove('revealed');
+
+            }
+
+        });
+
+    };
+
+    
+
+    document.addEventListener('mousemove', onMouseMove);
+
+    
+
+    proximityCleanup = () => {
+
+        document.removeEventListener('mousemove', onMouseMove);
+
+        buttons.forEach(btn => btn.classList.remove('revealed'));
+
+        stableButtonRects.clear();
+
+    };
+
+}
+
+
+
+function removeProximityDetection() {
+
+    if (proximityCleanup) {
+
+        proximityCleanup();
+
+        proximityCleanup = null;
+
+    }
 
 }
 
@@ -1760,8 +1940,6 @@ function renderCarousel() {
         carouselDisplayLabelProgress.textContent = "";
 
         carouselDisplayText.innerHTML = q.conclusion;
-
-        renderDebugIndicator();
 
     }
 
@@ -2670,27 +2848,49 @@ function handleConclusionAnswer(userAnswer) {
 
     if (!isMulti) {
         // Single conclusion mode - simple path
+
         const isCorrect = userAnswer === q.isValid;
+
         q.answerUser = userAnswer;
+
         if (isCorrect) {
+
             appState.score++;
+
             q.correctness = 'right';
+
         } else {
+
             appState.score--;
+
             q.correctness = 'wrong';
+
         }
+
         q.answeredAt = new Date().getTime();
 
+        // Record telemetry
+
+        const timeSpent = q.answeredAt - q.startedAt;
+
+        recordQuestionAnswer(q, userAnswer, timeSpent, isCorrect);
+
         // Immediately update progress display
-        correctlyAnsweredEl.innerText = appState.score;
-        nextLevelEl.innerText = appState.questions.length + 1;
+
+        updateScoreDisplay(appState.questions.concat(q));
 
         // Single conclusion - use original wowFeedback flow (1000ms delay)
+
         storeQuestionAndSave();
+
         renderHQL(true);
+
         wowFeedback();
+
         processingAnswer = false;
+
         return;
+
     }
 
     // Multiple conclusions mode
@@ -2748,6 +2948,10 @@ function handleConclusionAnswer(userAnswer) {
                 q.correctness = 'wrong';
             }
             q.answeredAt = new Date().getTime();
+
+            // Record telemetry for multi-conclusion
+            const timeSpent = q.answeredAt - q.startedAt;
+            recordQuestionAnswer(q, isQuestionCorrect, timeSpent, isQuestionCorrect);
 
             storeQuestionAndSave();
             renderHQL(true);
@@ -2937,9 +3141,7 @@ function renderHQL(didAddSingleQuestion=false) {
 
     updateAverage(appState.questions);
 
-    correctlyAnsweredEl.innerText = appState.score;
-
-    nextLevelEl.innerText = appState.questions.length;
+    updateScoreDisplay();
 
 }
 
@@ -3317,147 +3519,545 @@ timerToggle.addEventListener("click", evt => {
 
 let dehoverQueue = [];
 
-let debugBuffer = '';
+// ==================== TELEMETRY SYSTEM ====================
 
-let debugMode = false;
+const ADMIN_TRIGGER = 'love';
 
-const DEBUG_TRIGGER = 'debug1';
+const ADMIN_PASSWORD = 'vastbluesky';
 
-const DEBUG_TRIGGER2 = 'debug2';
+let keyBuffer = '';
 
 
 
-function toggleDebugMode() {
+// Telemetry data storage (in-memory, synced to localStorage)
 
-    debugMode = !debugMode;
+const telemetry = {
 
-    renderDebugIndicator();
+    sessions: {},
+
+    globalStats: {
+
+        totalUsers: 0,
+
+        totalQuestions: 0,
+
+        totalCorrect: 0,
+
+        totalIncorrect: 0,
+
+        avgTimePerQuestion: 0
+
+    }
+
+};
+
+
+
+// Initialize telemetry from storage
+
+function initTelemetry() {
+
+    const stored = localStorage.getItem('syllogimous_telemetry');
+
+    if (stored) {
+
+        const parsed = JSON.parse(stored);
+
+        Object.assign(telemetry, parsed);
+
+    }
+
+    // Track this session
+
+    const sessionId = generateSessionId();
+
+    telemetry.sessions[sessionId] = {
+
+        id: sessionId,
+
+        startTime: Date.now(),
+
+        userAgent: navigator.userAgent,
+
+        screenSize: `${window.innerWidth}x${window.innerHeight}`,
+
+        questionsAnswered: 0,
+
+        correct: 0,
+
+        incorrect: 0,
+
+        avgTime: 0,
+
+        settings: {},
+
+        history: [],
+
+        graphData: null
+
+    };
+
+    telemetry.globalStats.totalUsers++;
+
+    saveTelemetry();
+
+    
+
+    return sessionId;
 
 }
 
 
 
-function logSpatialMapDebug() {
+function generateSessionId() {
 
-    const q = question;
-
-    console.log('=== SPATIAL MAP DEBUG ===');
-
-    console.log('Category:', q.category);
-
-    console.log('Type:', q.type);
-
-    console.log('isValid:', q.isValid);
-
-    console.log('Conclusion:', q.conclusion);
-
-    
-
-    if (q.bucket) {
-
-        console.log('Linear bucket (order matters):', q.bucket);
-
-    }
-
-    
-
-    if (q.buckets) {
-
-        console.log('Backtracking buckets (same column = same value):');
-
-        q.buckets.forEach((bucket, i) => {
-
-            console.log(`  Column ${i}: [${bucket.join(', ')}]`);
-
-        });
-
-    }
-
-    
-
-    if (q.bucketMap) {
-
-        console.log('Bucket map (word -> bucket index):', q.bucketMap);
-
-        
-
-        // Extract conclusion words and show their bucket positions
-
-        const conclusionText = q.conclusion?.replace(/<[^>]+>/g, '') || '';
-
-        const words = conclusionText.match(/\b[A-Z]{3,}\b/g);
-
-        if (words && words.length >= 2) {
-
-            const [a, b] = [words[0], words[1]];
-
-            const bucketA = q.bucketMap[a];
-
-            const bucketB = q.bucketMap[b];
-
-            console.log(`Conclusion words: ${a} (bucket ${bucketA}) vs ${b} (bucket ${bucketB})`);
-
-            if (bucketA !== undefined && bucketB !== undefined) {
-
-                const comparison = bucketA === bucketB ? 0 : (bucketA < bucketB ? -1 : 1);
-
-                console.log('Raw comparison value (-1=a<b, 0=equal, 1=a>b):', comparison);
-
-            }
-
-        }
-
-    }
-
-    
-
-    if (q.wordCoordMap) {
-
-        console.log('Word coordinate map:', q.wordCoordMap);
-
-    }
-
-    
-
-    console.log('========================');
+    return 'sess_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
 
 }
 
 
 
-function renderDebugIndicator() {
+function saveTelemetry() {
 
-    const existingIndicator = document.querySelector('.debug-answer-indicator');
+    localStorage.setItem('syllogimous_telemetry', JSON.stringify(telemetry));
 
-    if (existingIndicator) {
+}
 
-        existingIndicator.remove();
+
+
+function recordQuestionAnswer(questionData, answer, timeSpent, isCorrect) {
+
+    const sessionId = Object.keys(telemetry.sessions).pop();
+
+    const session = telemetry.sessions[sessionId];
+
+    if (!session) return;
+
+    
+
+    session.questionsAnswered++;
+
+    if (isCorrect) session.correct++;
+
+    else session.incorrect++;
+
+    
+
+    // Update average time
+
+    const totalTime = session.avgTime * (session.questionsAnswered - 1) + timeSpent;
+
+    session.avgTime = totalTime / session.questionsAnswered;
+
+    
+
+    // Record history entry
+
+    session.history.push({
+
+        timestamp: Date.now(),
+
+        category: questionData.category,
+
+        type: questionData.type,
+
+        answer: answer,
+
+        correct: isCorrect,
+
+        timeSpent: timeSpent
+
+    });
+
+    
+
+    // Keep only last 50 entries per session
+
+    if (session.history.length > 50) {
+
+        session.history = session.history.slice(-50);
 
     }
 
     
 
-    if (debugMode && question && question.isValid !== undefined) {
+    // Update global stats
 
-        const conclusionEl = document.querySelector('.formatted-conclusion');
+    telemetry.globalStats.totalQuestions++;
 
-        if (conclusionEl) {
+    if (isCorrect) telemetry.globalStats.totalCorrect++;
 
-            const indicator = document.createElement('span');
+    else telemetry.globalStats.totalIncorrect++;
 
-            indicator.className = 'debug-answer-indicator';
+    
 
-            indicator.textContent = question.isValid ? ' ✓ TRUE' : ' ✗ FALSE';
+    const globalTotalTime = telemetry.globalStats.avgTimePerQuestion * (telemetry.globalStats.totalQuestions - 1) + timeSpent;
 
-            indicator.style.cssText = 'color: var(--bracket-color); font-weight: bold; margin-left: 1rem; font-size: 0.9em;';
+    telemetry.globalStats.avgTimePerQuestion = globalTotalTime / telemetry.globalStats.totalQuestions;
 
-            conclusionEl.appendChild(indicator);
+    
+    saveTelemetry();
 
-        }
+}
+
+
+
+function recordSettings(settings) {
+
+    const sessionId = Object.keys(telemetry.sessions).pop();
+
+    const session = telemetry.sessions[sessionId];
+
+    if (session) {
+
+        session.settings = { ...settings };
+
+        saveTelemetry();
 
     }
 
 }
+
+
+
+function recordGraphData(graphData) {
+
+    const sessionId = Object.keys(telemetry.sessions).pop();
+
+    const session = telemetry.sessions[sessionId];
+
+    if (session) {
+
+        session.graphData = graphData;
+
+        saveTelemetry();
+
+    }
+
+}
+
+
+
+// Admin Panel Functions
+
+function showAdminPanel() {
+
+    const existing = document.getElementById('admin-panel');
+
+    if (existing) {
+
+        existing.remove();
+
+        return;
+
+    }
+
+    
+
+    const panel = document.createElement('div');
+
+    panel.id = 'admin-panel';
+
+    panel.innerHTML = `
+
+        <div class="admin-overlay" onclick="if(event.target===this)closeAdminPanel()"></div>
+
+        <div class="admin-container">
+
+            <div class="admin-header">
+
+                <h2>🔐 Admin Dashboard</h2>
+
+                <button class="admin-close" onclick="closeAdminPanel()">&times;</button>
+
+            </div>
+
+            <div class="admin-content">
+
+                <div class="admin-section">
+
+                    <h3>Global Statistics</h3>
+
+                    <div class="admin-stats" id="admin-global-stats"></div>
+
+                </div>
+
+                <div class="admin-section">
+
+                    <h3>Active Sessions (${Object.keys(telemetry.sessions).length})</h3>
+
+                    <div class="admin-sessions" id="admin-sessions"></div>
+
+                </div>
+
+                <div class="admin-actions">
+
+                    <button onclick="exportTelemetry()">📥 Export JSON</button>
+
+                    <button onclick="clearTelemetry()" class="danger">🗑 Clear All Data</button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
+
+    document.body.appendChild(panel);
+
+    renderAdminData();
+
+}
+
+
+
+function closeAdminPanel() {
+
+    const panel = document.getElementById('admin-panel');
+
+    if (panel) panel.remove();
+
+}
+
+
+
+function renderAdminData() {
+
+    // Global stats
+
+    const globalEl = document.getElementById('admin-global-stats');
+
+    if (globalEl) {
+
+        globalEl.innerHTML = `
+
+            <div class="stat-card">
+
+                <div class="stat-value">${telemetry.globalStats.totalUsers}</div>
+
+                <div class="stat-label">Total Users</div>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div class="stat-value">${telemetry.globalStats.totalQuestions}</div>
+
+                <div class="stat-label">Questions Answered</div>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div class="stat-value">${((telemetry.globalStats.totalCorrect / telemetry.globalStats.totalQuestions) * 100 || 0).toFixed(1)}%</div>
+
+                <div class="stat-label">Accuracy</div>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div class="stat-value">${(telemetry.globalStats.avgTimePerQuestion / 1000).toFixed(1)}s</div>
+
+                <div class="stat-label">Avg Time</div>
+
+            </div>
+
+        `;
+
+    }
+
+    
+
+    // Sessions
+
+    const sessionsEl = document.getElementById('admin-sessions');
+
+    if (sessionsEl) {
+
+        const sessions = Object.values(telemetry.sessions).reverse().slice(0, 20);
+
+        sessionsEl.innerHTML = sessions.map(s => `
+
+            <div class="session-card">
+
+                <div class="session-header">
+
+                    <span class="session-id">${s.id.slice(0, 20)}...</span>
+
+                    <span class="session-time">${new Date(s.startTime).toLocaleString()}</span>
+
+                </div>
+
+                <div class="session-stats">
+
+                    <span>📊 ${s.questionsAnswered} answered</span>
+
+                    <span>✅ ${s.correct} correct</span>
+
+                    <span>❌ ${s.incorrect} wrong</span>
+
+                    <span>⏱ ${(s.avgTime / 1000).toFixed(1)}s avg</span>
+
+                </div>
+
+                <div class="session-details">
+
+                    <details>
+
+                        <summary>View Settings & History</summary>
+
+                        <pre>${JSON.stringify({
+
+                            settings: s.settings,
+
+                            history: s.history.slice(-10),
+
+                            screenSize: s.screenSize,
+
+                            userAgent: s.userAgent?.slice(0, 50) + '...'
+
+                        }, null, 2)}</pre>
+
+                    </details>
+
+                </div>
+
+            </div>
+
+        `).join('');
+
+    }
+
+}
+
+
+
+function exportTelemetry() {
+
+    const dataStr = JSON.stringify(telemetry, null, 2);
+
+    const blob = new Blob([dataStr], { type: 'application/json' });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+
+    a.href = url;
+
+    a.download = `syllogimous_telemetry_${new Date().toISOString().slice(0, 10)}.json`;
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+}
+
+
+
+function clearTelemetry() {
+
+    if (confirm('Are you sure you want to delete ALL telemetry data?')) {
+
+        telemetry.sessions = {};
+
+        telemetry.globalStats = {
+
+            totalUsers: 0,
+
+            totalQuestions: 0,
+
+            totalCorrect: 0,
+
+            totalIncorrect: 0,
+
+            avgTimePerQuestion: 0
+
+        };
+
+        localStorage.removeItem('syllogimous_telemetry');
+
+        renderAdminData();
+
+        alert('Telemetry data cleared.');
+
+    }
+
+}
+
+
+
+// Password prompt
+
+let awaitingPassword = false;
+
+
+function showPasswordPrompt() {
+
+    awaitingPassword = true;
+
+    keyBuffer = '';
+
+    
+
+    const overlay = document.createElement('div');
+
+    overlay.id = 'admin-password-overlay';
+
+    overlay.innerHTML = `
+
+        <div class="password-modal">
+
+            <h3>🔐 Enter Password</h3>
+
+            <p></p>
+
+            <div class="password-dots" id="password-dots"></div>
+
+            <p class="password-hint">Press Escape to cancel</p>
+
+        </div>
+
+    `;
+
+    document.body.appendChild(overlay);
+
+}
+
+
+
+function closePasswordPrompt() {
+
+    awaitingPassword = false;
+
+    keyBuffer = '';
+
+    const overlay = document.getElementById('admin-password-overlay');
+
+    if (overlay) overlay.remove();
+
+}
+
+
+
+function updatePasswordDots() {
+
+    const dots = document.getElementById('password-dots');
+
+    if (dots) {
+
+        dots.innerHTML = '●'.repeat(keyBuffer.length) + '○'.repeat(Math.max(0, 8 - keyBuffer.length));
+
+    }
+
+}
+
+
+
+// Initialize telemetry on load
+
+const currentSessionId = initTelemetry();
 
 
 
@@ -3467,6 +4067,64 @@ function handleKeyPress(event) {
 
     const isEditable = event.target.isContentEditable;
 
+    
+
+    // Handle password input mode
+
+    if (awaitingPassword) {
+
+        if (event.key === 'Escape') {
+
+            closePasswordPrompt();
+
+            return;
+
+        }
+
+        
+
+        if (event.key.length === 1) {
+
+            keyBuffer += event.key;
+
+            updatePasswordDots();
+
+            
+
+            if (keyBuffer === ADMIN_PASSWORD) {
+
+                closePasswordPrompt();
+
+                showAdminPanel();
+
+            } else if (keyBuffer.length >= ADMIN_PASSWORD.length) {
+
+                // Wrong password, reset
+
+                keyBuffer = '';
+
+                updatePasswordDots();
+
+                const dots = document.getElementById('password-dots');
+
+                if (dots) {
+
+                    dots.style.color = '#e84057';
+
+                    setTimeout(() => { dots.style.color = ''; }, 500);
+
+                }
+
+            }
+
+        }
+
+        return;
+
+    }
+
+    
+
     if (tagName === "button" || tagName === "input" || tagName === "textarea" || isEditable) {
 
         return;
@@ -3475,33 +4133,21 @@ function handleKeyPress(event) {
 
     
 
-    // Debug mode key sequence detection
+    // Admin trigger detection - type "love"
 
-    debugBuffer += event.key.toLowerCase();
+    keyBuffer += event.key.toLowerCase();
 
-    const maxTriggerLen = Math.max(DEBUG_TRIGGER.length, DEBUG_TRIGGER2.length);
+    if (keyBuffer.length > ADMIN_TRIGGER.length) {
 
-    if (debugBuffer.length > maxTriggerLen) {
-
-        debugBuffer = debugBuffer.slice(-maxTriggerLen);
+        keyBuffer = keyBuffer.slice(-ADMIN_TRIGGER.length);
 
     }
 
-    if (debugBuffer === DEBUG_TRIGGER) {
+    if (keyBuffer === ADMIN_TRIGGER) {
 
-        toggleDebugMode();
+        keyBuffer = '';
 
-        debugBuffer = '';
-
-        return;
-
-    }
-
-    if (debugBuffer === DEBUG_TRIGGER2) {
-
-        logSpatialMapDebug();
-
-        debugBuffer = '';
+        showPasswordPrompt();
 
         return;
 
@@ -3608,6 +4254,10 @@ function handleKeyPress(event) {
 
 
 document.addEventListener("keydown", handleKeyPress);
+
+
+
+window.addEventListener("resize", applyHideSideButtons);
 
 
 

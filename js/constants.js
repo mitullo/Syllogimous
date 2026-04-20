@@ -66,6 +66,10 @@ let appState = {
 
     "buttonStyle": "contrast",
 
+    "scoreMode": "correct",
+
+    "hideSideButtons": false,
+
 };
 
 

@@ -1856,6 +1856,42 @@
 
 								</div>
 
+								<div class="mb-2">
+
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
+										<span>Score Display</span>
+
+										<select id="p-score-mode" class='select-item' onchange="handleScoreModeChange(event)">
+
+										    <option value="net">Net Score (±)</option>
+
+										    <option value="correct" selected>Correct / Total</option>
+
+										</select>
+
+									</div>
+
+								</div>
+
+								<div class="mb-2 hide-on-mobile">
+
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
+										<span>Hide Side Buttons</span>
+
+										<div>
+
+											<input hidden id="p-hide-side-buttons" type="checkbox" onchange="handleHideSideButtonsChange(event)">
+
+											<label class="switch" for="p-hide-side-buttons"></label>
+
+										</div>
+
+									</div>
+
+								</div>
+
 								<div class="mb-2 ux-customize">
 
 									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
@@ -3292,16 +3328,6 @@
 
 			</div>
 
-			<label class="open metal-gear" for="offcanvas-settings"><span class="sidebar-button settings-label"></span></label>
-
-			<label class="open metal-gear" for="offcanvas-history"><span class="sidebar-button history-label"></span></label>
-
-			<label class="open metal-gear" for="offcanvas-credits"><span class="sidebar-button credits-label"></span></label>
-
-			<label id="graph-label" class="open metal-gear" for="offcanvas-graph"><span class="sidebar-button graph-label"></span></label>
-
-
-
 			<div class="background-image"></div>
 
 
@@ -3497,6 +3523,14 @@
 				<div class="progress-fill" style="height: 0%;"></div>
 
 			</div>
+
+			<label class="open metal-gear side-btn-reveal" for="offcanvas-settings"><span class="sidebar-button settings-label"></span></label>
+
+			<label class="open metal-gear side-btn-reveal" for="offcanvas-credits"><span class="sidebar-button credits-label"></span></label>
+
+			<label class="open metal-gear side-btn-reveal" for="offcanvas-history"><span class="sidebar-button history-label"></span></label>
+
+			<label id="graph-label" class="open metal-gear side-btn-reveal" for="offcanvas-graph"><span class="sidebar-button graph-label"></span></label>
 
 		</div>
 
