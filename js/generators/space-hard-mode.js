@@ -9,13 +9,27 @@ class SpaceHardMode {
     }
 
     basicHardMode(wordCoordMap, startWord, endWord, originalConclusionCoord) {
+        // Pre-flight check for transform feasibility
+        const bannedFromPool = new Set([startWord, endWord]);
+        if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
+            this.anchorWords.forEach(w => bannedFromPool.add(w));
+        }
+        const eligiblePool = Object.keys(wordCoordMap).filter(w => !bannedFromPool.has(w));
+        if (this.numTransforms > 0 && eligiblePool.length === 0) {
+            // Cannot generate any transforms - return unchanged map
+            console.warn(`Anchor Space: No transformable words available (${Object.keys(wordCoordMap).length} total, ${this.anchorWords.length} fixed)`);
+            return [wordCoordMap, [], []];
+        }
+
         let newWordMap;
         let newDiffCoord;
         let newConclusionCoord;
         let operations;
         let usedDimensions;
-        const demandClose = Math.random() > 0.4;
-        const demandChange = Math.random() > 0.2;
+        // Small pool: skip demandChange/demandClose - transforms likely won't shift conclusion
+        const isSmallPool = eligiblePool.length <= 2;
+        const demandClose = isSmallPool ? false : Math.random() > 0.4;
+        const demandChange = isSmallPool ? false : Math.random() > 0.2;
         let closeTries = 10;
         let changeTries = 10;
         for (let i = 0; i < 10000; i++) {
@@ -95,25 +109,43 @@ class SpaceHardMode {
             this.anchorWords.forEach(w => bannedFromPool.add(w));
         }
         const pool = Object.keys(wordCoordMap).filter(word => !bannedFromPool.has(word));
+        // Store eligible pool for applyChain to use as replacement source
+        this.eligiblePool = pool;
         const dimensionPool = wordCoordMap[leftStart].map((c, i) => i);
 
+        // Guard: return empty chains if no eligible words
+        if (pool.length === 0) {
+            return [[], []];
+        }
+
+        // Generate exactly numTransforms words (with reuse if pool is small)
         let wordSequence = repeatArrayUntil(shuffle(pool.slice()), this.numTransforms);
-        let count = 0;
-        while (wordSequence.length > 0 && count < 100) {
-            let chainSize = Math.min(wordSequence.length, pickRandomItems([1, 1, 2, 2, 3], 1).picked[0]);
-            let willUseAllTransforms = chainSize == wordSequence.length && leftChains.length == 0 && rightChains.length == 0;
-            let shouldNotChain = pool.length == 1 || (willUseAllTransforms && Math.random() < 0.4)
-            if (shouldNotChain)
-                chainSize = 1;
-            let words = wordSequence.splice(0, chainSize);
-            if (coinFlip()) {
-                leftChains.push(this.directionize(words, leftStart, leftDimensions, rightDimensions, dimensionPool, wordCoordMap));
-                leftDimensions.push(leftChains[leftChains.length - 1][1]);
-            } else {
-                rightChains.push(this.directionize(words, rightStart, rightDimensions, leftDimensions, dimensionPool, wordCoordMap));
-                rightDimensions.push(rightChains[rightChains.length - 1][1]);
+
+        // ALWAYS single-side for anchor space (v1/v2) - prevents left+right double
+        const isAnchorSpace = this.anchorWords.length > 0;
+        if (isAnchorSpace) {
+            // All on LEFT, regardless of fixedPositions
+            for (let i = 0; i < this.numTransforms && wordSequence.length > 0; i++) {
+                const target = wordSequence.shift();
+                const chain = this.directionize([leftStart, target], leftStart, leftDimensions, rightDimensions, dimensionPool, wordCoordMap);
+                leftChains.push(chain);
+                leftDimensions.push(chain[1]);
             }
-            count++;
+            rightChains = [];  // Critical: empty right
+        } else {
+            // Regular ONLY: alternate sides
+            let useLeft = true;
+            for (let i = 0; i < this.numTransforms && wordSequence.length > 0; i++) {
+                const target = wordSequence.shift();
+                if (useLeft) {
+                    leftChains.push(this.directionize([target], leftStart, leftDimensions, rightDimensions, dimensionPool, wordCoordMap));
+                    leftDimensions.push(leftChains[leftChains.length - 1][1]);
+                } else {
+                    rightChains.push(this.directionize([target], rightStart, rightDimensions, leftDimensions, dimensionPool, wordCoordMap));
+                    rightDimensions.push(rightChains[rightChains.length - 1][1]);
+                }
+                useLeft = !useLeft;
+            }
         }
 
         return [leftChains, rightChains];
@@ -241,16 +273,31 @@ class SpaceHardMode {
         }
 
         let operations = [];
-        let starterCommandPool = customizeCommands([setPoint, mirrorPoint, scalePoint, rotatePoint]);
-        let commandPool = customizeCommands([mirrorPoint, mirrorPoint, mirrorPoint, scalePoint, scalePoint, rotatePoint, rotatePoint]);
+        // Variety boost: rotate/mirror/scale cycle for more unique transforms
+        let starterCommandPool = customizeCommands([rotatePoint, mirrorPoint, scalePoint, setPoint]);
+        let commandPool = customizeCommands([rotatePoint, mirrorPoint, scalePoint, rotatePoint, mirrorPoint, scalePoint, setPoint]);
         let usedCommands = [];
+        let appliedTransforms = 0;
 
         let count = 0;
         let cpool = starterCommandPool;
         for (const [chain, dimension] of chains) {
             for (let i = 1; i < chain.length; i++) {
-                const a = chain[i-1];
-                const b = chain[i];
+                // Stop once we've applied the requested number of transforms
+                if (appliedTransforms >= this.numTransforms) {
+                    break;
+                }
+                let a = chain[i-1];
+                let b = chain[i];
+
+                // If target is anchor OR self-transform, replace with valid word
+                if (this.isAnchorWord(b) || a === b) {
+                    const candidates = this.eligiblePool.filter(w => w !== a);
+                    b = candidates.length > 0 ?
+                        pickRandomItems(candidates, 1).picked[0] :
+                        this.eligiblePool[0] || b;  // Guaranteed pick
+                }
+
                 const lastUsed = usedCommands?.[usedCommands.length - 1];
                 const filteredPool = cpool.filter(c => c !== lastUsed);
                 if (filteredPool.length !== 0) {
@@ -258,15 +305,32 @@ class SpaceHardMode {
                 }
 
                 const command = pickRandomItems(cpool, 1).picked[0];
-                // Skip transform if target word is a fixed anchor
-                if (!this.isAnchorWord(b)) {
-                    wordCoordMap[b] = command.call(null, a, b, dimension);
-                }
+                wordCoordMap[b] = command.call(null, a, b, dimension);
+                appliedTransforms++;
                 usedCommands.push(command);
                 cpool = commandPool;
             }
+            if (appliedTransforms >= this.numTransforms) {
+                break;
+            }
         }
-        return operations;
+
+        // Filler: ONLY for regular modes (anchor space always uses single-side chains)
+        const isAnchorSpace = this.anchorWords.length > 0;
+        if (!isAnchorSpace && appliedTransforms < this.numTransforms && this.eligiblePool && this.eligiblePool.length >= 2) {
+            const dimPool = wordCoordMap[this.eligiblePool[0]].map((c, i) => i);
+            while (appliedTransforms < this.numTransforms && this.eligiblePool.length >= 2) {
+                const a = pickRandomItems(this.eligiblePool, 1).picked[0];
+                const b = pickRandomItems(this.eligiblePool.filter(w => w !== a), 1).picked[0];
+                const dimension = pickRandomItems(dimPool, 1).picked[0];
+                const command = pickRandomItems(commandPool, 1).picked[0];
+                wordCoordMap[b] = command.call(null, a, b, dimension);
+                appliedTransforms++;
+                usedCommands.push(command);
+            }
+        }
+
+        return operations.slice(0, this.numTransforms);
     }
 
 }

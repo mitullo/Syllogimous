@@ -198,6 +198,11 @@ function registerEventHandlers() {
                     anchorSpace.resetPattern();
                 }
 
+                // Enable fixed positions when refreshing pattern
+                if (key === "p-anc-v2-fixed" && input.checked) {
+                    // Pattern will be regenerated on next question
+                }
+
                 // Set default numConclusions when enabling multiple conclusions mode
                 if (key === "p-multi-conc" && input.checked && !savedata.numConclusions) {
                     savedata.numConclusions = 3;
@@ -284,6 +289,22 @@ function registerEventHandlers() {
 
         }
 
+    }
+
+    // Refresh Pattern button for Anchor Space v2
+    const refreshPatternBtn = document.getElementById("p-anc-v2-refresh");
+    if (refreshPatternBtn) {
+        refreshPatternBtn.addEventListener("click", () => {
+            const anchorSpace = new AnchorSpaceV2();
+            anchorSpace.resetPattern();
+            // Enable fixed positions if not already
+            if (!savedata.anchorSpaceFixedPositions) {
+                savedata.anchorSpaceFixedPositions = true;
+                const fixedCheckbox = document.getElementById("p-anc-v2-fixed");
+                if (fixedCheckbox) fixedCheckbox.checked = true;
+            }
+            refresh();
+        });
     }
 
 }
