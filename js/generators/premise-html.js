@@ -2,6 +2,10 @@ function createPremiseHTML(premise, allowReversal=true, index=null, pattern=null
     if (typeof premise === 'string') {
         return premise;
     }
+    // Defensive: skip undefined/null premises (can happen with transform stacking)
+    if (!premise) {
+        return '';
+    }
     // For half-minimal mode, odd indices (0, 2, 4...) use minimal text
     const forceMinimal = (index !== null && savedata.halfMinimalMode) ? (index % 2 === 0) : null;
     if (savedata.widePremises && Array.isArray(premise)) {

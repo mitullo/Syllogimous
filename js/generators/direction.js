@@ -448,7 +448,8 @@ class DirectionQuestion {
         if (numInterleaved === 0) {
             premises = scramble(premises);
         }
-        premises = premises.map((p, i) => createPremiseHTML(p, true, i, pattern));
+        // Filter out any undefined/null premises (can happen with transform stacking)
+        premises = premises.filter(p => p != null).map((p, i) => createPremiseHTML(p, true, i, pattern));
         const countdown = this.generator.getCountdown();
         const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
         let modifiers = [];
