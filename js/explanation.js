@@ -45,6 +45,61 @@ function createGridFromMap(wordCoordMap) {
     return grid;
 }
 
+// Ensure grid has minimum required depth by wrapping if needed
+function ensureGridDepth(grid, minDepth) {
+    if (!Array.isArray(grid) || grid.length === 0) {
+        return grid;
+    }
+    
+    // Calculate current depth - go until we hit non-array
+    let depth = 0;
+    let curr = grid;
+    while (Array.isArray(curr) && curr.length > 0) {
+        depth++;
+        curr = curr[0];
+    }
+    
+    // If already at required depth, return as-is
+    if (depth === minDepth) {
+        return grid;
+    }
+    
+    // If depth is greater than needed, cells are arrays - flatten them
+    if (depth > minDepth) {
+        return flattenGridCells(grid, depth - minDepth);
+    }
+    
+    // Need to wrap to increase depth
+    let result = grid;
+    while (depth < minDepth) {
+        result = [result];
+        depth++;
+    }
+    
+    return result;
+}
+
+// Flatten cells that are nested too deep
+function flattenGridCells(grid, extraLevels) {
+    if (extraLevels <= 0 || !Array.isArray(grid)) {
+        return grid;
+    }
+    
+    return grid.map(item => {
+        if (Array.isArray(item)) {
+            // If this is the level before cells, flatten the cells
+            if (extraLevels === 1 && item.length > 0 && Array.isArray(item[0])) {
+                // item is an array of cell arrays - flatten each cell
+                return item.map(cell => 
+                    Array.isArray(cell) ? cell.filter(c => c && c !== '').join(',') : cell
+                );
+            }
+            return flattenGridCells(item, extraLevels - 1);
+        }
+        return item;
+    });
+}
+
 function centerText(text, width) {
     if (text.length > 50) {
         const half = Math.floor(width / 2);
@@ -331,6 +386,27 @@ function createExplanation(question) {
         return createExplanationMixed(question);
     }
 
+    // Check for spatial grid first (5D/6D analogy have both wordCoordMap and bucket)
+    if (question.wordCoordMap) {
+        const pattern = question.pattern || null;
+        const grid = createGridFromMap(question.wordCoordMap);
+        const coordDims = Object.values(question.wordCoordMap)[0]?.length || 0;
+        const is5D = coordDims === 5;
+        const is6D = coordDims === 6;
+        
+        if (is6D || (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]) && Array.isArray(grid[0][0][0][0][0]))) {
+            return createExplanation6D(ensureGridDepth(grid, 6), pattern);
+        } else if (is5D || (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]))) {
+            return createExplanation5D(ensureGridDepth(grid, 5), pattern);
+        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0])) {
+            return createExplanation4D(grid, pattern);
+        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0])) {
+            return createExplanation3D(grid, undefined, pattern);
+        } else if (grid && Array.isArray(grid[0])) {
+            return createExplanation2D(grid, undefined, undefined, pattern);
+        }
+    }
+
     if (question.bucket) {
         return createExplanationBucket(question);
     }
@@ -339,25 +415,11 @@ function createExplanation(question) {
         return createExplanationBuckets(question);
     }
 
-    if (question.wordCoordMap) {
-        const pattern = question.pattern || null;
-        const grid = createGridFromMap(question.wordCoordMap);
-        if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]) && Array.isArray(grid[0][0][0][0][0])) {
-            return createExplanation6D(grid, pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0])) {
-            return createExplanation5D(grid, pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0])) {
-            return createExplanation4D(grid, pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0])) {
-            return createExplanation3D(grid, undefined, pattern);
-        } else {
-            return createExplanation2D(grid, undefined, undefined, pattern);
-        }
-    }
-
     if (question.subresults) {
         return question.subresults.map(createExplanation).join('<div class="binary-explainer-separator"></div>');
     }
+    
+    return '<div style="padding: 1rem;">No explanation available for this question type.</div>';
 }
 
 function createExplanationPopup(question, e, isPinned = false) {

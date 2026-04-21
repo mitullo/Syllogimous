@@ -323,7 +323,13 @@ function replaceWordsWithPatternShapes(text, pattern) {
 }
 
 function renderJunkEmojis(question) {
+    // Preserve pattern separately as structuredClone may have issues with complex objects
+    const pattern = question.pattern;
     question = structuredClone(question);
+    // Restore pattern after clone
+    if (pattern) {
+        question.pattern = pattern;
+    }
     if (question.bucket) {
         question.bucket = question.bucket.map(text => renderJunkEmojisText(text, question.pattern));
     }

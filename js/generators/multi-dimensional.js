@@ -103,6 +103,23 @@ function createMultiDim5DGenerator(length) {
             getCountdown: function() {
                 return countdownFromOverride(savedata.overrideMultiDim5DPremises, savedata.overrideMultiDim5DTime);
             },
+            hardModeAllowed: function() {
+                return savedata.space5DHardModeLevel > 0;
+            },
+            hardModeLevel: function() {
+                return savedata.space5DHardModeLevel;
+            },
+            getNumTransformsSplit: function(numPremises) {
+                const totalTransforms = this.hardModeLevel();
+                if (!this.hardModeAllowed() || totalTransforms === 0) {
+                    return [0, 0];
+                }
+                if (!savedata.enableTransformInterleave) {
+                    return [0, totalTransforms];
+                }
+                let interleaveCount = Math.max(0, Math.min(totalTransforms - 1, numPremises - 1));
+                return [interleaveCount, totalTransforms - interleaveCount];
+            },
             create: function(length) {
                 const dir4dGen = new Direction4D();
                 const words = createStimuli(length + 1);
@@ -112,7 +129,7 @@ function createMultiDim5DGenerator(length) {
                 // Maintain a 4D map for the pathfinder to prevent distance calculation crashes, 
                 // and a true 5D map for the logic.
                 const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
-                const wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0] };
+                let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0] };
                 
                 for (let i = 0; i < length; i++) {
                     const baseWord = words[i];
@@ -135,7 +152,31 @@ neighbors[nextWord] = neighbors[nextWord] ?? [];
 neighbors[nextWord].push(baseWord);
                 }
 
+                // Transform support: pick primary conclusion words first
                 const pairChooser = new DirectionPairChooser();
+                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
+                let startWord, endWord;
+                let operations = [];
+
+                // Pick primary conclusion words
+                const primaryPair = pairChooser.pickTwoDistantWords(neighbors);
+                if (primaryPair) {
+                    [startWord, endWord] = primaryPair;
+                }
+
+                // Apply transforms if enabled
+                if (numTransforms > 0 && startWord && endWord) {
+                    const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+                    let _x;
+                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms).basicHardMode(
+                        wordCoordMap, startWord, endWord, conclusionCoord
+                    );
+                    if (numInterleaved > 0) {
+                        premises.push(...operations);
+                        operations = [];
+                    }
+                }
+
                 const conclusionsArr = [];
                 const usedPairsSet = new Set();
                 const usedConclusionTexts = new Set();
@@ -145,16 +186,24 @@ neighbors[nextWord].push(baseWord);
                     : 1;
 
                 let generatedCount = 0;
+                let isFirstConclusion = true;
+
                 while (generatedCount < numConclusions) {
                     let sw, ew;
-                    let attempts = 0;
 
-                    do {
-                        const pr = pairChooser.pickTwoDistantWords(neighbors);
-                        if (!pr) break;
-                        [sw, ew] = pr;
-                        attempts++;
-                    } while (usedPairsSet.has(`${sw}-${ew}`) && attempts < 5);
+                    if (isFirstConclusion && startWord && endWord) {
+                        sw = startWord;
+                        ew = endWord;
+                        isFirstConclusion = false;
+                    } else {
+                        let attempts = 0;
+                        do {
+                            const pr = pairChooser.pickTwoDistantWords(neighbors);
+                            if (!pr) break;
+                            [sw, ew] = pr;
+                            attempts++;
+                        } while (usedPairsSet.has(`${sw}-${ew}`) && attempts < 5);
+                    }
 
                     if (!sw || !ew) {
                         generatedCount++; // Prevent infinite loop
@@ -196,7 +245,6 @@ neighbors[nextWord].push(baseWord);
                         conclusionHTML, conclusionIsValid, conclusionObj
                     );
 
-                    // Always add conclusion (may have duplicates if unique ones exhausted)
                     usedConclusionTexts.add(conclusionHTML);
 
                     conclusionsArr.push({
@@ -210,6 +258,12 @@ neighbors[nextWord].push(baseWord);
 
                 const primary = conclusionsArr[0] ?? { conclusion: '', isValid: false };
 
+                const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
+                let modifiers = [];
+                if (totalTransforms > 0) {
+                    modifiers.push(`op${totalTransforms}`);
+                }
+
                 return {
                     premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
                     conclusion: primary.conclusion,
@@ -221,6 +275,89 @@ neighbors[nextWord].push(baseWord);
                     type: "space-five-d",
                     category: "SPACE FIVE D",
                     wordCoordMap: wordCoordMap,
+                    modifiers,
+                    operations,
+                };
+            },
+            createAnalogy: function(length) {
+                const dir4dGen = new Direction4D();
+                const words = createStimuli(length + 1);
+                const premises = [];
+                const neighbors = {};
+
+                const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
+                let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0] };
+
+                for (let i = 0; i < length; i++) {
+                    const baseWord = words[i];
+                    const nextWord = words[i + 1];
+                    const dirCoord4D = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap4D);
+                    const dim5 = Math.floor(Math.random() * 3) - 1;
+                    const dirCoord = [...dirCoord4D, dim5];
+
+                    wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
+                    wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+
+                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 5);
+                    premises.push(premise);
+
+                    neighbors[baseWord] = neighbors[baseWord] ?? [];
+                    neighbors[baseWord].push(nextWord);
+                    neighbors[nextWord] = neighbors[nextWord] ?? [];
+                    neighbors[nextWord].push(baseWord);
+                }
+
+                // Transform support
+                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
+                let [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
+                let operations = [];
+
+                if (numTransforms > 0) {
+                    const [startWord, endWord] = pickRandomItems([a, b, c, d], 2).picked;
+                    const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+                    let _x;
+                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms).basicHardMode(
+                        wordCoordMap, startWord, endWord, conclusionCoord
+                    );
+                    if (numInterleaved > 0) {
+                        premises.push(...operations);
+                        operations = [];
+                    }
+                }
+
+                const isValidSame = arraysEqual(
+                    findDirection(wordCoordMap[a], wordCoordMap[b]),
+                    findDirection(wordCoordMap[c], wordCoordMap[d])
+                );
+
+                let conclusion = analogyTo(a, b);
+                let isValid;
+                if (coinFlip()) {
+                    conclusion += pickAnalogyStatementSame().html;
+                    isValid = isValidSame;
+                } else {
+                    conclusion += pickAnalogyStatementDifferent().html;
+                    isValid = !isValidSame;
+                }
+                conclusion += analogyTo(c, d);
+
+                const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
+                let modifiers = [];
+                if (totalTransforms > 0) {
+                    modifiers.push(`op${totalTransforms}`);
+                }
+
+                return {
+                    category: 'Analogy: SPACE FIVE D',
+                    type: 'space-five-d',
+                    startedAt: new Date().getTime(),
+                    bucket: Object.keys(wordCoordMap),
+                    premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
+                    isValid,
+                    conclusion,
+                    modifiers,
+                    operations,
+                    wordCoordMap,
                 };
             }
         },
@@ -237,6 +374,23 @@ function createMultiDim6DGenerator(length) {
             getCountdown: function() {
                 return countdownFromOverride(savedata.overrideMultiDim6DPremises, savedata.overrideMultiDim6DTime);
             },
+            hardModeAllowed: function() {
+                return savedata.space6DHardModeLevel > 0;
+            },
+            hardModeLevel: function() {
+                return savedata.space6DHardModeLevel;
+            },
+            getNumTransformsSplit: function(numPremises) {
+                const totalTransforms = this.hardModeLevel();
+                if (!this.hardModeAllowed() || totalTransforms === 0) {
+                    return [0, 0];
+                }
+                if (!savedata.enableTransformInterleave) {
+                    return [0, totalTransforms];
+                }
+                let interleaveCount = Math.max(0, Math.min(totalTransforms - 1, numPremises - 1));
+                return [interleaveCount, totalTransforms - interleaveCount];
+            },
             create: function(length) {
                 const dir4dGen = new Direction4D();
                 const words = createStimuli(length + 1);
@@ -244,7 +398,7 @@ function createMultiDim6DGenerator(length) {
                 const neighbors = {};
                 
                 const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
-                const wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0, 0] };
+                let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0, 0] };
                 
                 for (let i = 0; i < length; i++) {
                     const baseWord = words[i];
@@ -267,7 +421,31 @@ neighbors[nextWord] = neighbors[nextWord] ?? [];
 neighbors[nextWord].push(baseWord);
                 }
 
+                // Transform support: pick primary conclusion words first
                 const pairChooser = new DirectionPairChooser();
+                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
+                let startWord, endWord;
+                let operations = [];
+
+                // Pick primary conclusion words
+                const primaryPair = pairChooser.pickTwoDistantWords(neighbors);
+                if (primaryPair) {
+                    [startWord, endWord] = primaryPair;
+                }
+
+                // Apply transforms if enabled
+                if (numTransforms > 0 && startWord && endWord) {
+                    const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+                    let _x;
+                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms).basicHardMode(
+                        wordCoordMap, startWord, endWord, conclusionCoord
+                    );
+                    if (numInterleaved > 0) {
+                        premises.push(...operations);
+                        operations = [];
+                    }
+                }
+
                 const conclusionsArr = [];
                 const usedPairsSet = new Set();
                 const usedConclusionTexts = new Set();
@@ -277,16 +455,24 @@ neighbors[nextWord].push(baseWord);
                     : 1;
 
                 let generatedCount = 0;
+                let isFirstConclusion = true;
+
                 while (generatedCount < numConclusions) {
                     let sw, ew;
-                    let attempts = 0;
 
-                    do {
-                        const pr = pairChooser.pickTwoDistantWords(neighbors);
-                        if (!pr) break;
-                        [sw, ew] = pr;
-                        attempts++;
-                    } while (usedPairsSet.has(`${sw}-${ew}`) && attempts < 5);
+                    if (isFirstConclusion && startWord && endWord) {
+                        sw = startWord;
+                        ew = endWord;
+                        isFirstConclusion = false;
+                    } else {
+                        let attempts = 0;
+                        do {
+                            const pr = pairChooser.pickTwoDistantWords(neighbors);
+                            if (!pr) break;
+                            [sw, ew] = pr;
+                            attempts++;
+                        } while (usedPairsSet.has(`${sw}-${ew}`) && attempts < 5);
+                    }
 
                     if (!sw || !ew) {
                         generatedCount++; // Prevent infinite loop
@@ -328,7 +514,6 @@ neighbors[nextWord].push(baseWord);
                         conclusionHTML, conclusionIsValid, conclusionObj
                     );
 
-                    // Always add conclusion (may have duplicates if unique ones exhausted)
                     usedConclusionTexts.add(conclusionHTML);
 
                     conclusionsArr.push({
@@ -342,6 +527,12 @@ neighbors[nextWord].push(baseWord);
 
                 const primary = conclusionsArr[0] ?? { conclusion: '', isValid: false };
 
+                const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
+                let modifiers = [];
+                if (totalTransforms > 0) {
+                    modifiers.push(`op${totalTransforms}`);
+                }
+
                 return {
                     premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
                     conclusion: primary.conclusion,
@@ -353,6 +544,90 @@ neighbors[nextWord].push(baseWord);
                     type: "space-six-d",
                     category: "SPACE SIX D",
                     wordCoordMap: wordCoordMap,
+                    modifiers,
+                    operations,
+                };
+            },
+            createAnalogy: function(length) {
+                const dir4dGen = new Direction4D();
+                const words = createStimuli(length + 1);
+                const premises = [];
+                const neighbors = {};
+
+                const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
+                let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0, 0] };
+
+                for (let i = 0; i < length; i++) {
+                    const baseWord = words[i];
+                    const nextWord = words[i + 1];
+                    const dirCoord4D = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap4D);
+                    const dim5 = Math.floor(Math.random() * 3) - 1;
+                    const dim6 = Math.floor(Math.random() * 3) - 1;
+                    const dirCoord = [...dirCoord4D, dim5, dim6];
+
+                    wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
+                    wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+
+                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
+                    premises.push(premise);
+
+                    neighbors[baseWord] = neighbors[baseWord] ?? [];
+                    neighbors[baseWord].push(nextWord);
+                    neighbors[nextWord] = neighbors[nextWord] ?? [];
+                    neighbors[nextWord].push(baseWord);
+                }
+
+                // Transform support
+                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
+                let [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
+                let operations = [];
+
+                if (numTransforms > 0) {
+                    const [startWord, endWord] = pickRandomItems([a, b, c, d], 2).picked;
+                    const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+                    let _x;
+                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms).basicHardMode(
+                        wordCoordMap, startWord, endWord, conclusionCoord
+                    );
+                    if (numInterleaved > 0) {
+                        premises.push(...operations);
+                        operations = [];
+                    }
+                }
+
+                const isValidSame = arraysEqual(
+                    findDirection(wordCoordMap[a], wordCoordMap[b]),
+                    findDirection(wordCoordMap[c], wordCoordMap[d])
+                );
+
+                let conclusion = analogyTo(a, b);
+                let isValid;
+                if (coinFlip()) {
+                    conclusion += pickAnalogyStatementSame().html;
+                    isValid = isValidSame;
+                } else {
+                    conclusion += pickAnalogyStatementDifferent().html;
+                    isValid = !isValidSame;
+                }
+                conclusion += analogyTo(c, d);
+
+                const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
+                let modifiers = [];
+                if (totalTransforms > 0) {
+                    modifiers.push(`op${totalTransforms}`);
+                }
+
+                return {
+                    category: 'Analogy: SPACE SIX D',
+                    type: 'space-six-d',
+                    startedAt: new Date().getTime(),
+                    bucket: Object.keys(wordCoordMap),
+                    premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
+                    isValid,
+                    conclusion,
+                    modifiers,
+                    operations,
+                    wordCoordMap,
                 };
             }
         },

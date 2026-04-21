@@ -7,7 +7,8 @@ function addCoords(a, b) {
 }
 
 function normalize(a) {
-    return a.map(c => c/Math.abs(c) || 0);
+    if (a.every(c => c === 0)) return null;
+    return a.map(c => c === 0 ? 0 : c / Math.abs(c));
 }
 
 function inverse(a) {
@@ -23,6 +24,10 @@ function getConclusionCoords(wordCoordMap, startWord, endWord) {
     const diffCoord = diffCoords(start, end);
     const conclusionCoord = normalize(diffCoord);
     return [diffCoord, conclusionCoord];
+}
+
+function isNonZeroConclusion(conclusionCoord) {
+    return conclusionCoord !== null && conclusionCoord.some(c => c !== 0);
 }
 
 function taxicabDistance(a, b) {
@@ -277,7 +282,10 @@ class DirectionQuestion {
         let isValid;
         let conclusionCoord;
         let diffCoord;
-        let [wordCoordMap, neighbors, premises, usedDirCoords] = [];
+        let wordCoordMap = {};
+        let neighbors = {};
+        let premises = [];
+        let usedDirCoords = [];
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
         const branchesAllowed = Math.random() < 0.75;
         let anchorWords = null;
@@ -336,7 +344,7 @@ class DirectionQuestion {
                 [startWord, endWord] = pairResult;
             }
             [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
-            if (conclusionCoord.slice(0, 3).some(c => c !== 0)) {
+            if (isNonZeroConclusion(conclusionCoord)) {
                 break;
             }
         }
@@ -386,7 +394,7 @@ class DirectionQuestion {
                 }
 
                 [dCoord, cCoord] = getConclusionCoords(wordCoordMap, sw, ew);
-                if (cCoord.slice(0, 3).every(c => c === 0)) {
+                if (!isNonZeroConclusion(cCoord)) {
                     generatedCount++; // Prevent infinite loop
                     continue;
                 }
@@ -495,43 +503,61 @@ class DirectionQuestion {
     createAnalogy(length) {
         let isValid;
         let isValidSame;
-        let [wordCoordMap, neighbors, premises, usedDirCoords, operations] = [];
-        let [a, b, c, d] = [];
+        let wordCoordMap = {};
+        let neighbors = {};
+        let premises = [];
+        let usedDirCoords = [];
+        let operations = [];
+        let anchorWords = null;
+        let pattern = null;
+        let a, b, c, d;
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
         const branchesAllowed = Math.random() > 0.2;
         const flip = coinFlip();
+        const isV2 = this.generator.getName() === 'Anchor Space v2';
         while (flip !== isValidSame) {
             if (this.generator.shouldUseAnchor()) {
-                [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMapAnchor(length, branchesAllowed);
+                // Capture anchorWords (5th return value) for transform protection
+                [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchor(length, branchesAllowed);
+                // Generate pattern for V2 to show memorization stage
+                if (isV2 && anchorWords) {
+                    pattern = this.generator.getPattern(wordCoordMap, anchorWords);
+                }
             } else if (numInterleaved > 0) {
                 [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMapInterleaved(length);
+                anchorWords = null;
             } else {
                 [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMap(length, branchesAllowed);
+                anchorWords = null;
             }
             [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
             if (numTransforms > 0) {
                 const [startWord, endWord] = pickRandomItems([a, b, c, d], 2).picked;
                 const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
                 let _x;
-                [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms).basicHardMode(wordCoordMap, startWord, endWord, conclusionCoord);
+                // Pass anchorWords to SpaceHardMode to protect them from transforms
+                [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms, anchorWords || []).basicHardMode(wordCoordMap, startWord, endWord, conclusionCoord);
                 if (numInterleaved > 0) {
                     premises.push(...operations);
                     operations = [];
                 }
             }
-            isValidSame = arraysEqual(findDirection(wordCoordMap[a], wordCoordMap[b]), findDirection(wordCoordMap[c], wordCoordMap[d]));
+            const dirAB = findDirection(wordCoordMap[a], wordCoordMap[b]);
+            const dirCD = findDirection(wordCoordMap[c], wordCoordMap[d]);
+            // Handle null directions (words at same position) - treat as not equal
+            isValidSame = dirAB !== null && dirCD !== null && arraysEqual(dirAB, dirCD);
         }
         let conclusion = analogyTo(a, b);
         if (coinFlip()) {
-            conclusion += pickAnalogyStatementSame();
+            conclusion += pickAnalogyStatementSame().html;
             isValid = isValidSame;
         } else {
-            conclusion += pickAnalogyStatementDifferent();
+            conclusion += pickAnalogyStatementDifferent().html;
             isValid = !isValidSame;
         }
         conclusion += analogyTo(c, d);
 
-        premises = premises.map((p, i) => createPremiseHTML(p, true, i));
+        premises = premises.map((p, i) => createPremiseHTML(p, true, i, pattern));
         const countdown = this.generator.getCountdown();
         const totalTransforms = this.getNumTransformsSplit(length).reduce((a, b) => a + b, 0);
         let modifiers = [];
@@ -553,6 +579,7 @@ class DirectionQuestion {
             operations,
             conclusion,
             ...(countdown && { countdown }),
+            ...(pattern && { pattern }),
         }
     }
 

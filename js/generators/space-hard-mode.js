@@ -51,7 +51,7 @@ class SpaceHardMode {
             newWordMap = structuredClone(wordCoordMap);
             [operations, usedDimensions] = this.applyHardMode(newWordMap, startWord, endWord);
             [newDiffCoord, newConclusionCoord] = getConclusionCoords(newWordMap, startWord, endWord);
-            if (newConclusionCoord.slice(0, 3).every(c => c === 0)) {
+            if (newConclusionCoord === null || newConclusionCoord.every(c => c === 0)) {
                 continue;
             }
             const distance = newDiffCoord.map(Math.abs).reduce((a, b) => a + b);
@@ -68,6 +68,11 @@ class SpaceHardMode {
             }
             break;
         }
+        // Post-loop validation: if conclusion is still invalid after exhaustion, return original
+        if (newConclusionCoord === null || newConclusionCoord.every(c => c === 0)) {
+            console.warn('SpaceHardMode: Failed to find valid transform after 10000 iterations');
+            return [structuredClone(wordCoordMap), [], []];
+        }
         return [newWordMap, operations, usedDimensions];
     }
 
@@ -79,12 +84,22 @@ class SpaceHardMode {
 
         let operation;
         let newWordMap;
-        let pool = Object.keys(wordCoordMap).filter(w => w !== movingWord);
+        // Exclude anchor words from pool to prevent anchor grid corruption
+        const bannedFromPool = new Set([movingWord]);
+        if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
+            this.anchorWords.forEach(w => bannedFromPool.add(w));
+        }
+        let pool = Object.keys(wordCoordMap).filter(w => !bannedFromPool.has(w));
+        // Fallback if pool is empty after banning anchors
+        if (pool.length === 0) {
+            pool = Object.keys(wordCoordMap).filter(w => w !== movingWord);
+        }
         let originalCoord = wordCoordMap[movingWord];
         for (let i = 0; i < 100; i++) {
             newWordMap = structuredClone(wordCoordMap);
             let axisWord = pickRandomItems(pool, 1).picked[0];
-            [operation,] = this.applyChain(newWordMap, [], [[[axisWord, movingWord], useBackup ? backupDimension : dimension]]);
+            const chainResult = this.applyChain(newWordMap, [], [[[axisWord, movingWord], useBackup ? backupDimension : dimension]]);
+            operation = chainResult.ops[0] || null;
             let newCoord = newWordMap[movingWord];
             if (demandChange && changeTries > 0 && arraysEqual(originalCoord, newCoord)) {
                 changeTries--;
@@ -106,10 +121,13 @@ class SpaceHardMode {
 
     applyHardMode(wordCoordMap, leftStart, rightStart) {
         const [leftChains, rightChains] = this.createChains(wordCoordMap, leftStart, rightStart);
-        const dimensionsUsed = [...leftChains.map(([words, dimension]) => dimension), ...rightChains.map(([words, dimension]) => dimension)];
-        const leftOperations = this.applyChain(wordCoordMap, dimensionsUsed, leftChains);
-        const rightOperations = this.applyChain(wordCoordMap, dimensionsUsed, rightChains);
-        return [[...leftOperations, ...rightOperations], dimensionsUsed];
+        const baseDimensions = [...leftChains.map(([words, dimension]) => dimension), ...rightChains.map(([words, dimension]) => dimension)];
+        // Pass copies to each applyChain to prevent mutation cross-contamination
+        const leftOperations = this.applyChain(wordCoordMap, [...baseDimensions], leftChains);
+        const rightOperations = this.applyChain(wordCoordMap, [...baseDimensions], rightChains);
+        // Merge dimensions from both sides (rotation may add new planes)
+        const allDimensions = [...new Set([...baseDimensions, ...leftOperations.extraDimensions || [], ...rightOperations.extraDimensions || []])];
+        return [[...leftOperations.ops, ...rightOperations.ops], allDimensions];
     }
 
     createChains(wordCoordMap, leftStart, rightStart) {
@@ -186,7 +204,10 @@ class SpaceHardMode {
 
         let allShifts = dimensionPool.map(c => 0);
         pairwise(chainWords, (a, b) => {
-            allShifts = addCoords(allShifts, normalize(diffCoords(wordCoordMap[a], wordCoordMap[b])).map(c => Math.abs(c)));
+            const norm = normalize(diffCoords(wordCoordMap[a], wordCoordMap[b]));
+            if (norm) {
+                allShifts = addCoords(allShifts, norm.map(c => Math.abs(c)));
+            }
         })
 
         const lastUsed = usedDimensions.length > 0 ? usedDimensions[usedDimensions.length - 1] : -1;
@@ -207,8 +228,10 @@ class SpaceHardMode {
 
     applyChain(wordCoordMap, dimensionsUsed, chains) {
         if (chains.length === 0) {
-            return [];
+            return { ops: [], extraDimensions: [] };
         }
+        // Track rotation planes discovered during this chain application
+        let rotationDimensions = [];
 
         const mirrorPoint = (a, b, index) => {
             const p1 = wordCoordMap[a];
@@ -243,11 +266,16 @@ class SpaceHardMode {
         const rotatePoint = (a, b, index) => {
             const p1 = wordCoordMap[a];
             const p2 = wordCoordMap[b];
-            const dimensionPool = p1.map((p, i) => i).slice(0, 3) // Do not include time dimension;
+            // Use all spatial dimensions (exclude non-spatial dims like time/quantity/membership)
+            // For 3D: [0,1,2], for 4D: [0,1,2,3], for 5D+: still only spatial [0,1,2,3]
+            const spatialDimCount = Math.min(p1.length, 4);
+            const dimensionPool = p1.map((p, i) => i).slice(0, spatialDimCount);
             const plane = pickRandomItems(dimensionPool, 2).picked;
             plane.sort();
             let [m, n] = plane;
-            dimensionsUsed.push.apply(dimensionsUsed, plane.filter(d => dimensionsUsed.indexOf(d) == -1));
+            // Track rotation plane dimensions without mutating the input array
+            const newDims = plane.filter(d => dimensionsUsed.indexOf(d) === -1 && rotationDimensions.indexOf(d) === -1);
+            rotationDimensions.push(...newDims);
             // Track whether the plane axes were swapped from the standard sorted order.
             // When axes are swapped (e.g., XZ→ZX), the rotation direction is reversed,
             // so we need to swap the CW/CCW labels to keep them visually correct.
@@ -344,7 +372,7 @@ class SpaceHardMode {
             }
         }
 
-        return operations;
+        return { ops: operations, extraDimensions: rotationDimensions };
     }
 
 }

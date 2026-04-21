@@ -15,6 +15,8 @@ class MixedModeQuestion {
         if (savedata.enableDirection4D) modes.push('direction4D');
         if (savedata.enableAnchorSpace) modes.push('anchorSpace');
         if (savedata.enableAnchorSpaceV2) modes.push('anchorSpaceV2');
+        if (savedata.enableMultiDim5D) modes.push('multiDim5D');
+        if (savedata.enableMultiDim6D) modes.push('multiDim6D');
         return modes;
     }
 
@@ -25,6 +27,8 @@ class MixedModeQuestion {
             case 'direction4D': return new Direction4D();
             case 'anchorSpace': return new Direction2D(true, true);
             case 'anchorSpaceV2': return new AnchorSpaceV2();
+            case 'multiDim5D': return new Direction4D();
+            case 'multiDim6D': return new Direction4D();
             default: return new Direction2D();
         }
     }
@@ -84,15 +88,21 @@ class MixedModeQuestion {
                     premise = createOppositePremise(source, target);
                     bucketMap[target] = (bucketMap[source] + 1) % 2;
                 }
-            } else if (relationType.startsWith('direction') || relationType === 'anchorSpace') {
+            } else if (relationType.startsWith('direction') || relationType === 'anchorSpace' || relationType.startsWith('multiDim')) {
                 // Create direction premise
                 const generator = this.pickDirectionGenerator(relationType);
                 if (!coordMap[source]) {
-                    coordMap[source] = generator.initialCoord();
+                    coordMap[source] = this.getInitialCoord([relationType]);
                 }
                 const dirCoord = this.pickDirectionCoord(relationType, source, neighbors, coordMap);
                 coordMap[target] = addCoords(coordMap[source], dirCoord);
-                premise = generator.createDirectionStatement(source, target, dirCoord);
+                if (relationType === 'multiDim5D') {
+                    premise = createMultiDimStatement(source, target, dirCoord, 5);
+                } else if (relationType === 'multiDim6D') {
+                    premise = createMultiDimStatement(source, target, dirCoord, 6);
+                } else {
+                    premise = generator.createDirectionStatement(source, target, dirCoord);
+                }
             }
 
             if (premise) {
@@ -189,7 +199,7 @@ class MixedModeQuestion {
         };
 
         // Add explanation data for direction modes - ensure only valid words have coordinates
-        const hasDirection = selectedModes.some(m => m.startsWith('direction') || m === 'anchorSpace');
+        const hasDirection = selectedModes.some(m => m.startsWith('direction') || m === 'anchorSpace' || m.startsWith('multiDim'));
         if (hasDirection) {
             const fullCoordMap = {};
             for (const word of words) {
@@ -227,6 +237,8 @@ class MixedModeQuestion {
     }
 
     getInitialCoord(modes) {
+        if (modes.includes('multiDim6D')) return [0, 0, 0, 0, 0, 0];
+        if (modes.includes('multiDim5D')) return [0, 0, 0, 0, 0];
         if (modes.includes('direction4D')) return [0, 0, 0, 0];
         if (modes.includes('direction3D')) return [0, 0, 0];
         return [0, 0];
@@ -251,12 +263,12 @@ class MixedModeQuestion {
         // Pick a random mode from selected, but weight towards creating interesting mixtures
         const sourceRelations = wordRelations.get(source) || [];
         const hasDistinction = sourceRelations.some(r => r.type === 'distinction');
-        const hasDirection = sourceRelations.some(r => r.type.startsWith('direction') || r.type === 'anchorSpace');
+        const hasDirection = sourceRelations.some(r => r.type.startsWith('direction') || r.type === 'anchorSpace' || r.type.startsWith('multiDim'));
 
         // If source already has a relation type, prefer others to create mixtures
         let weights = selectedModes.map(mode => {
             if (mode === 'distinction' && !hasDistinction) return 2;
-            if ((mode.startsWith('direction') || mode === 'anchorSpace') && !hasDirection) return 2;
+            if ((mode.startsWith('direction') || mode === 'anchorSpace' || mode.startsWith('multiDim')) && !hasDirection) return 2;
             return 1;
         });
 
@@ -273,13 +285,22 @@ class MixedModeQuestion {
         const coords = coordMap[baseWord];
         if (!coords) {
             // Return a default direction based on mode
+            if (mode === 'multiDim6D') return [0, 1, 0, 0, 0, 0];
+            if (mode === 'multiDim5D') return [0, 1, 0, 0, 0];
             if (mode === 'direction3D') return [0, 1, 0];
             if (mode === 'direction4D') return [0, 1, 0, 0];
             return [0, 1];
         }
 
         let availableDirs;
-        if (mode === 'direction3D') {
+        if (mode === 'multiDim6D' || mode === 'multiDim5D') {
+            // For multi-dim modes, generate a 4D direction + extra dims
+            const spatialDirs = dirCoords4D.filter(c => !arraysEqual(c, [0,0,0,0]));
+            const spatial = spatialDirs[Math.floor(Math.random() * spatialDirs.length)];
+            const extraDims = mode === 'multiDim6D' ? 2 : 1;
+            const extra = Array.from({length: extraDims}, () => Math.floor(Math.random() * 3) - 1);
+            return [...spatial, ...extra];
+        } else if (mode === 'direction3D') {
             availableDirs = dirCoords3D.filter(c => !arraysEqual(c, [0,0,0]));
         } else if (mode === 'direction4D') {
             availableDirs = dirCoords4D.filter(c => !arraysEqual(c, [0,0,0,0]));
@@ -374,7 +395,7 @@ buildParityDSU(words, premises) {
 
 createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors, selectedModes) {
         const hasDistinction = selectedModes.includes('distinction');
-        const hasDirection = selectedModes.some(m => m.startsWith('direction') || m === 'anchorSpace');
+        const hasDirection = selectedModes.some(m => m.startsWith('direction') || m === 'anchorSpace' || m.startsWith('multiDim'));
 
         if (hasDistinction && hasDirection) {
             const components = [];
@@ -511,7 +532,9 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
             const validCoords = words.filter(w => coordMap[w]);
             if (validCoords.length >= 2) {
                 const [a, b] = pickRandomItems(validCoords, 2).picked;
-                const actualCoord = this.normalizeCoord(findDirection(coordMap[a], coordMap[b]));
+                const rawDir = findDirection(coordMap[a], coordMap[b]);
+                if (!rawDir) return [null, false, []];
+                const actualCoord = this.normalizeCoord(rawDir);
 
                 let generator;
                 if (actualCoord.length === 4) generator = new Direction4D();
@@ -588,7 +611,7 @@ oppositeDirection(dir) {
                 if (k.toLowerCase() === String(dir).toLowerCase()) return nameInverseDir[k];
             }
         }
-        return opposites[dir] || dir;
+        return dir;
     }
 
     getModeDisplayName(mode) {
@@ -599,6 +622,8 @@ oppositeDirection(dir) {
             'direction4D': '4D',
             'anchorSpace': 'Anchor',
             'anchorSpaceV2': 'AnchorV2',
+            'multiDim5D': '5D',
+            'multiDim6D': '6D',
         };
         return names[mode] || mode;
     }
@@ -611,6 +636,8 @@ oppositeDirection(dir) {
             if (mode === 'direction4D') return savedata.overrideDirection4DTime;
             if (mode === 'anchorSpace') return savedata.overrideAnchorSpaceTime;
             if (mode === 'anchorSpaceV2') return savedata.overrideAnchorSpaceV2Time;
+            if (mode === 'multiDim5D') return savedata.overrideMultiDim5DTime;
+            if (mode === 'multiDim6D') return savedata.overrideMultiDim6DTime;
         }
         return savedata.overrideDistinctionTime;
     }

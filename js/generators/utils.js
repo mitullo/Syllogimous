@@ -1,4 +1,7 @@
 function pickRandomItems(array, n) {
+    if (n <= 0 || array.length === 0) {
+        return { picked: [], remaining: [...array] };
+    }
     const copy = [...array];
     const picked = [];
     while (n > 0) {
@@ -35,16 +38,25 @@ function negationRoll() {
 // and flips the validity. This is actual negation, not inversion.
 // Returns [conclusionHTML, isValid] tuple
 function applyConclusionNegation(conclusion, isValid, premiseObj, pattern=null) {
-    if (!savedata.enableConclusionNegation || !conclusion || !premiseObj) {
+    if (!savedata.enableConclusionNegation || !conclusion) {
         return [conclusion, isValid];
     }
 
     // Use frequency setting (default 50%)
     const freq = savedata.conclusionNegationFrequency || 50;
     if (Math.random() * 100 < freq) {
-        const negatedConclusion = createNegatedConclusionHTML(premiseObj, false, null, pattern);
-        // Negation flips the validity - "A is Not west of B" is true when "A is west of B" is false
-        return [negatedConclusion, !isValid];
+        if (premiseObj) {
+            const negatedConclusion = createNegatedConclusionHTML(premiseObj, false, null, pattern);
+            // Negation flips the validity - "A is Not west of B" is true when "A is west of B" is false
+            return [negatedConclusion, !isValid];
+        } else {
+            // For non-premise conclusions (e.g., syllogism), wrap relation in negation span
+            const negatedConclusion = conclusion.replace(
+                /<span class="relation">((?:(?!<\/span>).)*?)<\/span>/g,
+                '<span class="relation"><span class="is-negated">$1</span></span>'
+            );
+            return [negatedConclusion, !isValid];
+        }
     }
 
     return [conclusion, isValid];
@@ -58,6 +70,8 @@ function randomInclusive(start, end) {
 }
 
 function arraysEqual(arr1, arr2) {
+    if (arr1 === null || arr2 === null) return arr1 === arr2;
+    if (!Array.isArray(arr1) || !Array.isArray(arr2)) return false;
     return arr1.length === arr2.length && arr1.every((value, index) => value === arr2[index]);
 }
 

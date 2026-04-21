@@ -51,6 +51,10 @@ class AnalogyQuestion {
             generators.push(createAnchorSpaceGenerator(length));
         if (savedata.enableAnchorSpaceV2)
             generators.push(createAnchorSpaceV2Generator(length));
+        if (savedata.enableMultiDim5D)
+            generators.push(createMultiDim5DGenerator(length));
+        if (savedata.enableMultiDim6D)
+            generators.push(createMultiDim6DGenerator(length));
 
         const totalWeight = generators.reduce((sum, item) => sum + item.weight, 0);
         const randomValue = Math.random() * totalWeight;
@@ -137,10 +141,10 @@ class AnalogyQuestion {
                 let conclusionIsValid;
 
                 if (coinFlip()) {
-                    conclusion += pickAnalogyStatementSame();
+                    conclusion += pickAnalogyStatementSame().html;
                     conclusionIsValid = isValidSame;
                 } else {
-                    conclusion += pickAnalogyStatementDifferent();
+                    conclusion += pickAnalogyStatementDifferent().html;
                     conclusionIsValid = !isValidSame;
                 }
 

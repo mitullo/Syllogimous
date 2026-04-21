@@ -342,10 +342,10 @@ class LinearQuestion {
         let conclusion = analogyTo(a, b);
         let isValid;
         if (coinFlip()) {
-            conclusion += pickAnalogyStatementSame();
+            conclusion += pickAnalogyStatementSame().html;
             isValid = isValidSame;
         } else {
-            conclusion += pickAnalogyStatementDifferent();
+            conclusion += pickAnalogyStatementDifferent().html;
             isValid = !isValidSame;
         }
         conclusion += analogyTo(c, d);

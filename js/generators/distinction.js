@@ -102,10 +102,10 @@ class DistinctionQuestion {
         let conclusion = analogyTo(a, b);
         let isValid;
         if (coinFlip()) {
-            conclusion += pickAnalogyStatementSameTwoOptions();
+            conclusion += pickAnalogyStatementSameTwoOptions().html;
             isValid = isValidSame;
         } else {
-            conclusion += pickAnalogyStatementDifferentTwoOptions();
+            conclusion += pickAnalogyStatementDifferentTwoOptions().html;
             isValid = !isValidSame;
         }
         conclusion += analogyTo(c, d);

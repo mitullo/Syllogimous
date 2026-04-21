@@ -3411,7 +3411,7 @@ input[type="checkbox"]:focus-visible + .switch {
 
 .hqli-answer-user.true, .hqli-answer.true {
 
-    color: var(--correct-color);
+    color: var(--correct-color) !important;
 
 }
 
@@ -3419,7 +3419,7 @@ input[type="checkbox"]:focus-visible + .switch {
 
 .hqli-answer-user.false, .hqli-answer.false {
 
-    color: var(--wrong-color);
+    color: var(--wrong-color) !important;
 
 }
 
@@ -6266,7 +6266,7 @@ input:checked + .slider:before {
 
     /* The glowing underline effect */
 
-    box-shadow: inset 0px -3px 0px 0px var(--theme-color, #217fe4), 0px 4px 12px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.4);
+    box-shadow: inset 0px -2px 0px 0px var(--theme-color, #217fe4), 0px 4px 12px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.4);
 
     transition: box-shadow 0.3s ease;
 
@@ -6284,7 +6284,7 @@ input:checked + .slider:before {
 
     outline: none;
 
-    box-shadow: inset 0px -4px 0px 0px var(--theme-color, #217fe4), 0px 6px 16px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.6);
+    box-shadow: inset 0px -3px 0px 0px var(--theme-color, #217fe4), 0px 6px 16px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.6);
 
 }
 
@@ -8632,7 +8632,7 @@ html {
 
     /* The glowing underline effect */
 
-    box-shadow: inset 0px -3px 0px 0px var(--theme-color, #217fe4), 0px 4px 12px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.4);
+    box-shadow: inset 0px -2px 0px 0px var(--theme-color, #217fe4), 0px 4px 12px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.4);
 
     transition: box-shadow 0.3s ease;
 
@@ -8646,7 +8646,7 @@ html {
 
     outline: none;
 
-    box-shadow: inset 0px -4px 0px 0px var(--theme-color, #217fe4), 0px 6px 16px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.6);
+    box-shadow: inset 0px -3px 0px 0px var(--theme-color, #217fe4), 0px 6px 16px -2px rgba(var(--accent-rgb, 33, 127, 228), 0.6);
 
 }
 

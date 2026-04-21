@@ -1,3 +1,81 @@
+// Safe boolean operand evaluation - replaces fragile eval() with string replacement
+function evalBoolOperand(operand, a, b) {
+    const va = Boolean(a);
+    const vb = Boolean(b);
+    switch (operand) {
+        case "a&&b": return va && vb;
+        case "!(a&&b)": return !(va && vb);
+        case "a||b": return va || vb;
+        case "!(a||b)": return !(va || vb);
+        case "!(a&&b)&&(a||b)": return !(va && vb) && (va || vb);
+        case "!(!(a&&b)&&(a||b))": return !(!(va && vb) && (va || vb));
+        default: return false;
+    }
+}
+
+// Safe nested boolean evaluation - replaces eval() for nested binary expressions
+function evalNestedBool(expr, questions) {
+    // Replace digit references with their boolean isValid values, then evaluate safely
+    const boolExpr = expr.replaceAll(/(\d+)/g, m => Boolean(questions[+m]?.isValid));
+    // Parse and evaluate the boolean expression without eval
+    return evalBoolExpr(boolExpr);
+}
+
+function evalBoolExpr(expr) {
+    // Tokenize: handle true, false, &&, ||, !, (, )
+    const tokens = [];
+    let i = 0;
+    while (i < expr.length) {
+        if (expr[i] === ' ') { i++; continue; }
+        if (expr.substr(i, 4) === 'true') { tokens.push(true); i += 4; }
+        else if (expr.substr(i, 5) === 'false') { tokens.push(false); i += 5; }
+        else if (expr.substr(i, 2) === '&&') { tokens.push('&&'); i += 2; }
+        else if (expr.substr(i, 2) === '||') { tokens.push('||'); i += 2; }
+        else if (expr[i] === '!') { tokens.push('!'); i++; }
+        else if (expr[i] === '(') { tokens.push('('); i++; }
+        else if (expr[i] === ')') { tokens.push(')'); i++; }
+        else { i++; } // skip unknown
+    }
+    // Recursive descent parser
+    let pos = 0;
+    function parseOr() {
+        let left = parseAnd();
+        while (pos < tokens.length && tokens[pos] === '||') {
+            pos++;
+            left = parseAnd() || left;
+        }
+        return left;
+    }
+    function parseAnd() {
+        let left = parseNot();
+        while (pos < tokens.length && tokens[pos] === '&&') {
+            pos++;
+            left = parseNot() && left;
+        }
+        return left;
+    }
+    function parseNot() {
+        if (pos < tokens.length && tokens[pos] === '!') {
+            pos++;
+            return !parseNot();
+        }
+        return parsePrimary();
+    }
+    function parsePrimary() {
+        if (pos < tokens.length && tokens[pos] === '(') {
+            pos++;
+            const val = parseOr();
+            if (pos < tokens.length && tokens[pos] === ')') pos++;
+            return val;
+        }
+        if (pos < tokens.length && (tokens[pos] === true || tokens[pos] === false)) {
+            return tokens[pos++];
+        }
+        return false;
+    }
+    return Boolean(parseOr());
+}
+
 function createBinaryGeneratorPool(length) {
     let generators = [];
     if (savedata.enableDistinction)
@@ -12,6 +90,14 @@ function createBinaryGeneratorPool(length) {
         generators.push(createDirection3DGenerator(length));
     if (savedata.enableDirection4D)
         generators.push(createDirection4DGenerator(length));
+    if (savedata.enableAnchorSpace)
+        generators.push(createAnchorSpaceGenerator(length));
+    if (savedata.enableAnchorSpaceV2)
+        generators.push(createAnchorSpaceV2Generator(length));
+    if (savedata.enableMultiDim5D)
+        generators.push(createMultiDim5DGenerator(length));
+    if (savedata.enableMultiDim6D)
+        generators.push(createMultiDim6DGenerator(length));
     return generators;
 }
 
@@ -74,11 +160,7 @@ class BinaryQuestion {
                 .replace("$a", choice.conclusion)
                 .replace("$b", choice2.conclusion);
 
-            isValid = eval(
-                operand
-                    .replaceAll("a", choice.isValid)
-                    .replaceAll("b", choice2.isValid)
-            );
+            isValid = evalBoolOperand(operand, choice.isValid, choice2.isValid);
         }
 
         const countdown = getBinaryCountdown();
@@ -124,7 +206,7 @@ class NestedBinaryQuestion {
             .map(() => pool[Math.floor(Math.random() * pool.length)].question.create(2));
 
         let numOperands = +savedata.maxNestedBinaryDepth;
-        let i = 0;
+        let leafIndex = 0;
         function generator(remaining, depth) {
             remaining--;
             const left = Math.floor(Math.random() * remaining);
@@ -134,20 +216,20 @@ class NestedBinaryQuestion {
             const evalOperand = evalOperands[rndIndex];
             const val = (left > 0)
                 ? generator(left, depth+1)
-                : (i++) % halfLength;
+                : { leaf: (leafIndex++) % halfLength };
             const val2 = (right > 0)
                 ? generator(right, depth+1)
-                : (i++) % halfLength;
+                : { leaf: (leafIndex++) % halfLength };
             const letter = String.fromCharCode(97 + depth);
             return {
                 human: humanOperand
                     .replaceAll('DEPTH', 'depth-' + letter)
                     .replaceAll('INDENT', 'indent-' + letter)
-                    .replace('à', val > - 1 ? val : val.human)
-                    .replace('ò', val2 > - 1 ? val2 : val2.human),
+                    .replace('à', val.leaf !== undefined ? val.leaf : val.human)
+                    .replace('ò', val2.leaf !== undefined ? val2.leaf : val2.human),
                 eval: evalOperand
-                    .replaceAll('a', val > - 1 ? val : val.eval)
-                    .replaceAll('b', val2 > - 1 ? val2 : val2.eval),
+                    .replaceAll('a', val.leaf !== undefined ? val.leaf : val.eval)
+                    .replaceAll('b', val2.leaf !== undefined ? val2.leaf : val2.eval),
             };
         }
 
@@ -159,7 +241,7 @@ class NestedBinaryQuestion {
                 .reduce((a, c) => (a[c] = 1, a), {})
         )
         .join('/');
-        const isValid = eval(generated.eval.replaceAll(/(\d+)/g, m => questions[m].isValid));
+        const isValid = evalNestedBool(generated.eval, questions);
         const premises = questions.reduce((a, q) => [ ...a, ...q.premises ], [])
         const conclusion = generated.human.replaceAll(/(\d+)/g, m => questions[m].conclusion);
         const countdown = getBinaryCountdown();

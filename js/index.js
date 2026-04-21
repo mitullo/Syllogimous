@@ -2245,7 +2245,11 @@ function generateQuestion() {
 
         savedata.enableAnchorSpace,
 
-        savedata.enableAnchorSpaceV2
+        savedata.enableAnchorSpaceV2,
+
+        savedata.enableMultiDim5D,
+
+        savedata.enableMultiDim6D
 
     ].reduce((a, c) => a + +c, 0) > 0;
 
@@ -3195,15 +3199,15 @@ function createHQLI(question, i) {
 
         'missed': '',
 
-        'right': answerUser,
+        'right': String(answerUser).toLowerCase(),
 
-        'wrong': answerUser,
+        'wrong': String(answerUser).toLowerCase(),
 
     }[q.correctness];
 
     
 
-    const answer = q.isValid;
+    const answer = String(q.isValid).toLowerCase();
 
     let classModifier = {
 
