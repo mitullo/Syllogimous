@@ -141,9 +141,13 @@ class SpaceHardMode {
             return [[], []];
         }
 
-        // Generate up to the available number of words (prevents infinite loops or undefined arrays)
-        const actualTransforms = Math.min(this.numTransforms, pool.length);
-        let wordSequence = repeatArrayUntil(shuffle(pool.slice()), actualTransforms);
+        // STACKING: Allow multiple transforms per word by cycling through pool
+        // This enables N transforms even with fewer than N words available
+        const shuffledPool = shuffle(pool.slice());
+        let wordSequence = [];
+        for (let i = 0; i < this.numTransforms; i++) {
+            wordSequence.push(shuffledPool[i % shuffledPool.length]);
+        }
 
         // ALWAYS single-side for anchor space (v1/v2) - prevents left+right double
         const isAnchorSpace = this.anchorWords.length > 0;
@@ -151,7 +155,8 @@ class SpaceHardMode {
             // All on LEFT, regardless of fixedPositions
             for (let i = 0; i < this.numTransforms && wordSequence.length > 0; i++) {
                 const target = wordSequence.shift();
-                const chain = this.directionize([leftStart, target], leftStart, leftDimensions, rightDimensions, dimensionPool, wordCoordMap);
+                // Pass just [target] like regular mode - directionize adds leftStart
+                const chain = this.directionize([target], leftStart, leftDimensions, rightDimensions, dimensionPool, wordCoordMap);
                 leftChains.push(chain);
                 leftDimensions.push(chain[1]);
             }
@@ -339,22 +344,7 @@ class SpaceHardMode {
             }
         }
 
-        // Filler: ONLY for regular modes (anchor space always uses single-side chains)
-        const isAnchorSpace = this.anchorWords.length > 0;
-        if (!isAnchorSpace && appliedTransforms < this.numTransforms && this.eligiblePool && this.eligiblePool.length >= 2) {
-            const dimPool = wordCoordMap[this.eligiblePool[0]].map((c, i) => i);
-            while (appliedTransforms < this.numTransforms && this.eligiblePool.length >= 2) {
-                const a = pickRandomItems(this.eligiblePool, 1).picked[0];
-                const b = pickRandomItems(this.eligiblePool.filter(w => w !== a), 1).picked[0];
-                const dimension = pickRandomItems(dimPool, 1).picked[0];
-                const command = pickRandomItems(commandPool, 1).picked[0];
-                wordCoordMap[b] = command.call(null, a, b, dimension);
-                appliedTransforms++;
-                usedCommands.push(command);
-            }
-        }
-
-        return operations.slice(0, this.numTransforms);
+        return operations;
     }
 
 }

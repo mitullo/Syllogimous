@@ -578,6 +578,14 @@ class DirectionQuestion {
         if (!savedata.enableTransformInterleave) {
             return [0, totalTransforms];
         }
+
+        // OVERRIDE: Anchor Space with fixed positions needs constant transforms
+        // regardless of premise count. Put all transforms through basicHardMode
+        // for maximum predictability with restricted word pools.
+        if (this.generator.shouldUseAnchor() && savedata.anchorSpaceFixedPositions) {
+            return [0, totalTransforms];
+        }
+
         let interleaveCount = Math.max(0, Math.min(totalTransforms - 1, numPremises - 1));
         return [interleaveCount, totalTransforms - interleaveCount];
     }
