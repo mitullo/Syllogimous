@@ -14,11 +14,23 @@ class SpaceHardMode {
         if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
             this.anchorWords.forEach(w => bannedFromPool.add(w));
         }
-        const eligiblePool = Object.keys(wordCoordMap).filter(w => !bannedFromPool.has(w));
-        if (this.numTransforms > 0 && eligiblePool.length === 0) {
-            // Cannot generate any transforms - return unchanged map
-            console.warn(`Anchor Space: No transformable words available (${Object.keys(wordCoordMap).length} total, ${this.anchorWords.length} fixed)`);
-            return [wordCoordMap, [], []];
+        let eligiblePool = Object.keys(wordCoordMap).filter(w => !bannedFromPool.has(w));
+
+        // SAFEGUARD: If pool is too small but we MUST transform, relax start/end ban
+        // NEVER relax anchor ban when fixed positions is enabled
+        if (this.numTransforms > 0 && eligiblePool.length < this.numTransforms) {
+            console.warn(`Anchor Space: Pool too small (${eligiblePool.length} < ${this.numTransforms}). Relaxing start/end restrictions.`);
+            const fallbackBanned = new Set();
+            if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
+                this.anchorWords.forEach(w => fallbackBanned.add(w));
+            }
+            eligiblePool = Object.keys(wordCoordMap).filter(w => !fallbackBanned.has(w));
+
+            // If STILL empty (e.g., literally only anchors exist), fail out safely
+            if (eligiblePool.length === 0) {
+                console.error(`Anchor Space: No non-anchor words available at all.`);
+                return [wordCoordMap, [], []];
+            }
         }
 
         let newWordMap;
@@ -26,6 +38,9 @@ class SpaceHardMode {
         let newConclusionCoord;
         let operations;
         let usedDimensions;
+        // Store the resolved eligible pool for createChains to use
+        this.resolvedEligiblePool = eligiblePool;
+
         // Small pool: skip demandChange/demandClose - transforms likely won't shift conclusion
         const isSmallPool = eligiblePool.length <= 2;
         const demandClose = isSmallPool ? false : Math.random() > 0.4;
@@ -103,12 +118,20 @@ class SpaceHardMode {
         let leftDimensions = [];
         let rightDimensions = [];
 
-        const bannedFromPool = new Set([leftStart, rightStart]);
-        // When fixed anchors enabled, exclude anchor words from transform pool
-        if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
-            this.anchorWords.forEach(w => bannedFromPool.add(w));
+        // Use the pre-resolved eligible pool from basicHardMode if available
+        // This ensures the safeguard fallback (relaxing start/end ban) is respected
+        let pool;
+        if (this.resolvedEligiblePool && this.resolvedEligiblePool.length > 0) {
+            pool = this.resolvedEligiblePool;
+        } else {
+            // Fallback: recalculate (shouldn't happen in normal flow)
+            const bannedFromPool = new Set([leftStart, rightStart]);
+            if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
+                this.anchorWords.forEach(w => bannedFromPool.add(w));
+            }
+            pool = Object.keys(wordCoordMap).filter(word => !bannedFromPool.has(word));
         }
-        const pool = Object.keys(wordCoordMap).filter(word => !bannedFromPool.has(word));
+
         // Store eligible pool for applyChain to use as replacement source
         this.eligiblePool = pool;
         const dimensionPool = wordCoordMap[leftStart].map((c, i) => i);
@@ -118,8 +141,9 @@ class SpaceHardMode {
             return [[], []];
         }
 
-        // Generate exactly numTransforms words (with reuse if pool is small)
-        let wordSequence = repeatArrayUntil(shuffle(pool.slice()), this.numTransforms);
+        // Generate up to the available number of words (prevents infinite loops or undefined arrays)
+        const actualTransforms = Math.min(this.numTransforms, pool.length);
+        let wordSequence = repeatArrayUntil(shuffle(pool.slice()), actualTransforms);
 
         // ALWAYS single-side for anchor space (v1/v2) - prevents left+right double
         const isAnchorSpace = this.anchorWords.length > 0;

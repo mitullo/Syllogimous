@@ -297,6 +297,7 @@ class DirectionQuestion {
                 // Handle wide premises (arrays) and regular premises (objects)
                 const premiseList = Array.isArray(premise) ? premise : [premise];
                 for (const p of premiseList) {
+                    if (!p) continue; // Skip undefined/null premises
                     if (p.start) wordsInPremises.add(p.start);
                     if (p.end) wordsInPremises.add(p.end);
                 }
