@@ -1,7 +1,40 @@
+class TransformState {
+    constructor(wordCoordMap = {}, anchorWords = []) {
+        this.wordCoordMap = structuredClone(wordCoordMap);
+        this.anchorWords = anchorWords;
+        this.transformedWords = new Set();
+        this.usedDimensions = new Set();
+        this.operations = [];
+        this.extraDimensions = [];
+    }
+
+    markTransformed(word) {
+        if (!this.anchorWords.includes(word)) {
+            this.transformedWords.add(word);
+        }
+    }
+
+    markDimensionUsed(dim) {
+        this.usedDimensions.add(dim);
+    }
+
+    getEligiblePool() {
+        // Pool is for REFERENCE points (axisWord / 'a' in chains), not moving words.
+        // All words including anchors and previously transformed words can be reference points.
+        // Anchors are protected from being MOVING words via isAnchorWord() check in applyChain.
+        return Object.keys(this.wordCoordMap);
+    }
+
+    updateWordCoordMap(newMap) {
+        this.wordCoordMap = structuredClone(newMap);
+    }
+}
+
 class SpaceHardMode {
-    constructor(numTransforms, anchorWords = []) {
+    constructor(numTransforms, anchorWords = [], transformState = null) {
         this.numTransforms = numTransforms;
         this.anchorWords = anchorWords;
+        this.transformState = transformState;
     }
 
     isAnchorWord(word) {
@@ -9,27 +42,35 @@ class SpaceHardMode {
     }
 
     basicHardMode(wordCoordMap, startWord, endWord, originalConclusionCoord) {
+        // Use transformState's wordCoordMap as base if available (for coordinated transforms)
+        const baseWordMap = this.transformState ? this.transformState.wordCoordMap : wordCoordMap;
+        
         // Pre-flight check for transform feasibility
-        const bannedFromPool = new Set([startWord, endWord]);
-        if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
-            this.anchorWords.forEach(w => bannedFromPool.add(w));
+        // Use transformState pool if available for coordination
+        let eligiblePool;
+        if (this.transformState) {
+            eligiblePool = this.transformState.getEligiblePool().filter(w => w !== startWord && w !== endWord);
         }
-        let eligiblePool = Object.keys(wordCoordMap).filter(w => !bannedFromPool.has(w));
+        
+        // Fallback: local calculation
+        if (!eligiblePool || eligiblePool.length === 0) {
+            const bannedFromPool = new Set([startWord, endWord]);
+            eligiblePool = Object.keys(baseWordMap).filter(w => !bannedFromPool.has(w));
+        }
 
         // SAFEGUARD: If pool is too small but we MUST transform, relax start/end ban
-        // NEVER relax anchor ban when fixed positions is enabled
         if (this.numTransforms > 0 && eligiblePool.length < this.numTransforms) {
             console.warn(`Anchor Space: Pool too small (${eligiblePool.length} < ${this.numTransforms}). Relaxing start/end restrictions.`);
-            const fallbackBanned = new Set();
-            if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
-                this.anchorWords.forEach(w => fallbackBanned.add(w));
+            if (this.transformState) {
+                eligiblePool = this.transformState.getEligiblePool();
+            } else {
+                eligiblePool = Object.keys(baseWordMap);
             }
-            eligiblePool = Object.keys(wordCoordMap).filter(w => !fallbackBanned.has(w));
 
-            // If STILL empty (e.g., literally only anchors exist), fail out safely
+            // If pool is empty, fail out safely
             if (eligiblePool.length === 0) {
-                console.error(`Anchor Space: No non-anchor words available at all.`);
-                return [wordCoordMap, [], []];
+                console.error(`Anchor Space: No words available for transforms.`);
+                return [baseWordMap, this.transformState ? this.transformState.operations : [], []];
             }
         }
 
@@ -47,9 +88,21 @@ class SpaceHardMode {
         const demandChange = isSmallPool ? false : Math.random() > 0.2;
         let closeTries = 10;
         let changeTries = 10;
+        
+        // Build base dimensions from transformState if available
+        let baseDimensions = [];
+        if (this.transformState) {
+            baseDimensions = Array.from(this.transformState.usedDimensions);
+        }
+        
         for (let i = 0; i < 10000; i++) {
-            newWordMap = structuredClone(wordCoordMap);
-            [operations, usedDimensions] = this.applyHardMode(newWordMap, startWord, endWord);
+            // When using transformState, mutate directly to maintain reference sync
+            if (this.transformState) {
+                newWordMap = baseWordMap; // Use same reference for coordination
+            } else {
+                newWordMap = structuredClone(baseWordMap);
+            }
+            [operations, usedDimensions] = this.applyHardMode(newWordMap, startWord, endWord, baseDimensions);
             [newDiffCoord, newConclusionCoord] = getConclusionCoords(newWordMap, startWord, endWord);
             if (newConclusionCoord === null || newConclusionCoord.every(c => c === 0)) {
                 continue;
@@ -71,8 +124,17 @@ class SpaceHardMode {
         // Post-loop validation: if conclusion is still invalid after exhaustion, return original
         if (newConclusionCoord === null || newConclusionCoord.every(c => c === 0)) {
             console.warn('SpaceHardMode: Failed to find valid transform after 10000 iterations');
-            return [structuredClone(wordCoordMap), [], []];
+            // When using transformState, baseWordMap is already mutated, so return it directly
+            return [baseWordMap, this.transformState ? this.transformState.operations : [], []];
         }
+        
+        // Update transformState with results if available
+        if (this.transformState) {
+            // No need to update wordCoordMap reference since we mutated directly
+            this.transformState.operations.push(...operations);
+            usedDimensions.forEach(d => this.transformState.markDimensionUsed(d));
+        }
+        
         return [newWordMap, operations, usedDimensions];
     }
 
@@ -84,22 +146,60 @@ class SpaceHardMode {
 
         let operation;
         let newWordMap;
-        // Exclude anchor words from pool to prevent anchor grid corruption
-        const bannedFromPool = new Set([movingWord]);
-        if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
-            this.anchorWords.forEach(w => bannedFromPool.add(w));
+        
+        // Use transformState for coordinated pool if available, otherwise fallback
+        let pool;
+        if (this.transformState) {
+            pool = this.transformState.getEligiblePool().filter(w => w !== movingWord);
         }
-        let pool = Object.keys(wordCoordMap).filter(w => !bannedFromPool.has(w));
-        // Fallback if pool is empty after banning anchors
-        if (pool.length === 0) {
-            pool = Object.keys(wordCoordMap).filter(w => w !== movingWord);
+        
+        // Fallback: local pool calculation
+        if (!pool || pool.length === 0) {
+            const bannedFromPool = new Set([movingWord]);
+            pool = Object.keys(wordCoordMap).filter(w => !bannedFromPool.has(w));
+            if (pool.length === 0) {
+                pool = Object.keys(wordCoordMap).filter(w => w !== movingWord);
+            }
         }
+        
         let originalCoord = wordCoordMap[movingWord];
         for (let i = 0; i < 100; i++) {
-            newWordMap = structuredClone(wordCoordMap);
+            // When using transformState, mutate directly to maintain reference sync
+            // Otherwise clone to avoid side effects
+            if (this.transformState) {
+                newWordMap = wordCoordMap; // Use same reference for coordination
+            } else {
+                newWordMap = structuredClone(wordCoordMap);
+            }
+            
             let axisWord = pickRandomItems(pool, 1).picked[0];
-            const chainResult = this.applyChain(newWordMap, [], [[[axisWord, movingWord], useBackup ? backupDimension : dimension]]);
+            
+            // Safety check: ensure both words exist in the map
+            if (!newWordMap[axisWord] || !newWordMap[movingWord]) {
+                console.warn('oneTransform: word not in map, retrying', { axisWord, movingWord, hasAxis: !!newWordMap[axisWord], hasMoving: !!newWordMap[movingWord] });
+                continue;
+            }
+            
+            // Build dimensionsUsed from transformState if available
+            let dimensionsUsed = [];
+            if (this.transformState) {
+                dimensionsUsed = Array.from(this.transformState.usedDimensions);
+            }
+            
+            const chainResult = this.applyChain(newWordMap, dimensionsUsed, [[[axisWord, movingWord], useBackup ? backupDimension : dimension]]);
             operation = chainResult.ops[0] || null;
+            
+            // Update transformState if available (wordCoordMap is already mutated if using transformState)
+            if (this.transformState && operation) {
+                this.transformState.markTransformed(movingWord);
+                this.transformState.markDimensionUsed(useBackup ? backupDimension : dimension);
+                this.transformState.operations.push(operation);
+                if (chainResult.extraDimensions) {
+                    chainResult.extraDimensions.forEach(d => this.transformState.markDimensionUsed(d));
+                }
+                // No need to update wordCoordMap reference since we mutated directly
+            }
+            
             let newCoord = newWordMap[movingWord];
             if (demandChange && changeTries > 0 && arraysEqual(originalCoord, newCoord)) {
                 changeTries--;
@@ -119,9 +219,12 @@ class SpaceHardMode {
         return [newWordMap, operation];
     }
 
-    applyHardMode(wordCoordMap, leftStart, rightStart) {
+    applyHardMode(wordCoordMap, leftStart, rightStart, existingDimensions = []) {
         const [leftChains, rightChains] = this.createChains(wordCoordMap, leftStart, rightStart);
-        const baseDimensions = [...leftChains.map(([words, dimension]) => dimension), ...rightChains.map(([words, dimension]) => dimension)];
+        // Use existingDimensions as base if provided (for coordinated transforms), otherwise build from chains
+        const baseDimensions = existingDimensions.length > 0 
+            ? existingDimensions 
+            : [...leftChains.map(([words, dimension]) => dimension), ...rightChains.map(([words, dimension]) => dimension)];
         // Pass copies to each applyChain to prevent mutation cross-contamination
         const leftOperations = this.applyChain(wordCoordMap, [...baseDimensions], leftChains);
         const rightOperations = this.applyChain(wordCoordMap, [...baseDimensions], rightChains);
@@ -144,9 +247,6 @@ class SpaceHardMode {
         } else {
             // Fallback: recalculate (shouldn't happen in normal flow)
             const bannedFromPool = new Set([leftStart, rightStart]);
-            if (savedata.anchorSpaceFixedPositions && this.anchorWords.length > 0) {
-                this.anchorWords.forEach(w => bannedFromPool.add(w));
-            }
             pool = Object.keys(wordCoordMap).filter(word => !bannedFromPool.has(word));
         }
 
@@ -159,22 +259,96 @@ class SpaceHardMode {
             return [[], []];
         }
 
-        // STACKING: Allow multiple transforms per word by cycling through pool
-        // This enables N transforms even with fewer than N words available
-        const shuffledPool = shuffle(pool.slice());
+        // FAIR DISTRIBUTION: Ensure transforms are spread evenly across available words
+        // Split pool into anchors and non-anchors for better variety
+        let anchorPool = shuffle(pool.filter(w => this.anchorWords.includes(w)));
+        let nonAnchorPool = shuffle(pool.filter(w => !this.anchorWords.includes(w)));
+        
+        // Build sequence with fair round-robin distribution
         let wordSequence = [];
+        let lastPicked = null;
+        let anchorIdx = 0;
+        let nonAnchorIdx = 0;
+        
         for (let i = 0; i < this.numTransforms; i++) {
-            wordSequence.push(shuffledPool[i % shuffledPool.length]);
+            let picked = null;
+            
+            // Alternate between anchor and non-anchor pools (50/50 when both available)
+            if (anchorPool.length > 0 && nonAnchorPool.length > 0) {
+                // Decide which pool to use this round
+                const useAnchor = (i % 2 === 0) ? 
+                    anchorPool.length >= nonAnchorPool.length : 
+                    anchorPool.length < nonAnchorPool.length;
+                
+                if (useAnchor) {
+                    // Cycle through anchors fairly
+                    picked = anchorPool[anchorIdx % anchorPool.length];
+                    anchorIdx++;
+                } else {
+                    // Cycle through non-anchors fairly
+                    picked = nonAnchorPool[nonAnchorIdx % nonAnchorPool.length];
+                    nonAnchorIdx++;
+                }
+            } else if (anchorPool.length > 0) {
+                // Only anchors - cycle through them
+                picked = anchorPool[anchorIdx % anchorPool.length];
+                anchorIdx++;
+            } else if (nonAnchorPool.length > 0) {
+                // Only non-anchors - cycle through them fairly
+                picked = nonAnchorPool[nonAnchorIdx % nonAnchorPool.length];
+                nonAnchorIdx++;
+            }
+            
+            // Avoid consecutive same word if possible
+            if (picked === lastPicked && i > 0) {
+                // Try to pick a different word from the same pool
+                if (anchorPool.length > 1 && this.anchorWords.includes(picked)) {
+                    picked = anchorPool[(anchorIdx + 1) % anchorPool.length];
+                } else if (nonAnchorPool.length > 1 && !this.anchorWords.includes(picked)) {
+                    picked = nonAnchorPool[(nonAnchorIdx + 1) % nonAnchorPool.length];
+                }
+            }
+            
+            if (picked) {
+                wordSequence.push(picked);
+                lastPicked = picked;
+            }
         }
 
         // ALWAYS single-side for anchor space (v1/v2) - prevents left+right double
         const isAnchorSpace = this.anchorWords.length > 0;
         if (isAnchorSpace) {
             // All on LEFT, regardless of fixedPositions
+            // DISTRIBUTE transforms across different moving words for variety
+            // Build separate pool of "other words" (non-conclusion, non-anchor words that can be transformed)
+            const otherMovingWords = wordSequence.filter(w => 
+                w !== leftStart && w !== rightStart && !this.isAnchorWord(w)
+            );
+            
             for (let i = 0; i < this.numTransforms && wordSequence.length > 0; i++) {
-                const target = wordSequence.shift();
-                // Pass just [target] like regular mode - directionize adds leftStart
-                const chain = this.directionize([target], leftStart, leftDimensions, rightDimensions, dimensionPool, wordCoordMap);
+                const target = wordSequence.shift(); // Reference word (what we transform around)
+                
+                // Alternate between conclusion word and other words for variety
+                // 50% conclusion word, 50% other words (but NEVER use anchor as moving word)
+                let movingWord;
+                if (i % 2 === 0 || otherMovingWords.length === 0) {
+                    movingWord = leftStart; // Conclusion word
+                } else {
+                    // Use a different non-anchor word from pool
+                    const idx = Math.floor((i / 2) % otherMovingWords.length);
+                    movingWord = otherMovingWords[idx];
+                }
+                
+                // FINAL SAFETY CHECK: Never use an anchor as moving word
+                if (this.isAnchorWord(movingWord)) {
+                    // Find any non-anchor replacement
+                    const safeWords = Object.keys(wordCoordMap).filter(w => !this.isAnchorWord(w));
+                    if (safeWords.length > 0) {
+                        movingWord = safeWords[Math.floor(Math.random() * safeWords.length)];
+                    }
+                }
+                
+                const chain = this.directionize([target], movingWord, leftDimensions, rightDimensions, dimensionPool, wordCoordMap);
                 leftChains.push(chain);
                 leftDimensions.push(chain[1]);
             }
@@ -347,12 +521,17 @@ class SpaceHardMode {
                 let a = chain[i-1];
                 let b = chain[i];
 
-                // If target is anchor OR self-transform, replace with valid word
+                // If target is anchor OR self-transform, replace with valid non-anchor word
                 if (this.isAnchorWord(b) || a === b) {
-                    const candidates = this.eligiblePool.filter(w => w !== a);
-                    b = candidates.length > 0 ?
-                        pickRandomItems(candidates, 1).picked[0] :
-                        this.eligiblePool[0] || b;  // Guaranteed pick
+                    // Never let an anchor become the moving word via replacement
+                    const candidates = this.eligiblePool.filter(w => w !== a && !this.anchorWords.includes(w));
+                    if (candidates.length > 0) {
+                        b = pickRandomItems(candidates, 1).picked[0];
+                    } else {
+                        // No valid non-anchor found - skip this transform by using 'a' (reference word)
+                        // This effectively cancels the transform since a→a is identity
+                        b = a;
+                    }
                 }
 
                 const lastUsed = usedCommands?.[usedCommands.length - 1];

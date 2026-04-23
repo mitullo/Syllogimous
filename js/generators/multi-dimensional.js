@@ -42,6 +42,18 @@ function createSpatialStatement(a, b, dirCoord) {
 
 // Create a multi-dimensional premise combining spatial and additional layers
 function createMultiDimStatement(a, b, dirCoord, dimensions) {
+    // Handle null dirCoord (can happen when transforms result in zero vector)
+    if (!dirCoord) {
+        return {
+            start: b,
+            end: a,
+            relation: `is at of`,
+            reverse: `is at of`,
+            relationMinimal: '',
+            reverseMinimal: '',
+        }
+    }
+    
     const spatialStmt = createSpatialStatement(a, b, dirCoord);
     
     let layers = [spatialStmt];
@@ -123,13 +135,39 @@ function createMultiDim5DGenerator(length) {
             create: function(length) {
                 const dir4dGen = new Direction4D();
                 const words = createStimuli(length + 1);
-                const premises = [];
                 const neighbors = {};
+                
+                // Transform split for interleave mode
+                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
+                
+                // Create unified transform state for coordinated transforms
+                let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
                 
                 // Maintain a 4D map for the pathfinder to prevent distance calculation crashes, 
                 // and a true 5D map for the logic.
                 const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
                 let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0] };
+                
+                // When using transforms, initialize transformState with the wordCoordMap reference
+                if (transformState) {
+                    transformState.wordCoordMap = wordCoordMap;
+                }
+                
+                // Interleave transforms during premise generation
+                // Pre-calculate evenly distributed positions for interleaved transforms
+                let interleavePositions = [];
+                for (let j = 0; j < numInterleaved; j++) {
+                    interleavePositions.push(Math.floor((j + 1) * length / (numInterleaved + 1)));
+                }
+                let nextInterleaveIdx = 0;
+                let interleavedOps = [];
+                let anchorWords = [];
+                // Dimension pool for interleaved transforms (like direction.js)
+                const dimPool5D = repeatArrayUntil(shuffle([0, 1, 2, 3, 4]), numInterleaved * 2);
+                let dimIndex = 0;
+                
+                // Build premise chunks for interleaving (like direction.js createWordMapInterleaved)
+                let premiseChunks = [[]];
                 
                 for (let i = 0; i < length; i++) {
                     const baseWord = words[i];
@@ -144,17 +182,49 @@ function createMultiDim5DGenerator(length) {
                     wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
                     
                     const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 5);
-                    premises.push(premise);
+                    premiseChunks[premiseChunks.length - 1].push(premise);
                     
                     neighbors[baseWord] = neighbors[baseWord] ?? [];
-neighbors[baseWord].push(nextWord);
-neighbors[nextWord] = neighbors[nextWord] ?? [];
-neighbors[nextWord].push(baseWord);
+                    neighbors[baseWord].push(nextWord);
+                    neighbors[nextWord] = neighbors[nextWord] ?? [];
+                    neighbors[nextWord].push(baseWord);
+                    
+                    // Apply interleaved transform if due
+                    if (nextInterleaveIdx < interleavePositions.length && i === interleavePositions[nextInterleaveIdx]) {
+                        // Start a new premise chunk after the transform
+                        premiseChunks.push([]);
+                        // Pick random moving word (not anchor)
+                        const availableWords = Object.keys(wordCoordMap).filter(w => !anchorWords.includes(w));
+                        if (availableWords.length > 0) {
+                            const movingWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+                            const [newMap, operation] = new SpaceHardMode(1, anchorWords, transformState)
+                                .oneTransform(wordCoordMap, movingWord, dimPool5D[dimIndex], dimPool5D[dimIndex + 1]);
+                            dimIndex++;
+                            wordCoordMap = newMap;
+                            if (operation) {
+                                interleavedOps.push(operation);
+                            }
+                        }
+                        nextInterleaveIdx++;
+                    }
+                }
+                
+                // Remove empty trailing chunk
+                if (premiseChunks[premiseChunks.length - 1].length === 0) {
+                    premiseChunks.pop();
+                }
+                
+                // Merge premise chunks with interleaved operations (same as direction.js)
+                let premises;
+                if (numInterleaved > 0 && interleavedOps.length > 0) {
+                    let merged = interleaveArrays(premiseChunks, interleavedOps);
+                    premises = merged.flatMap(p => Array.isArray(p) ? p : [p]);
+                } else {
+                    premises = premiseChunks.flat();
                 }
 
                 // Transform support: pick primary conclusion words first
                 const pairChooser = new DirectionPairChooser();
-                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
                 let startWord, endWord;
                 let operations = [];
 
@@ -164,14 +234,15 @@ neighbors[nextWord].push(baseWord);
                     [startWord, endWord] = primaryPair;
                 }
 
-                // Apply transforms if enabled
+                // Apply remaining basic transforms (interleaved were already applied via transformState)
                 if (numTransforms > 0 && startWord && endWord) {
                     const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
                     let _x;
-                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms).basicHardMode(
-                        wordCoordMap, startWord, endWord, conclusionCoord
-                    );
+                    // Pass transformState for coordinated transforms
+                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms, anchorWords, transformState)
+                        .basicHardMode(wordCoordMap, startWord, endWord, conclusionCoord);
                     if (numInterleaved > 0) {
+                        // Interleave mode: push basic ops to premises, hide Transformations section
                         premises.push(...operations);
                         operations = [];
                     }
@@ -394,11 +465,37 @@ function createMultiDim6DGenerator(length) {
             create: function(length) {
                 const dir4dGen = new Direction4D();
                 const words = createStimuli(length + 1);
-                const premises = [];
                 const neighbors = {};
+                
+                // Transform split for interleave mode
+                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
+                
+                // Create unified transform state for coordinated transforms
+                let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
                 
                 const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
                 let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0, 0] };
+                
+                // When using transforms, initialize transformState with the wordCoordMap reference
+                if (transformState) {
+                    transformState.wordCoordMap = wordCoordMap;
+                }
+                
+                // Interleave transforms during premise generation
+                // Pre-calculate evenly distributed positions for interleaved transforms
+                let interleavePositions = [];
+                for (let j = 0; j < numInterleaved; j++) {
+                    interleavePositions.push(Math.floor((j + 1) * length / (numInterleaved + 1)));
+                }
+                let nextInterleaveIdx = 0;
+                let interleavedOps = [];
+                let anchorWords = [];
+                // Dimension pool for interleaved transforms (like direction.js)
+                const dimPool6D = repeatArrayUntil(shuffle([0, 1, 2, 3, 4, 5]), numInterleaved * 2);
+                let dimIndex = 0;
+                
+                // Build premise chunks for interleaving (like direction.js createWordMapInterleaved)
+                let premiseChunks = [[]];
                 
                 for (let i = 0; i < length; i++) {
                     const baseWord = words[i];
@@ -413,17 +510,49 @@ function createMultiDim6DGenerator(length) {
                     wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
                     
                     const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
-                    premises.push(premise);
+                    premiseChunks[premiseChunks.length - 1].push(premise);
                     
                     neighbors[baseWord] = neighbors[baseWord] ?? [];
-neighbors[baseWord].push(nextWord);
-neighbors[nextWord] = neighbors[nextWord] ?? [];
-neighbors[nextWord].push(baseWord);
+                    neighbors[baseWord].push(nextWord);
+                    neighbors[nextWord] = neighbors[nextWord] ?? [];
+                    neighbors[nextWord].push(baseWord);
+                    
+                    // Apply interleaved transform if due
+                    if (nextInterleaveIdx < interleavePositions.length && i === interleavePositions[nextInterleaveIdx]) {
+                        // Start a new premise chunk after the transform
+                        premiseChunks.push([]);
+                        // Pick random moving word (not anchor)
+                        const availableWords = Object.keys(wordCoordMap).filter(w => !anchorWords.includes(w));
+                        if (availableWords.length > 0) {
+                            const movingWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+                            const [newMap, operation] = new SpaceHardMode(1, anchorWords, transformState)
+                                .oneTransform(wordCoordMap, movingWord, dimPool6D[dimIndex], dimPool6D[dimIndex + 1]);
+                            dimIndex++;
+                            wordCoordMap = newMap;
+                            if (operation) {
+                                interleavedOps.push(operation);
+                            }
+                        }
+                        nextInterleaveIdx++;
+                    }
+                }
+                
+                // Remove empty trailing chunk
+                if (premiseChunks[premiseChunks.length - 1].length === 0) {
+                    premiseChunks.pop();
+                }
+                
+                // Merge premise chunks with interleaved operations (same as direction.js)
+                let premises;
+                if (numInterleaved > 0 && interleavedOps.length > 0) {
+                    let merged = interleaveArrays(premiseChunks, interleavedOps);
+                    premises = merged.flatMap(p => Array.isArray(p) ? p : [p]);
+                } else {
+                    premises = premiseChunks.flat();
                 }
 
                 // Transform support: pick primary conclusion words first
                 const pairChooser = new DirectionPairChooser();
-                const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
                 let startWord, endWord;
                 let operations = [];
 
@@ -433,14 +562,15 @@ neighbors[nextWord].push(baseWord);
                     [startWord, endWord] = primaryPair;
                 }
 
-                // Apply transforms if enabled
+                // Apply remaining basic transforms (interleaved were already applied via transformState)
                 if (numTransforms > 0 && startWord && endWord) {
                     const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
                     let _x;
-                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms).basicHardMode(
-                        wordCoordMap, startWord, endWord, conclusionCoord
-                    );
+                    // Pass transformState for coordinated transforms
+                    [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms, anchorWords, transformState)
+                        .basicHardMode(wordCoordMap, startWord, endWord, conclusionCoord);
                     if (numInterleaved > 0) {
+                        // Interleave mode: push basic ops to premises, hide Transformations section
                         premises.push(...operations);
                         operations = [];
                     }

@@ -236,6 +236,10 @@ function throwSvgsOnPage() {
 }
 
 function renderJunkEmojisText(text, pattern = null) {
+    // Handle null/undefined input
+    if (text === null || text === undefined) {
+        return '';
+    }
     // Handle object input from createPremiseHTML (which returns {html, isInverted})
     if (typeof text === 'object' && text !== null && text.html !== undefined) {
         text = text.html;

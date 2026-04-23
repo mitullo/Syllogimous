@@ -2843,7 +2843,9 @@ function handleConclusionAnswer(userAnswer) {
     if (!isMulti) {
         // Single conclusion mode - simple path
 
-        const isCorrect = userAnswer === q.isValid;
+        // Defensive: ensure isValid is defined (default to false if somehow undefined)
+        const questionIsValid = q.isValid ?? false;
+        const isCorrect = userAnswer === questionIsValid;
 
         q.answerUser = userAnswer;
 
@@ -2891,7 +2893,9 @@ function handleConclusionAnswer(userAnswer) {
         processingAnswer = false;
         return;
     }
-    const isCorrect = userAnswer === current.isValid;
+    // Defensive: ensure isValid is defined (default to false if somehow undefined)
+    const conclusionIsValid = current.isValid ?? false;
+    const isCorrect = userAnswer === conclusionIsValid;
 
     q.userAnswers[idx] = userAnswer;
 
