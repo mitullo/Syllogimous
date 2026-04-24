@@ -2,14 +2,26 @@ function createWidePremises(premises, premiseMap) {
     if (!premiseMap) {
         premiseMap = {};
         for (const premise of premises) {
-            premiseMap[premiseKey(premise.start, premise.end)] = premise;
+            if (premise.startSet) {
+                premiseMap[premiseKey(premise.startSet[0], premise.endSet[0])] = premise;
+            } else {
+                premiseMap[premiseKey(premise.start, premise.end)] = premise;
+            }
         }
     }
 
     const graph = new Map();
     const edges = new Set();
 
-    for (const { start, end } of premises) {
+    for (const premise of premises) {
+        let start, end;
+        if (premise.startSet) {
+            start = premise.startSet[0];
+            end = premise.endSet[0];
+        } else {
+            start = premise.start;
+            end = premise.end;
+        }
         if (!graph.has(start)) graph.set(start, []);
         if (!graph.has(end)) graph.set(end, []);
         graph.get(start).push(end);

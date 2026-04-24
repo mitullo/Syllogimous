@@ -8,6 +8,10 @@ function createPremiseHTML(premise, allowReversal=true, index=null, pattern=null
     }
     // For half-minimal mode, odd indices (0, 2, 4...) use minimal text
     const forceMinimal = (index !== null && savedata.halfMinimalMode) ? (index % 2 === 0) : null;
+    // Detect stimulus set premise (has startSet/endSet arrays)
+    if (premise.startSet && premise.endSet) {
+        return createSetPremiseHTML(premise, allowReversal, forceMinimal, pattern);
+    }
     if (savedata.widePremises && Array.isArray(premise)) {
         return createWidePremiseHTML(premise, allowReversal, forceMinimal, pattern);
     } else {
@@ -67,7 +71,23 @@ function createWidePremiseHTML(premise, allowReversal=true, forceMinimal=null, p
     const useMinimal = forceMinimal !== null ? forceMinimal : savedata.minimalMode;
     const useInverted = useMinimal && savedata.invertedMinimalMode;
     if (premise.length === 1) {
+        // Single premise in wide wrapper - delegate to appropriate renderer
+        if (premise[0].startSet) {
+            return createSetPremiseHTML(premise[0], allowReversal, forceMinimal, pattern);
+        }
         return createBasicPremiseHTML(premise[0], allowReversal, forceMinimal, pattern);
+    }
+
+    // If either premise is a set premise, render them individually (combining set premises into wide format is complex)
+    if (premise[0].startSet || premise[1].startSet) {
+        const rendered = premise.map(p => {
+            if (p.startSet) {
+                return createSetPremiseHTML(p, allowReversal, forceMinimal, pattern);
+            }
+            return createBasicPremiseHTML(p, allowReversal, forceMinimal, pattern);
+        });
+        // Return combined HTML from individual renderings
+        return rendered.map(r => r.html || r).join(' ');
     }
 
     // Helper to render a subject (word or shape)
@@ -152,13 +172,11 @@ function createWidePremiseHTML(premise, allowReversal=true, forceMinimal=null, p
     return result;
 }
 
-// Create a negated conclusion HTML - wraps the relation in a "not" indicator
-// This is actual negation, not inversion (e.g., "A is not west of B" vs "A is east of B")
-function createNegatedConclusionHTML(premise, allowReversal=true, forceMinimal=null, pattern=null) {
+// Render a stimulus set premise: "A, B and C are south east of D and E"
+function createSetPremiseHTML(premise, allowReversal=true, forceMinimal=null, pattern=null) {
     const useMinimal = forceMinimal !== null ? forceMinimal : savedata.minimalMode;
     const useInverted = useMinimal && savedata.invertedMinimalMode;
 
-    // For inverted mode, swap the minimal symbols
     let relation, reverse;
     if (useMinimal && useInverted) {
         relation = premise.reverseMinimal;
@@ -179,14 +197,101 @@ function createNegatedConclusionHTML(premise, allowReversal=true, forceMinimal=n
         return word;
     };
 
-    const start = renderSubject(premise.start);
-    const end = renderSubject(premise.end);
+    // Format a set of items as "A, B and C"
+    const formatSet = (items) => {
+        const rendered = items.map(renderSubject);
+        if (rendered.length === 1) return rendered[0];
+        if (rendered.length === 2) return `${rendered[0]} <span class="set-op">and</span> ${rendered[1]}`;
+        return rendered.slice(0, -1).join('<span class="set-op">,</span> ') + ' <span class="set-op">and</span> ' + rendered[rendered.length - 1];
+    };
 
-    // Create the negated relation text - lowercase "not" and format nicely
-    // For relations like "is west of", we want "is not west of"
-    // For minimal symbols, we want "¬[symbol]" (negation symbol prefix)
+    // Wrap formatted set in subject span
+    const formatSetSpan = (items) => {
+        return `<span class="subject">${formatSet(items)}</span>`;
+    };
+
+    // Adapt relation for plural: "is" -> "are" when either set has >1 item
+    const adaptRelation = (rel, startSet, endSet) => {
+        if (useMinimal) return rel; // Minimal symbols don't have is/are
+        const hasPlural = startSet.length > 1 || endSet.length > 1;
+        if (hasPlural) {
+            return rel.replace(/^is\s+/, 'are ');
+        }
+        return rel;
+    };
+
+    const startSet = premise.startSet;
+    const endSet = premise.endSet;
+
+    const relationAdapted = adaptRelation(relation, startSet, endSet);
+    const reverseAdapted = adaptRelation(reverse, endSet, startSet);
+
+    let ps;
+    if (!allowReversal || coinFlip()) {
+        ps = [
+            `${formatSetSpan(startSet)} <span class="relation">${relationAdapted}</span> ${formatSetSpan(endSet)}`,
+            `${formatSetSpan(startSet)} <span class="relation"><span class="is-negated">${reverseAdapted}</span></span> ${formatSetSpan(endSet)}`,
+        ];
+    } else {
+        ps = [
+            `${formatSetSpan(endSet)} <span class="relation">${reverseAdapted}</span> ${formatSetSpan(startSet)}`,
+            `${formatSetSpan(endSet)} <span class="relation"><span class="is-negated">${relationAdapted}</span></span> ${formatSetSpan(startSet)}`,
+        ];
+    }
+    const result = pickNegatable(ps);
+    return result;
+}
+
+// Create a negated conclusion HTML - wraps the relation in a "not" indicator
+// This is actual negation, not inversion (e.g., "A is not west of B" vs "A is east of B")
+function createNegatedConclusionHTML(premise, allowReversal=true, forceMinimal=null, pattern=null) {
+    const useMinimal = forceMinimal !== null ? forceMinimal : savedata.minimalMode;
+    const useInverted = useMinimal && savedata.invertedMinimalMode;
+
+    // For inverted mode, swap the minimal symbols
+    let relation, reverse;
+    if (useMinimal && useInverted) {
+        relation = premise.reverseMinimal;
+        reverse = premise.relationMinimal;
+    } else {
+        relation = useMinimal ? premise.relationMinimal : premise.relation;
+        reverse = useMinimal ? premise.reverseMinimal : premise.reverse;
+    }
+
+    // Create the negated relation text
     const negRelation = useMinimal ? `¬${relation}` : relation.replace(/^(is\s+)/, 'is not ').replace(/^(are\s+)/, 'are not ');
     const negReverse = useMinimal ? `¬${reverse}` : reverse.replace(/^(is\s+)/, 'is not ').replace(/^(are\s+)/, 'are not ');
+
+    // Handle set premises (startSet/endSet)
+    if (premise.startSet && premise.endSet) {
+        const formatSet = (items) => {
+            if (items.length === 1) return items[0];
+            if (items.length === 2) return `${items[0]} <span class="set-op">and</span> ${items[1]}`;
+            return items.slice(0, -1).join('<span class="set-op">,</span> ') + ' <span class="set-op">and</span> ' + items[items.length - 1];
+        };
+        const startSetHTML = `<span class="subject">${formatSet(premise.startSet)}</span>`;
+        const endSetHTML = `<span class="subject">${formatSet(premise.endSet)}</span>`;
+
+        if (!allowReversal || coinFlip()) {
+            return `${startSetHTML} <span class="relation">${negRelation}</span> ${endSetHTML}`;
+        } else {
+            return `${endSetHTML} <span class="relation">${negReverse}</span> ${startSetHTML}`;
+        }
+    }
+
+    // Helper to render a subject (word or shape)
+    const renderSubject = (word) => {
+        if (pattern && pattern[word]) {
+            const { shape, color } = pattern[word];
+            const size = 28;
+            const svg = createShapeSVG(shape, color, size/2, size/2, size);
+            return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="vertical-align: middle; display: inline-block;">${svg}</svg>`;
+        }
+        return word;
+    };
+
+    const start = renderSubject(premise.start);
+    const end = renderSubject(premise.end);
 
     if (!allowReversal || coinFlip()) {
         return `<span class="subject">${start}</span> <span class="relation">${negRelation}</span> <span class="subject">${end}</span>`;

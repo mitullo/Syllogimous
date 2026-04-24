@@ -889,7 +889,7 @@ function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, 
 
         `<div class="preamble">Premises${easy}</div>`,
 
-        ...premises.map((p, i) => `<div class="formatted-premise ${halfMinimal && i % 2 === 0 ? 'minimal-style' : ''}">${p}</div>`),
+        ...premises.map((p, i) => `<div class="formatted-premise ${halfMinimal && i % 2 === 0 ? 'minimal-style' : ''}">${p.html ?? p}</div>`),
 
         ...((operations && operations.length > 0) ? ['<div class="transform-header">Transformations</div>'] : []),
 
@@ -3292,7 +3292,9 @@ function createHQLI(question, i) {
                 const concClass = wasCorrect ? 'correct' : 'wrong';
                 const answerText = userAns === true ? 'TRUE' : (userAns === false ? 'FALSE' : '-');
                 const correctText = c.isValid ? 'TRUE' : 'FALSE';
-                return `<div class="hqli-postamble">Conclusion ${i + 1} of ${q.conclusions.length} — You: ${answerText} (correct: ${correctText})</div>
+                const answerSpanClass = userAns === true ? 'conc-true' : (userAns === false ? 'conc-false' : '');
+                const correctSpanClass = c.isValid ? 'conc-true' : 'conc-false';
+                return `<div class="hqli-postamble">Conclusion ${i + 1} of ${q.conclusions.length} — You: <span class="${answerSpanClass}">${answerText}</span> (correct: <span class="${correctSpanClass}">${correctText}</span>)</div>
         <div class="hqli-conclusion ${concClass}">${c.conclusion}</div>`;
             }).join('')
             : `<div class="hqli-postamble">Conclusion</div>

@@ -310,6 +310,10 @@ let savedata = {
 
     "anchorSpaceFixedPositions": false,
 
+    "enableStimulusSets": false,
+
+    "stimulusSetSize": 2,
+
 };
 
 
@@ -596,6 +600,10 @@ const compressedSettings = {
 
     "enableHarderConclusions": "hardConc",
 
+    "enableStimulusSets": "stimSets",
+
+    "stimulusSetSize": "stimSetSize",
+
 };
 
 
@@ -735,6 +743,8 @@ const keySettingMap = {
     "p-67": "autoProgressionChange",
     "p-68": "autoProgressionTimeDrop",
     "p-69": "autoProgressionTimeBump",
+    "p-stim-sets": "enableStimulusSets",
+    "p-stim-set-size": "stimulusSetSize",
 };
 
 
@@ -808,6 +818,10 @@ const legacySettings = [
     "enableTransformRotate",
 
     "enableTransformInterleave",
+
+    "enableStimulusSets",
+
+    "stimulusSetSize",
 
 ];
 

@@ -86,6 +86,31 @@ class LinearGenerator {
         }
     }
 
+    createSetLinearPremise(startSet, endSet, forwards=true) {
+        // Adapt relation for plural: "is" -> "are" when either set has >1 item
+        const hasPlural = startSet.length > 1 || endSet.length > 1;
+        const adapt = (rel) => hasPlural ? rel.replace(/^is\s+/, 'are ') : rel;
+        if (forwards) {
+            return {
+                startSet: startSet,
+                endSet: endSet,
+                relation: adapt(this.prev),
+                reverse: adapt(this.next),
+                relationMinimal: this.prevMin,
+                reverseMinimal: this.nextMin,
+            };
+        } else {
+            return {
+                startSet: endSet,
+                endSet: startSet,
+                relation: adapt(this.next),
+                reverse: adapt(this.prev),
+                relationMinimal: this.nextMin,
+                reverseMinimal: this.prevMin,
+            };
+        }
+    }
+
     createBacktrackingLinearPremise(a, b, options, negationOptions, isValid) {
         // Map comparison values (-1, 0, 1) to correct relations
         // For most modes: -1=prev, 0=equal, +1=next (e.g., less/equal/more)
@@ -142,7 +167,22 @@ class LinearQuestion {
         let buckets;
         let bucketMap;
 
-        const words = createStimuli(length + 1);
+        // When stimulus sets are enabled, we need more words per premise
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+        // Chained mode: setSize + length*setSize words total
+        // Backtracking mode: 1 + length*(2*setSize-1) words total
+        let extraWords;
+        if (useStimSets) {
+            if (this.isBacktrackingEnabled()) {
+                extraWords = 1 + length * (2 * setSize - 1) - (length + 1);
+            } else {
+                extraWords = setSize + length * setSize - (length + 1);
+            }
+        } else {
+            extraWords = 0;
+        }
+        const words = createStimuli(length + 1 + extraWords);
 
         if (this.isBacktrackingEnabled()) {
             [premises, conclusion, isValid, buckets, bucketMap, this.neighbors] = this.buildBacktrackingMap(words);
@@ -154,7 +194,7 @@ class LinearQuestion {
         premises = premises.map((p, i) => createPremiseHTML(p, true, i));
 
         if (savedata.enableMeta && !savedata.minimalMode && !savedata.widePremises) {
-            premises = applyMeta(premises, p => p.match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]);
+            premises = applyMeta(premises, p => (p.html ?? p).match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]);
         }
 
         this.premises = premises;
@@ -174,17 +214,49 @@ class LinearQuestion {
         let isValid;
         const neighbors = {};
 
-        for (let i = 0; i < words.length - 1; i++) {
-            const curr = words[i];
-            const next = words[i + 1];
+        // Stimulus sets: group words into sets of stimulusSetSize
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
 
-            premises.push(this.generator.createLinearPremise(curr, next));
-            
-            // Build neighbors map for multiple conclusions
-            neighbors[curr] = neighbors[curr] ?? [];
-            neighbors[next] = neighbors[next] ?? [];
-            neighbors[curr].push(next);
-            neighbors[next].push(curr);
+        if (useStimSets) {
+            // Chain adjacent words into connected set premises
+            // First startSet from words[0..setSize-1], then each endSet becomes next startSet
+            let i = 0;
+            let startSet = words.slice(i, i + setSize);
+            i += startSet.length;
+            while (i + setSize <= words.length) {
+                const endSet = words.slice(i, i + setSize);
+                i += endSet.length;
+
+                if (endSet.length === setSize) {
+                    premises.push(this.generator.createSetLinearPremise(startSet, endSet, true));
+
+                    // Build neighbors map
+                    for (const w of startSet) {
+                        neighbors[w] = neighbors[w] ?? [];
+                        for (const w2 of endSet) {
+                            if (!neighbors[w].includes(w2)) neighbors[w].push(w2);
+                            neighbors[w2] = neighbors[w2] ?? [];
+                            if (!neighbors[w2].includes(w)) neighbors[w2].push(w);
+                        }
+                    }
+                }
+
+                startSet = endSet; // Chain: endSet becomes next startSet
+            }
+        } else {
+            for (let i = 0; i < words.length - 1; i++) {
+                const curr = words[i];
+                const next = words[i + 1];
+
+                premises.push(this.generator.createLinearPremise(curr, next));
+
+                // Build neighbors map for multiple conclusions
+                neighbors[curr] = neighbors[curr] ?? [];
+                neighbors[next] = neighbors[next] ?? [];
+                neighbors[curr].push(next);
+                neighbors[next].push(curr);
+            }
         }
 
         if (savedata.widePremises) {
@@ -213,6 +285,9 @@ class LinearQuestion {
 
 
     buildBacktrackingMap(words) {
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+
         const chanceOfBranching = {
             5: 0.60,
             6: 0.55,
@@ -246,36 +321,116 @@ class LinearQuestion {
             premiseMap = {};
             bucketMap = { [first]: 0 };
             neighbors = { [first]: [] };
-            for (let i = 1; i < words.length; i++) {
-                const source = pickBaseWord(neighbors, Math.random() < chanceOfBranching);
-                const target = words[i];
-                const key = premiseKey(source, target);
+            a = undefined;
+            b = undefined;
+            let wordIndex = 1;
 
-                let forwardChance = 0.5;
-                const neighborList = neighbors[source];
-                const firstNeighbor = neighborList[0];
-                if (firstNeighbor && neighborList.every(word => bucketMap[word] === bucketMap[firstNeighbor])) {
-                    if (bucketMap[firstNeighbor] + 1 == bucketMap[source]) {
-                        forwardChance = 0.6;
+            while (wordIndex < words.length) {
+                const source = pickBaseWord(neighbors, Math.random() < chanceOfBranching);
+
+                if (useStimSets) {
+                    const baseCompanions = words.slice(wordIndex, wordIndex + (setSize - 1));
+                    wordIndex += baseCompanions.length;
+                    const targetSet = words.slice(wordIndex, wordIndex + setSize);
+                    if (targetSet.length < setSize) break;
+                    wordIndex += targetSet.length;
+
+                    const baseSet = [source, ...baseCompanions];
+                    // Assign same bucket to base companions
+                    for (const bc of baseCompanions) {
+                        bucketMap[bc] = bucketMap[source];
+                        neighbors[source] = neighbors[source] ?? [];
+                        neighbors[source].push(bc);
+                        neighbors[bc] = neighbors[bc] ?? [];
+                        neighbors[bc].push(source);
+                    }
+
+                    let forwardChance = 0.5;
+                    const neighborList = neighbors[source];
+                    const firstNeighbor = neighborList[0];
+                    if (firstNeighbor && neighborList.every(word => bucketMap[word] === bucketMap[firstNeighbor])) {
+                        if (bucketMap[firstNeighbor] + 1 == bucketMap[source]) {
+                            forwardChance = 0.6;
+                        } else {
+                            forwardChance = 0.4;
+                        }
+                    }
+
+                    const key = premiseKey(source, targetSet[0]);
+                    if (Math.random() < forwardChance) {
+                        premiseMap[key] = this.generator.createSetLinearPremise(baseSet, targetSet, true);
+                        for (const t of targetSet) {
+                            bucketMap[t] = bucketMap[source] + 1;
+                        }
                     } else {
-                        forwardChance = 0.4;
+                        premiseMap[key] = this.generator.createSetLinearPremise(baseSet, targetSet, false);
+                        for (const t of targetSet) {
+                            bucketMap[t] = bucketMap[source] - 1;
+                        }
+                    }
+
+                    // Build neighbors for all set members
+                    for (const bs of baseSet) {
+                        for (const t of targetSet) {
+                            neighbors[bs] = neighbors[bs] ?? [];
+                            neighbors[t] = neighbors[t] ?? [];
+                            if (!neighbors[bs].includes(t)) neighbors[bs].push(t);
+                            if (!neighbors[t].includes(bs)) neighbors[t].push(bs);
+                        }
+                    }
+                } else {
+                    const target = words[wordIndex];
+                    const key = premiseKey(source, target);
+
+                    let forwardChance = 0.5;
+                    const neighborList = neighbors[source];
+                    const firstNeighbor = neighborList[0];
+                    if (firstNeighbor && neighborList.every(word => bucketMap[word] === bucketMap[firstNeighbor])) {
+                        if (bucketMap[firstNeighbor] + 1 == bucketMap[source]) {
+                            forwardChance = 0.6;
+                        } else {
+                            forwardChance = 0.4;
+                        }
+                    }
+                    if (Math.random() < forwardChance) {
+                        premiseMap[key] = this.generator.createLinearPremise(source, target);
+                        bucketMap[target] = bucketMap[source] + 1;
+                    } else {
+                        premiseMap[key] = this.generator.createLinearPremise(target, source);
+                        bucketMap[target] = bucketMap[source] - 1;
+                    }
+
+                    neighbors[source] = neighbors?.[source] ?? [];
+                    neighbors[target] = neighbors?.[target] ?? [];
+                    neighbors[target].push(source);
+                    neighbors[source].push(target);
+                    wordIndex++;
+                }
+            }
+            const pairResult = new DirectionPairChooser().pickTwoDistantWords(neighbors, true);
+            if (pairResult) {
+                [a, b] = pairResult;
+            }
+            if (!a || !b) {
+                // Fallback: pick any two words with different buckets
+                const allWords = Object.keys(bucketMap);
+                if (allWords.length >= 2) {
+                    // Try to find words with different buckets
+                    for (let att = 0; att < 50; att++) {
+                        const [c, d] = pickRandomItems(allWords, 2).picked;
+                        if (bucketMap[c] !== bucketMap[d]) {
+                            a = c;
+                            b = d;
+                            break;
+                        }
+                    }
+                    // Last resort: just pick any two different words
+                    if (!a || !b) {
+                        [a, b] = pickRandomItems(allWords, 2).picked;
                     }
                 }
-                if (Math.random() < forwardChance) {
-                    premiseMap[key] = this.generator.createLinearPremise(source, target);
-                    bucketMap[target] = bucketMap[source] + 1;
-                } else {
-                    premiseMap[key] = this.generator.createLinearPremise(target, source);
-                    bucketMap[target] = bucketMap[source] - 1;
-                }
-
-                neighbors[source] = neighbors?.[source] ?? [];
-                neighbors[target] = neighbors?.[target] ?? [];
-                neighbors[target].push(source);
-                neighbors[source].push(target);
             }
-            [a, b] = new DirectionPairChooser().pickTwoDistantWords(neighbors, true);
-            if (isIdealScenario(a, b)) {
+            if (a && b && isIdealScenario(a, b)) {
                 break;
             }
         }
@@ -295,23 +450,70 @@ class LinearQuestion {
         }
         const comparison = bucketMap[a] === bucketMap[b] ? 0 : (bucketMap[a] < bucketMap[b] ? -1 : 1)
         let conclusion, isValid;
-        if (coinFlip()) {
-            isValid = true;
-            conclusion = this.generator.createBacktrackingLinearPremise(a, b, [comparison], [-1, 0, 1].filter(o => o !== comparison), isValid);
-        } else {
-            isValid = false;
-            let options = [-1, 0, 1].filter(o => o !== comparison);
-            const distance = Math.abs(bucketMap[a] - bucketMap[b]);
-            const includeZero = {
-                1: oneOutOf(2),
-                2: oneOutOf(4),
-                3: oneOutOf(6),
-                4: oneOutOf(8),
-            }?.[distance] ?? oneOutOf(12);
-            if (!includeZero) {
-                options = options.filter(o => o !== 0);
+        if (useStimSets) {
+            // Find set-mates for a and b (words in same bucket that are connected)
+            const aSet = [a, ...Object.keys(bucketMap).filter(w => w !== a && bucketMap[w] === bucketMap[a] && neighbors[a]?.includes(w))];
+            const bSet = [b, ...Object.keys(bucketMap).filter(w => w !== b && bucketMap[w] === bucketMap[b] && neighbors[b]?.includes(w))];
+            // Trim sets to setSize
+            const aTrimmed = aSet.slice(0, setSize);
+            const bTrimmed = bSet.slice(0, setSize);
+
+            // Determine correct relation direction
+            const correctForwards = comparison <= 0; // -1 or 0: a is before/equal b → forwards
+            const hasPlural = aTrimmed.length > 1 || bTrimmed.length > 1;
+            const adapt = (rel) => hasPlural ? rel.replace(/^is\s+/, 'are ') : rel;
+
+            if (coinFlip()) {
+                isValid = true;
+                conclusion = this.generator.createSetLinearPremise(aTrimmed, bTrimmed, correctForwards);
+            } else {
+                isValid = false;
+                // Use wrong relation: if correct is "before", wrong is "after" (and vice versa)
+                // Keep same subject order but flip the relation
+                if (correctForwards) {
+                    // Correct: "A are before B" → Wrong: "A are after B"
+                    conclusion = {
+                        startSet: aTrimmed,
+                        endSet: bTrimmed,
+                        relation: adapt(this.generator.next),
+                        reverse: adapt(this.generator.prev),
+                        relationMinimal: this.generator.nextMin,
+                        reverseMinimal: this.generator.prevMin,
+                    };
+                } else {
+                    // Correct: "A are after B" → Wrong: "A are before B"
+                    conclusion = {
+                        startSet: aTrimmed,
+                        endSet: bTrimmed,
+                        relation: adapt(this.generator.prev),
+                        reverse: adapt(this.generator.next),
+                        relationMinimal: this.generator.prevMin,
+                        reverseMinimal: this.generator.nextMin,
+                    };
+                }
             }
-            conclusion = this.generator.createBacktrackingLinearPremise(a, b, options, [comparison], isValid);
+            // Render as HTML
+            conclusion = createPremiseHTML(conclusion, true, 0);
+            conclusion = conclusion.html ?? conclusion;
+        } else {
+            if (coinFlip()) {
+                isValid = true;
+                conclusion = this.generator.createBacktrackingLinearPremise(a, b, [comparison], [-1, 0, 1].filter(o => o !== comparison), isValid);
+            } else {
+                isValid = false;
+                let options = [-1, 0, 1].filter(o => o !== comparison);
+                const distance = Math.abs(bucketMap[a] - bucketMap[b]);
+                const includeZero = {
+                    1: oneOutOf(2),
+                    2: oneOutOf(4),
+                    3: oneOutOf(6),
+                    4: oneOutOf(8),
+                }?.[distance] ?? oneOutOf(12);
+                if (!includeZero) {
+                    options = options.filter(o => o !== 0);
+                }
+                conclusion = this.generator.createBacktrackingLinearPremise(a, b, options, [comparison], isValid);
+            }
         }
 
         return [premises, conclusion, isValid, buckets, bucketMap, neighbors];
@@ -370,18 +572,30 @@ class LinearQuestion {
         this.generate(length);
         const countdown = this.getCountdown();
 
-        // Handle backtracking mode: conclusion is a premise object that needs HTML conversion
+        // Handle backtracking mode: conclusion may be a premise object or {html, isInverted} from pickNegatable
         let finalConclusion = this.conclusion;
         let finalIsValid = this.isValid;
         if (this.isBacktrackingEnabled() && typeof this.conclusion === 'object' && this.conclusion !== null) {
             const conclusionObj = this.conclusion;
-            const premiseResult = createPremiseHTML(conclusionObj, true, 0);
-            finalConclusion = premiseResult.html;
-            const wasInvertedByPremiseHTML = premiseResult.isInverted;
-            if (wasInvertedByPremiseHTML) {
-                finalIsValid = !finalIsValid;
+            // Check if it's a premise object (has start/startSet) vs pickNegatable result (has html)
+            if (conclusionObj.start !== undefined || conclusionObj.startSet !== undefined) {
+                // It's a premise object - render to HTML
+                const premiseResult = createPremiseHTML(conclusionObj, true, 0);
+                finalConclusion = premiseResult.html;
+                const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                if (wasInvertedByPremiseHTML) {
+                    finalIsValid = !finalIsValid;
+                }
+                [finalConclusion, finalIsValid] = applyConclusionNegation(finalConclusion, finalIsValid, conclusionObj, null, wasInvertedByPremiseHTML);
+            } else if (conclusionObj.html !== undefined) {
+                // It's a {html, isInverted} from pickNegatable - use html directly
+                finalConclusion = conclusionObj.html;
+                const wasInverted = conclusionObj.isInverted;
+                if (wasInverted) {
+                    finalIsValid = !finalIsValid;
+                }
+                [finalConclusion, finalIsValid] = applyConclusionNegation(finalConclusion, finalIsValid, null, null, wasInverted);
             }
-            [finalConclusion, finalIsValid] = applyConclusionNegation(finalConclusion, finalIsValid, conclusionObj, null, wasInvertedByPremiseHTML);
         }
 
         // Generate multiple conclusions if mode is enabled (only for non-backtracking)

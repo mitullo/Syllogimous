@@ -7,13 +7,14 @@ function applyMeta(premises, relationFinder) {
     while (_premises.picked.length) {
 
         const choosenPair = pickRandomItems(_premises.picked, 2);
-        const negations = choosenPair.picked.map(p => /is-negated/.test(p));
+        const choosenHTML = choosenPair.picked.map(p => p.html ?? p);
+        const negations = choosenHTML.map(p => /is-negated/.test(p));
         const relations = choosenPair.picked.map(relationFinder);
 
         // Generate substitution string
         let substitution;
         const [a, b] = [
-                ...choosenPair.picked[0]
+                ...choosenHTML[0]
                 .matchAll(/<span class="subject">(.*?)<\/span>/g)
             ]
             .map(m => m[1]);
@@ -31,8 +32,8 @@ function applyMeta(premises, relationFinder) {
         }
 
         // Replace relation with meta-relation via substitution string
-        const metaPremise = choosenPair.picked[1]
-            .replace(/(<span class="relation">)(.*)(<\/span>) (?=<span class="subject">)/, substitution);
+        const metaPremise = choosenHTML[1]
+            .replace(/(<span class="relation">)(.*)(<\/span>) (?=<span class="subject">)/, substitution.html ?? substitution);
 
         // Push premise and its corresponding meta-premise
         premises.push(choosenPair.picked[0], metaPremise);

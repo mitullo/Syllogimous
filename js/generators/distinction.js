@@ -20,11 +20,41 @@ function createOppositePremise(a, b) {
     }
 }
 
+function createSameSetPremise(startSet, endSet) {
+    const hasPlural = startSet.length > 1 || endSet.length > 1;
+    const rel = hasPlural ? 'are same as' : 'is same as';
+    return {
+        startSet: startSet,
+        endSet: endSet,
+        relation: rel,
+        reverse: rel,
+        relationMinimal: '=',
+        reverseMinimal: '=',
+    }
+}
+
+function createOppositeSetPremise(startSet, endSet) {
+    const hasPlural = startSet.length > 1 || endSet.length > 1;
+    const rel = hasPlural ? 'are opposite of' : 'is opposite of';
+    return {
+        startSet: startSet,
+        endSet: endSet,
+        relation: rel,
+        reverse: rel,
+        relationMinimal: '☍',
+        reverseMinimal: '☍',
+    }
+}
+
 class DistinctionQuestion {
     generate(length) {
         length++;
-    
-        const words = createStimuli(length);
+
+        // When stimulus sets are enabled, we need more words per premise
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+        const extraWords = useStimSets ? ((length - 1) * (2 * setSize - 2)) : 0;
+        const words = createStimuli(length + extraWords);
 
         let premiseMap = {};
         let first = words[0];
@@ -39,23 +69,85 @@ class DistinctionQuestion {
             9: 0.40,
             10: 0.35,
         }[words.length] ?? (words.length > 10 ? 0.3 : 0.6);
-        for (let i = 1; i < words.length; i++) {
-            const source = pickBaseWord(neighbors, Math.random() < chanceOfBranching);
-            const target = words[i];
 
-            const key = premiseKey(source, target);
-            if (coinFlip()) {
-                premiseMap[key] = createSamePremise(source, target);
-                bucketMap[target] = bucketMap[source];
-            } else {
-                premiseMap[key] = createOppositePremise(source, target);
-                bucketMap[target] = (bucketMap[source] + 1) % 2;
+        if (useStimSets) {
+            // Stimulus set mode: both sides of each premise have setSize words
+            // Each premise needs (setSize-1) source companions + setSize targets = 2*setSize-1 new words
+            const wordsPerPremise = 2 * setSize - 1;
+            let wordIndex = 1;
+            while (wordIndex + wordsPerPremise - 1 < words.length) {
+                const source = pickBaseWord(neighbors, Math.random() < chanceOfBranching);
+                // Source companions: setSize-1 new words sharing source's bucket
+                const sourceCompanions = words.slice(wordIndex, wordIndex + (setSize - 1));
+                wordIndex += sourceCompanions.length;
+                // Target set: setSize new words
+                const targetSet = words.slice(wordIndex, wordIndex + setSize);
+                wordIndex += targetSet.length;
+
+                if (targetSet.length < setSize) continue; // Skip partial sets
+
+                const sourceSet = [source, ...sourceCompanions];
+                // Source companions share source's bucket
+                for (const sc of sourceCompanions) {
+                    bucketMap[sc] = bucketMap[source];
+                }
+
+                let setPremise;
+                if (coinFlip()) {
+                    setPremise = createSameSetPremise(sourceSet, targetSet);
+                    for (const t of targetSet) {
+                        bucketMap[t] = bucketMap[source];
+                    }
+                } else {
+                    setPremise = createOppositeSetPremise(sourceSet, targetSet);
+                    for (const t of targetSet) {
+                        bucketMap[t] = (bucketMap[source] + 1) % 2;
+                    }
+                }
+                // Store under each word pair key so orderPremises can find the premise
+                for (const s of sourceSet) {
+                    for (const t of targetSet) {
+                        premiseMap[premiseKey(s, t)] = setPremise;
+                    }
+                }
+
+                neighbors[source] = neighbors?.[source] ?? [];
+                // Connect source companions to source and each other
+                for (const sc of sourceCompanions) {
+                    neighbors[sc] = neighbors?.[sc] ?? [];
+                    neighbors[sc].push(source);
+                    neighbors[source].push(sc);
+                }
+                // Connect targets to source and source companions
+                for (const t of targetSet) {
+                    neighbors[t] = neighbors?.[t] ?? [];
+                    neighbors[t].push(source);
+                    neighbors[source].push(t);
+                    for (const sc of sourceCompanions) {
+                        neighbors[t].push(sc);
+                        neighbors[sc].push(t);
+                    }
+                }
             }
+        } else {
+            for (let i = 1; i < words.length; i++) {
+                const source = pickBaseWord(neighbors, Math.random() < chanceOfBranching);
+                const target = words[i];
 
-            neighbors[source] = neighbors?.[source] ?? [];
-            neighbors[target] = neighbors?.[target] ?? [];
-            neighbors[target].push(source);
-            neighbors[source].push(target);
+                const key = premiseKey(source, target);
+                if (coinFlip()) {
+                    premiseMap[key] = createSamePremise(source, target);
+                    bucketMap[target] = bucketMap[source];
+                } else {
+                    premiseMap[key] = createOppositePremise(source, target);
+                    bucketMap[target] = (bucketMap[source] + 1) % 2;
+                }
+
+                neighbors[source] = neighbors?.[source] ?? [];
+                neighbors[target] = neighbors?.[target] ?? [];
+                neighbors[target].push(source);
+                neighbors[source].push(target);
+            }
         }
 
         let premises = orderPremises(premiseMap, neighbors);
@@ -72,7 +164,7 @@ class DistinctionQuestion {
         premises = premises.map((p, i) => createPremiseHTML(p, false, i));
 
         if (savedata.enableMeta && !savedata.minimalMode && !savedata.widePremises) {
-            premises = applyMeta(premises, p => p.match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]);
+            premises = applyMeta(premises, p => (p.html ?? p).match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]);
         }
 
         this.premises = premises;

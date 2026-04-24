@@ -286,5 +286,14 @@ function getUniquePairOrFallback(neighbors, pairChooser, usedPairKeys, maxAttemp
     }
 
     // Fallback: plain random pair (may repeat)
-    return pairChooser.pickTwoDistantWords(neighbors);
+    const fallback = pairChooser.pickTwoDistantWords(neighbors);
+    if (fallback) return fallback;
+
+    // Ultimate fallback: pick any two words from neighbors
+    const keys = Object.keys(neighbors);
+    if (keys.length >= 2) {
+        const shuffled = shuffle([...keys]);
+        return [shuffled[0], shuffled[1]];
+    }
+    return null;
 }

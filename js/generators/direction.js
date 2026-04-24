@@ -16,6 +16,12 @@ function inverse(a) {
     return a.map(c => -c);
 }
 
+function dirCoordsEqual(a, b) {
+    if (!a || !b) return false;
+    if (a.length !== b.length) return false;
+    return a.every((c, i) => c === b[i]);
+}
+
 function findDirection(a, b) {
     return normalize(diffCoords(a, b));
 }
@@ -28,7 +34,7 @@ function getConclusionCoords(wordCoordMap, startWord, endWord) {
 }
 
 function isNonZeroConclusion(conclusionCoord) {
-    return conclusionCoord !== null && conclusionCoord.some(c => c !== 0);
+    return conclusionCoord != null && Array.isArray(conclusionCoord) && conclusionCoord.some(c => c !== 0);
 }
 
 function taxicabDistance(a, b) {
@@ -36,8 +42,9 @@ function taxicabDistance(a, b) {
 }
 
 function pickWeightedRandomDirection(dirCoords, baseWord, neighbors, wordCoordMap) {
-    const badTargets = (neighbors[baseWord] ?? []).map(word => wordCoordMap[word]);
+    const badTargets = (neighbors[baseWord] ?? []).map(word => wordCoordMap[word]).filter(Boolean);
     const base = wordCoordMap[baseWord];
+    if (!base) return dirCoords[Math.floor(Math.random() * dirCoords.length)];
     let pool = [];
     for (const dirCoord of dirCoords) {
         const endLocation = dirCoord.map((d,i) => d + base[i]);
@@ -271,7 +278,11 @@ function pickBaseWord(neighbors, branchesAllowed, bannedFromBranching=[]) {
         branchesAllowed = false;
     }
     const options = Object.keys(neighbors);
-    const neighborLimit = (!branchesAllowed || options.length <= 3) ? 1 : 2;
+    const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+    const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+    // When stimulus sets are enabled, each premise adds setSize neighbors, so increase the limit
+    const baseLimit = (!branchesAllowed || options.length <= 3) ? 1 : 2;
+    const neighborLimit = useStimSets ? baseLimit + setSize - 1 : baseLimit;
     let pool = [];
     for (const word of options) {
         if (neighbors[word] && neighbors[word].length > neighborLimit) {
@@ -298,6 +309,10 @@ function pickBaseWord(neighbors, branchesAllowed, bannedFromBranching=[]) {
         }
     }
     const baseWord = pickRandomItems(pool, 1).picked[0];
+    if (!baseWord && options.length > 0) {
+        // Fallback: pick any word from neighbors if pool was empty
+        return pickRandomItems(options, 1).picked[0];
+    }
     return baseWord;
 }
 
@@ -331,8 +346,11 @@ class DirectionQuestion {
         let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
         let operations = []; // Declare outside while loop for access in return statement
         let hardModeDimensions = []; // Declare outside while loop
+        let retryCount = 0;
+        const maxRetries = 50;
         
-        while (true) {
+        while (retryCount < maxRetries) {
+            retryCount++;
             // Reset transformState at start of each iteration to clear stale data from failed attempts
             // But preserve the wordCoordMap as a reference (will be repopulated by createWordMapInterleaved)
             if (transformState) {
@@ -365,8 +383,16 @@ class DirectionQuestion {
                 const premiseList = Array.isArray(premise) ? premise : [premise];
                 for (const p of premiseList) {
                     if (!p) continue; // Skip undefined/null premises
-                    if (p.start) wordsInPremises.add(p.start);
-                    if (p.end) wordsInPremises.add(p.end);
+                    if (p.startSet) {
+                        for (const w of p.startSet) wordsInPremises.add(w);
+                    } else if (p.start) {
+                        wordsInPremises.add(p.start);
+                    }
+                    if (p.endSet) {
+                        for (const w of p.endSet) wordsInPremises.add(w);
+                    } else if (p.end) {
+                        wordsInPremises.add(p.end);
+                    }
                 }
             }
             // For Anchor Space modes, only pick conclusion words from words that appear in premises
@@ -384,16 +410,29 @@ class DirectionQuestion {
                 }
                 // Check if we have valid pairs with distance > 1 (required by pickTwoDistantWords)
                 const hasValidPairs = this._hasValidDistantPairs(premiseNeighbors);
-                if (!hasValidPairs) {
-                    // Words in premises don't form valid distant pairs, retry with new word map
-                    continue;
+                if (hasValidPairs) {
+                    let pairResult = this.pairChooser.pickTwoDistantWords(premiseNeighbors);
+                    if (pairResult) {
+                        [startWord, endWord] = pairResult;
+                    }
                 }
-                let pairResult = this.pairChooser.pickTwoDistantWords(premiseNeighbors);
-                if (!pairResult) {
-                    // No valid pairs found, retry with new word map
-                    continue;
+                // Fallback: pick any two words with non-zero coordinate difference
+                if (!startWord || !endWord) {
+                    const allWords = Array.from(wordsInPremises);
+                    for (let attempts = 0; attempts < 20 && (!startWord || !endWord); attempts++) {
+                        const [a, b] = pickRandomItems(allWords, 2).picked;
+                        if (wordCoordMap[a] && wordCoordMap[b]) {
+                            const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, a, b);
+                            if (isNonZeroConclusion(conclusionCoord)) {
+                                startWord = a;
+                                endWord = b;
+                            }
+                        }
+                    }
                 }
-                [startWord, endWord] = pairResult;
+                if (!startWord || !endWord) {
+                    continue; // Retry with new word map
+                }
                 
                 // Ensure conclusion has at least one non-anchor word (to avoid trivial answers)
                 const isStartAnchor = anchorWords.includes(startWord);
@@ -416,10 +455,26 @@ class DirectionQuestion {
             } else {
                 const pairResult = this.pairChooser.pickTwoDistantWords(neighbors);
                 if (!pairResult) {
-                    // No valid pairs found, retry with new word map
-                    continue;
+                    // No distant pairs found - fall back to any pair with non-zero coordinate difference
+                    const allWords = Object.keys(wordCoordMap);
+                    let fallbackPair = null;
+                    for (let attempts = 0; attempts < 20 && !fallbackPair; attempts++) {
+                        const [a, b] = pickRandomItems(allWords, 2).picked;
+                        if (wordCoordMap[a] && wordCoordMap[b]) {
+                            const diff = diffCoords(wordCoordMap[a], wordCoordMap[b]);
+                            const norm = normalize(diff);
+                            if (isNonZeroConclusion(norm)) {
+                                fallbackPair = [a, b];
+                            }
+                        }
+                    }
+                    if (!fallbackPair) {
+                        continue; // Retry with new word map
+                    }
+                    [startWord, endWord] = fallbackPair;
+                } else {
+                    [startWord, endWord] = pairResult;
                 }
-                [startWord, endWord] = pairResult;
             }
             
             // Get initial conclusion coords (before transforms) for validation
@@ -533,7 +588,7 @@ class DirectionQuestion {
                 // Get pair with fallback when unique ones exhausted
                 [sw, ew] = getUniquePairOrFallback(neighbors, this.pairChooser, usedPairKeys);
 
-                if (!sw || !ew) {
+                if (!sw || !ew || !wordCoordMap[sw] || !wordCoordMap[ew]) {
                     generatedCount++; // Prevent infinite loop
                     continue;
                 }
@@ -853,8 +908,35 @@ class DirectionQuestion {
         return [interleaveCount, totalTransforms - interleaveCount];
     }
 
+    createSetDirectionStatement(startSet, endSet, dirCoord) {
+        if (!dirCoord) {
+            return {
+                startSet: startSet,
+                endSet: endSet,
+                relation: `are at of`,
+                reverse: `are at of`,
+                relationMinimal: '',
+                reverseMinimal: '',
+            }
+        }
+        const direction = dirStringFromCoord(dirCoord);
+        const reverseDirection = dirStringFromCoord(inverse(dirCoord));
+        return {
+            startSet: endSet,   // subject set (the set that "is [direction] of" the other)
+            endSet: startSet,   // object set (the reference set)
+            relation: `are ${direction} of`,
+            reverse: `are ${reverseDirection} of`,
+            relationMinimal: dirStringMinimal(dirCoord),
+            reverseMinimal: dirStringMinimal(inverse(dirCoord)),
+        }
+    }
+
     createWordMapCommands(length, forcedInterleaveCount = null) {
-        const words = createStimuli(length + 1);
+        // When stimulus sets are enabled, we need more words per premise
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+        const extraWords = useStimSets ? (length * (2 * setSize - 2)) : 0;
+        const words = createStimuli(length + 1 + extraWords);
         let commands = words.map(w => ['move', w]);
         // Use forced interleave count if provided (from createWordMapInterleaved), otherwise calculate
         let interleaveCount = forcedInterleaveCount !== null 
@@ -878,7 +960,11 @@ class DirectionQuestion {
     createWordMapInterleaved(length, numInterleaved, transformState = null, anchorWords = null) {
         let [words, commands] = this.createWordMapCommands(length, numInterleaved);
         const initialCoord = this.generator.initialCoord();
-        
+
+        // Stimulus sets: group words into sets of stimulusSetSize
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+
         // When using coordinated transforms, use transformState's wordCoordMap as base
         // to maintain reference consistency
         let wordCoordMap;
@@ -888,7 +974,7 @@ class DirectionQuestion {
         } else {
             wordCoordMap = {[words[0]]: initialCoord };
         }
-        
+
         let neighbors = {[words[0]]: []};
         let premiseChunks = [[]];
         let operations = [];
@@ -897,42 +983,128 @@ class DirectionQuestion {
         let lastWord = words[0];
         let dimensionPool = repeatArrayUntil(shuffle(initialCoord.map((d, i) => i)), commands.length * 2);
         let dimensionIndex = 0;
-        
+
         // Create local transformState if not provided (for coordination)
         const localTransformState = transformState || (numInterleaved > 0 ? new TransformState(wordCoordMap, []) : null);
-        
+
+        let baseCompanionBuffer = [];  // Buffer for base companion words
+        let targetBuffer = [];  // Buffer for target words
+        let setBaseWord = null;
+
         for (let i = 1; i < commands.length; i++) {
             let command = commands[i];
             let action = command[0];
             if (action === 'transform') {
+                // Flush any buffered set words before transform (only if full set)
+                if (useStimSets && targetBuffer.length >= setSize) {
+                    const baseSet = [setBaseWord, ...baseCompanionBuffer];
+                    const dirCoord = this.generator.pickDirection(setBaseWord, neighbors, wordCoordMap);
+                    for (const bc of baseCompanionBuffer) {
+                        wordCoordMap[bc] = [...wordCoordMap[setBaseWord]];
+                    }
+                    for (const w of targetBuffer) {
+                        wordCoordMap[w] = addCoords(wordCoordMap[setBaseWord], dirCoord);
+                    }
+                    const setStatement = this.createSetDirectionStatement(baseSet, targetBuffer, dirCoord);
+                    premiseChunks[premiseChunks.length - 1].push(setStatement);
+                    usedDirCoords.push(dirCoord);
+                    neighbors[setBaseWord] = neighbors[setBaseWord] ?? [];
+                    for (const bc of baseCompanionBuffer) {
+                        neighbors[setBaseWord].push(bc);
+                        neighbors[bc] = neighbors[bc] ?? [];
+                        neighbors[bc].push(setBaseWord);
+                    }
+                    for (const w of targetBuffer) {
+                        neighbors[setBaseWord].push(w);
+                        neighbors[w] = neighbors[w] ?? [];
+                        neighbors[w].push(setBaseWord);
+                        for (const bc of baseCompanionBuffer) {
+                            neighbors[w].push(bc);
+                            neighbors[bc].push(w);
+                        }
+                    }
+                    lastWord = targetBuffer[targetBuffer.length - 1];
+                    baseCompanionBuffer = [];
+                    targetBuffer = [];
+                    setBaseWord = null;
+                }
                 if (premiseChunks[premiseChunks.length - 1].length !== 0) {
                     premiseChunks.push([]);
                 }
                 // Use coordinated SpaceHardMode with shared transformState
                 const hardMode = new SpaceHardMode(1, anchorWords || [], localTransformState);
                 let [newWordMap, operation] = hardMode.oneTransform(
-                    localTransformState ? localTransformState.wordCoordMap : wordCoordMap, 
-                    lastWord, 
-                    dimensionPool[dimensionIndex], 
+                    localTransformState ? localTransformState.wordCoordMap : wordCoordMap,
+                    lastWord,
+                    dimensionPool[dimensionIndex],
                     dimensionPool[dimensionIndex+1]
                 );
                 dimensionIndex++;
                 wordCoordMap = newWordMap;
                 operations.push(operation);
             } else {
-                const baseWord = lastWord;
                 const nextWord = command[1];
-                const dirCoord = this.generator.pickDirection(baseWord, neighbors, wordCoordMap);
-                wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
-                // No need to sync - wordCoordMap and localTransformState.wordCoordMap are the same reference
-                const premise = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
-                premiseChunks[premiseChunks.length - 1].push(premise);
-                usedDirCoords.push(dirCoord);
-                neighbors[baseWord] = neighbors[baseWord] ?? [];
-                neighbors[baseWord].push(nextWord);
-                neighbors[nextWord] = neighbors[nextWord] ?? [];
-                neighbors[nextWord].push(baseWord);
-                lastWord = nextWord;
+
+                if (useStimSets) {
+                    // Buffer words for set grouping
+                    // First (setSize-1) words are base companions, next setSize words are targets
+                    if (baseCompanionBuffer.length === 0 && targetBuffer.length === 0) {
+                        setBaseWord = lastWord;
+                    }
+                    if (baseCompanionBuffer.length < (setSize - 1)) {
+                        baseCompanionBuffer.push(nextWord);
+                    } else {
+                        targetBuffer.push(nextWord);
+                    }
+                    // When we have all words for a complete set premise, flush
+                    if (targetBuffer.length >= setSize) {
+                        const baseSet = [setBaseWord, ...baseCompanionBuffer];
+                        const dirCoord = this.generator.pickDirection(setBaseWord, neighbors, wordCoordMap);
+                        // Place base companions at baseWord's coordinate
+                        for (const bc of baseCompanionBuffer) {
+                            wordCoordMap[bc] = [...wordCoordMap[setBaseWord]];
+                        }
+                        // Place target words at offset coordinate
+                        for (const w of targetBuffer) {
+                            wordCoordMap[w] = addCoords(wordCoordMap[setBaseWord], dirCoord);
+                        }
+                        const setStatement = this.createSetDirectionStatement(baseSet, targetBuffer, dirCoord);
+                        premiseChunks[premiseChunks.length - 1].push(setStatement);
+                        usedDirCoords.push(dirCoord);
+                        neighbors[setBaseWord] = neighbors[setBaseWord] ?? [];
+                        for (const bc of baseCompanionBuffer) {
+                            neighbors[setBaseWord].push(bc);
+                            neighbors[bc] = neighbors[bc] ?? [];
+                            neighbors[bc].push(setBaseWord);
+                        }
+                        for (const w of targetBuffer) {
+                            neighbors[setBaseWord].push(w);
+                            neighbors[w] = neighbors[w] ?? [];
+                            neighbors[w].push(setBaseWord);
+                            for (const bc of baseCompanionBuffer) {
+                                neighbors[w].push(bc);
+                                neighbors[bc].push(w);
+                            }
+                        }
+                        lastWord = targetBuffer[targetBuffer.length - 1];
+                        baseCompanionBuffer = [];
+                        targetBuffer = [];
+                        setBaseWord = null;
+                    }
+                } else {
+                    // Standard single-word premise
+                    const baseWord = lastWord;
+                    const dirCoord = this.generator.pickDirection(baseWord, neighbors, wordCoordMap);
+                    wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+                    const premise = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
+                    premiseChunks[premiseChunks.length - 1].push(premise);
+                    usedDirCoords.push(dirCoord);
+                    neighbors[baseWord] = neighbors[baseWord] ?? [];
+                    neighbors[baseWord].push(nextWord);
+                    neighbors[nextWord] = neighbors[nextWord] ?? [];
+                    neighbors[nextWord].push(baseWord);
+                    lastWord = nextWord;
+                }
             }
         }
 
@@ -961,7 +1133,11 @@ class DirectionQuestion {
     }
 
     createWordMap(length, branchesAllowed) {
-        const baseWords = createStimuli(length + 1);
+        // When stimulus sets are enabled, we need more words per premise
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+        const extraWords = useStimSets ? (length * (2 * setSize - 2)) : 0;
+        const baseWords = createStimuli(length + 1 + extraWords);
         const start = baseWords[0];
         const words = baseWords.slice(1, baseWords.length);
         let wordCoordMap = {[start]: this.generator.initialCoord() };
@@ -988,7 +1164,9 @@ class DirectionQuestion {
             let result;
             for (let i = 0; i < 10; i++) {
                 const excludedWords = [star, circle, triangle, heart, center, ne, nw, se].filter(w => w);
-                const words = createStimuli(length, excludedWords);
+                const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+                const extraWords = useStimSets ? (length * (2 * savedata.stimulusSetSize - 2)) : 0;
+                const words = createStimuli(length + extraWords, excludedWords);
                 let wordCoordMap = {};
                 if (star) wordCoordMap[star] = [0, 1];
                 if (circle) wordCoordMap[circle] = [1, 0];
@@ -1041,7 +1219,9 @@ class DirectionQuestion {
         let result;
         for (let i = 0; i < 10; i++) {
             const excludedWords = [star, circle, triangle, heart];
-            const words = createStimuli(length, excludedWords);
+            const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+            const extraWords = useStimSets ? (length * (2 * savedata.stimulusSetSize - 2)) : 0;
+            const words = createStimuli(length + extraWords, excludedWords);
             let wordCoordMap = {
                 [star]: [0, 1],
                 [circle]: [1, 0],
@@ -1114,7 +1294,9 @@ class DirectionQuestion {
             const se = numShapes > 7 ? 'shape_7' : null;
 
             const excludedWords = [star, circle, triangle, heart, center, ne, nw, se].filter(w => w);
-            const words = createStimuli(length, excludedWords);
+            const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+            const extraWords = useStimSets ? (length * (2 * savedata.stimulusSetSize - 2)) : 0;
+            const words = createStimuli(length + extraWords, excludedWords);
 
             // Initialize wordCoordMap - use transformState's map as base if available
             let wordCoordMap;
@@ -1166,8 +1348,11 @@ class DirectionQuestion {
             const anchorWordList = [...anchorWords];
 
             // Build premises with interleaved transforms
-            for (let i = 0; i < words.length; i++) {
-                const nextWord = words[i];
+            const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+            const wordsPerPremise = useStimSets ? (2 * setSize - 1) : 1;
+            let wordIdx = 0;
+            let premiseCount = 0;
+            while (wordIdx + wordsPerPremise - 1 < words.length) {
                 let baseWord;
 
                 // Same logic as buildOntoWordMap for V2
@@ -1190,22 +1375,58 @@ class DirectionQuestion {
                 }
 
                 const dirCoord = this.generator.pickDirection(baseWord, neighbors, wordCoordMap);
-                wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
                 usedDirCoords.push(dirCoord);
 
-                const premise = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
-                premiseChunks[premiseChunks.length - 1].push(premise);
+                if (useStimSets) {
+                    const baseCompanions = words.slice(wordIdx, wordIdx + (setSize - 1));
+                    wordIdx += baseCompanions.length;
+                    const targetSet = words.slice(wordIdx, wordIdx + setSize);
+                    wordIdx += targetSet.length;
 
-                neighbors[baseWord] = neighbors[baseWord] ?? [];
-                neighbors[baseWord].push(nextWord);
-                neighbors[nextWord] = neighbors[nextWord] ?? [];
-                neighbors[nextWord].push(baseWord);
+                    if (targetSet.length < setSize) continue;
+
+                    const baseSet = [baseWord, ...baseCompanions];
+                    for (const bc of baseCompanions) {
+                        wordCoordMap[bc] = [...wordCoordMap[baseWord]];
+                    }
+                    for (const w of targetSet) {
+                        wordCoordMap[w] = addCoords(wordCoordMap[baseWord], dirCoord);
+                    }
+                    const setStatement = this.createSetDirectionStatement(baseSet, targetSet, dirCoord);
+                    premiseChunks[premiseChunks.length - 1].push(setStatement);
+                    neighbors[baseWord] = neighbors[baseWord] ?? [];
+                    for (const bc of baseCompanions) {
+                        neighbors[baseWord].push(bc);
+                        neighbors[bc] = neighbors[bc] ?? [];
+                        neighbors[bc].push(baseWord);
+                    }
+                    for (const w of targetSet) {
+                        neighbors[baseWord].push(w);
+                        neighbors[w] = neighbors[w] ?? [];
+                        neighbors[w].push(baseWord);
+                        for (const bc of baseCompanions) {
+                            neighbors[w].push(bc);
+                            neighbors[bc].push(w);
+                        }
+                    }
+                } else {
+                    const nextWord = words[wordIdx];
+                    wordIdx++;
+                    wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+                    const premise = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
+                    premiseChunks[premiseChunks.length - 1].push(premise);
+                    neighbors[baseWord] = neighbors[baseWord] ?? [];
+                    neighbors[baseWord].push(nextWord);
+                    neighbors[nextWord] = neighbors[nextWord] ?? [];
+                    neighbors[nextWord].push(baseWord);
+                }
                 if (anchorWords.has(baseWord)) {
                     usedShapes.add(baseWord);
                 }
+                premiseCount++;
 
                 // Apply interleaved transform if due
-                if (nextInterleaveIdx < interleavePositions.length && i === interleavePositions[nextInterleaveIdx]) {
+                if (nextInterleaveIdx < interleavePositions.length && premiseCount === interleavePositions[nextInterleaveIdx]) {
                     premiseChunks.push([]);
                     const nonAnchorWords = Object.keys(wordCoordMap).filter(w => !anchorWords.has(w));
                     if (nonAnchorWords.length > 0) {
@@ -1245,7 +1466,9 @@ class DirectionQuestion {
         const heart = '[svg]3[/svg]';
 
         const excludedWords = [star, circle, triangle, heart];
-        const words = createStimuli(length, excludedWords);
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const extraWords = useStimSets ? (length * (2 * savedata.stimulusSetSize - 2)) : 0;
+        const words = createStimuli(length + extraWords, excludedWords);
 
         // Initialize wordCoordMap - use transformState's map as base if available
         let wordCoordMap;
@@ -1288,24 +1511,64 @@ class DirectionQuestion {
         const anchorWords = new Set([star, circle, triangle, heart]);
 
         // Build premises with interleaved transforms
-        for (let i = 0; i < words.length; i++) {
-            const nextWord = words[i];
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+        const wordsPerPremise = useStimSets ? (2 * setSize - 1) : 1;
+        let wordIdx = 0;
+        let premiseCount = 0;
+        while (wordIdx + wordsPerPremise - 1 < words.length) {
             const baseWord = pickBaseWord(neighbors, branchesAllowed, bannedFromBranching);
 
             const dirCoord = this.generator.pickDirection(baseWord, neighbors, wordCoordMap);
-            wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
             usedDirCoords.push(dirCoord);
 
-            const premise = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
-            premiseChunks[premiseChunks.length - 1].push(premise);
+            if (useStimSets) {
+                const baseCompanions = words.slice(wordIdx, wordIdx + (setSize - 1));
+                wordIdx += baseCompanions.length;
+                const targetSet = words.slice(wordIdx, wordIdx + setSize);
+                wordIdx += targetSet.length;
 
-            neighbors[baseWord] = neighbors[baseWord] ?? [];
-            neighbors[baseWord].push(nextWord);
-            neighbors[nextWord] = neighbors[nextWord] ?? [];
-            neighbors[nextWord].push(baseWord);
+                if (targetSet.length < setSize) continue;
+
+                const baseSet = [baseWord, ...baseCompanions];
+                for (const bc of baseCompanions) {
+                    wordCoordMap[bc] = [...wordCoordMap[baseWord]];
+                }
+                for (const w of targetSet) {
+                    wordCoordMap[w] = addCoords(wordCoordMap[baseWord], dirCoord);
+                }
+                const setStatement = this.createSetDirectionStatement(baseSet, targetSet, dirCoord);
+                premiseChunks[premiseChunks.length - 1].push(setStatement);
+                neighbors[baseWord] = neighbors[baseWord] ?? [];
+                for (const bc of baseCompanions) {
+                    neighbors[baseWord].push(bc);
+                    neighbors[bc] = neighbors[bc] ?? [];
+                    neighbors[bc].push(baseWord);
+                }
+                for (const w of targetSet) {
+                    neighbors[baseWord].push(w);
+                    neighbors[w] = neighbors[w] ?? [];
+                    neighbors[w].push(baseWord);
+                    for (const bc of baseCompanions) {
+                        neighbors[w].push(bc);
+                        neighbors[bc].push(w);
+                    }
+                }
+            } else {
+                const nextWord = words[wordIdx];
+                wordIdx++;
+                wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+                const premise = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
+                premiseChunks[premiseChunks.length - 1].push(premise);
+                neighbors[baseWord] = neighbors[baseWord] ?? [];
+                neighbors[baseWord].push(nextWord);
+                neighbors[nextWord] = neighbors[nextWord] ?? [];
+                neighbors[nextWord].push(baseWord);
+            }
+
+            premiseCount++;
 
             // Apply interleaved transform if due
-            if (nextInterleaveIdx < interleavePositions.length && i === interleavePositions[nextInterleaveIdx]) {
+            if (nextInterleaveIdx < interleavePositions.length && premiseCount === interleavePositions[nextInterleaveIdx]) {
                 premiseChunks.push([]);
                 const nonAnchorWords = Object.keys(wordCoordMap).filter(w => !anchorWords.has(w));
                 if (nonAnchorWords.length > 0) {
@@ -1415,8 +1678,16 @@ class DirectionQuestion {
         const anchorWordList = [...anchorWords];
         let shapeIndex = 0;
 
-        // For each new word, connect it to the graph
-        for (const nextWord of words) {
+        // Stimulus sets: group words into sets of stimulusSetSize
+        const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+        const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+        // Each set premise needs (setSize-1) base companions + setSize targets = 2*setSize-1 words
+        const wordsPerPremise = useStimSets ? (2 * setSize - 1) : 1;
+
+        // For each new word (or set of words), connect it to the graph
+        let wordIndex = 0;
+        while (wordIndex + wordsPerPremise - 1 < words.length) {
+            // Pick the next word or group of words for this premise
             let baseWord;
             if (isAnchorSpaceV2) {
                 // For V2, cycle through shapes to ensure all appear in premises
@@ -1445,18 +1716,75 @@ class DirectionQuestion {
                 baseWord = pickBaseWord(neighbors, branchesAllowed, bannedFromBranching);
             }
             const dirCoord = this.generator.pickDirection(baseWord, neighbors, wordCoordMap);
-            wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
-            premiseMap[premiseKey(baseWord, nextWord)] = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
-            usedDirCoords.push(dirCoord);
-            neighbors[baseWord] = neighbors[baseWord] ?? [];
-            neighbors[baseWord].push(nextWord);
-            neighbors[nextWord] = neighbors[nextWord] ?? [];
-            neighbors[nextWord].push(baseWord);
-            wordsInPremises.add(baseWord);
-            wordsInPremises.add(nextWord);
-            // Track that this shape was used
-            if (anchorWords.has(baseWord)) {
-                usedShapes.add(baseWord);
+
+            if (useStimSets) {
+                // Base companions: setSize-1 new words placed at baseWord's coordinate
+                const baseCompanions = words.slice(wordIndex, wordIndex + (setSize - 1));
+                wordIndex += baseCompanions.length;
+                // Target set: setSize new words placed at offset coordinate
+                const targetSet = words.slice(wordIndex, wordIndex + setSize);
+                wordIndex += targetSet.length;
+
+                if (targetSet.length < setSize) continue; // Skip partial sets
+
+                const baseSet = [baseWord, ...baseCompanions];
+                // Place base companions at baseWord's coordinate
+                for (const bc of baseCompanions) {
+                    wordCoordMap[bc] = [...wordCoordMap[baseWord]];
+                }
+                // Place target words at offset coordinate
+                for (const w of targetSet) {
+                    wordCoordMap[w] = addCoords(wordCoordMap[baseWord], dirCoord);
+                }
+                // Create a set premise with both sides having setSize words
+                const setStatement = this.createSetDirectionStatement(baseSet, targetSet, dirCoord);
+                // Store under each word pair key so orderPremises can find the premise
+                for (const b of baseSet) {
+                    for (const t of targetSet) {
+                        premiseMap[premiseKey(b, t)] = setStatement;
+                    }
+                }
+                usedDirCoords.push(dirCoord);
+                // Update neighbors
+                neighbors[baseWord] = neighbors[baseWord] ?? [];
+                // Connect base companions to baseWord
+                for (const bc of baseCompanions) {
+                    neighbors[baseWord].push(bc);
+                    neighbors[bc] = neighbors[bc] ?? [];
+                    neighbors[bc].push(baseWord);
+                    wordsInPremises.add(bc);
+                }
+                // Connect targets to baseWord and base companions
+                for (const w of targetSet) {
+                    neighbors[baseWord].push(w);
+                    neighbors[w] = neighbors[w] ?? [];
+                    neighbors[w].push(baseWord);
+                    for (const bc of baseCompanions) {
+                        neighbors[w].push(bc);
+                        neighbors[bc].push(w);
+                    }
+                    wordsInPremises.add(w);
+                }
+                wordsInPremises.add(baseWord);
+                if (anchorWords.has(baseWord)) {
+                    usedShapes.add(baseWord);
+                }
+            } else {
+                // Standard single-word premise
+                const nextWord = words[wordIndex];
+                wordIndex++;
+                wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+                premiseMap[premiseKey(baseWord, nextWord)] = this.generator.createDirectionStatement(baseWord, nextWord, dirCoord);
+                usedDirCoords.push(dirCoord);
+                neighbors[baseWord] = neighbors[baseWord] ?? [];
+                neighbors[baseWord].push(nextWord);
+                neighbors[nextWord] = neighbors[nextWord] ?? [];
+                neighbors[nextWord].push(baseWord);
+                wordsInPremises.add(baseWord);
+                wordsInPremises.add(nextWord);
+                if (anchorWords.has(baseWord)) {
+                    usedShapes.add(baseWord);
+                }
             }
         }
 

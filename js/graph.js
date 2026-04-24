@@ -173,6 +173,9 @@ class ProgressGraph {
     }
 
     createChart(ctx, labels, datasets, type, yAxisTitle, tickDecimals = 1, tooltipDecimals = 2, unit='', subtitle) {
+        const isLightMode = document.body.classList.contains('light-mode');
+        const textColor = isLightMode ? '#333' : '#ccc';
+        const gridColor = isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
         return new Chart(ctx, {
             type: type,
             data: {
@@ -195,18 +198,30 @@ class ProgressGraph {
                         title: {
                             display: true,
                             text: 'Day',
+                            color: textColor,
+                        },
+                        ticks: {
+                            color: textColor,
+                        },
+                        grid: {
+                            color: gridColor,
                         },
                     },
                     y: {
                         title: {
                             display: true,
                             text: yAxisTitle,
+                            color: textColor,
                         },
                         ticks: {
+                            color: textColor,
                             callback: function (value) {
                                 return value.toFixed(1);
                             }
-                        }
+                        },
+                        grid: {
+                            color: gridColor,
+                        },
                     },
                 },
                 plugins: {
@@ -222,8 +237,13 @@ class ProgressGraph {
                         display: subtitle ? true : false,
                         text: subtitle,
                         align: 'end',
-                        color: '#EEEEEE',
-                    }
+                        color: isLightMode ? '#555' : '#EEEEEE',
+                    },
+                    legend: {
+                        labels: {
+                            color: textColor,
+                        },
+                    },
                 },
             },
         });

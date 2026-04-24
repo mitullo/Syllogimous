@@ -2268,6 +2268,13 @@ input[type="number"]::-moz-inner-spin-button {
 
 }
 
+.subject .set-op {
+    font-weight: normal;
+    text-transform: lowercase;
+    font-size: 0.85em;
+    opacity: 0.6;
+}
+
 
 
 .analogy-statement {
@@ -3425,6 +3432,50 @@ input[type="checkbox"]:focus-visible + .switch {
 
 
 
+/* Multiple conclusions color styling */
+
+.hqli-conclusion.correct {
+
+    color: var(--correct-color) !important;
+
+}
+
+.hqli-conclusion.wrong {
+
+    color: var(--wrong-color) !important;
+
+}
+
+.hqli-answer-user.hqli--right {
+
+    color: var(--correct-color) !important;
+
+}
+
+.hqli-answer-user.hqli--wrong {
+
+    color: var(--wrong-color) !important;
+
+}
+
+.hqli-postamble .conc-true {
+
+    color: var(--correct-color);
+
+    font-weight: 600;
+
+}
+
+.hqli-postamble .conc-false {
+
+    color: var(--wrong-color);
+
+    font-weight: 600;
+
+}
+
+
+
 .hqli-response-time::before {
 
     content: "Response Time:"
@@ -3923,7 +3974,7 @@ table.distinction {
 
 .tooltip-text.shift-right-small {
 
-    margin-left: 30px;
+    transform: translateX(15%);
 
 }
 
@@ -8255,6 +8306,163 @@ textarea:focus-visible {
     border: 1px solid transparent !important;
 
     border-radius: 0 !important;
+
+}
+
+
+
+/* Light mode history tab text colors */
+
+.light-mode .stat-label {
+
+    color: #111;
+
+}
+
+.light-mode .stat-row span:not(.stat-label) {
+
+    color: #111;
+
+}
+
+.light-mode .hqli-premise,
+
+.light-mode .hqli-conclusion,
+
+.light-mode .hqli-response-time,
+
+.light-mode .hqli-footer {
+
+    color: #111 !important;
+
+}
+
+.light-mode .hqli-answer-user,
+
+.light-mode .hqli-answer {
+
+    color: #111;
+
+}
+
+.light-mode .hqli-answer-user.true,
+
+.light-mode .hqli-answer.true {
+
+    color: var(--correct-color) !important;
+
+}
+
+.light-mode .hqli-answer-user.false,
+
+.light-mode .hqli-answer.false {
+
+    color: var(--wrong-color) !important;
+
+}
+
+.light-mode .hqli-conclusion.correct {
+
+    color: var(--correct-color) !important;
+
+}
+
+.light-mode .hqli-conclusion.wrong {
+
+    color: var(--wrong-color) !important;
+
+}
+
+.light-mode .hqli-answer-user.hqli--right {
+
+    color: var(--correct-color) !important;
+
+}
+
+.light-mode .hqli-answer-user.hqli--wrong {
+
+    color: var(--wrong-color) !important;
+
+}
+
+.light-mode .hqli-postamble .conc-true {
+
+    color: var(--correct-color);
+
+}
+
+.light-mode .hqli-postamble .conc-false {
+
+    color: var(--wrong-color);
+
+}
+
+.light-mode .hql {
+
+    color: #111;
+
+}
+
+.light-mode .clear-history-btn {
+
+    background: linear-gradient(135deg, #c97a7a, #b85a5a);
+
+    color: #fff;
+
+}
+
+/* Light mode graph popup */
+
+.light-mode .graph-popup {
+
+    background: linear-gradient(135deg, rgba(245, 245, 255, 0.98), rgba(230, 235, 245, 0.98));
+
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(var(--accent-rgb), 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+}
+
+.light-mode .graph-popup-content {
+
+    background: rgba(0, 0, 0, 0.04);
+
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.08);
+
+}
+
+.light-mode .graph-controls {
+
+    background: rgba(0, 0, 0, 0.05);
+
+}
+
+.light-mode .graph-end-controls {
+
+    background: rgba(0, 0, 0, 0.04);
+
+}
+
+.light-mode .graph-end-controls > div {
+
+    color: #333;
+
+}
+
+/* Light mode graph close button */
+
+.light-mode #graph-close-popup {
+
+    background: linear-gradient(135deg, #c97a7a, #b85a5a);
+
+    color: #fff;
+
+}
+
+.light-mode #graph-close-popup:hover {
+
+    background: linear-gradient(135deg, #d98a8a, #c97a7a);
 
 }
 

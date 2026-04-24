@@ -7,6 +7,7 @@ function premiseKey(source, target) {
 function orderPremises(premiseMap, neighbors) {
     let premises = [];
     let traversed = new Set();
+    let addedPremises = new Set();
     const traverse = (word, parent) => {
         if (traversed.has(word)) {
             return;
@@ -15,7 +16,12 @@ function orderPremises(premiseMap, neighbors) {
 
         const key = premiseKey(word, parent);
         if (premiseMap[key]) {
-            premises.push(premiseMap[key]);
+            // Deduplicate: same premise object may be stored under multiple keys (stimulus sets)
+            const premise = premiseMap[key];
+            if (!addedPremises.has(premise)) {
+                premises.push(premise);
+                addedPremises.add(premise);
+            }
         }
         const wordNeighbors = neighbors[word] || [];
         const traversalOptions = [...wordNeighbors];
@@ -27,7 +33,13 @@ function orderPremises(premiseMap, neighbors) {
     const start = Object.keys(neighbors).filter(word => (neighbors[word] || []).length === 1)[0];
     if (!start) {
         // No valid start found (no words with exactly 1 neighbor), return premises in map order
-        return Object.values(premiseMap);
+        // Deduplicate: same premise object may be stored under multiple keys (stimulus sets)
+        const seen = new Set();
+        return Object.values(premiseMap).filter(p => {
+            if (seen.has(p)) return false;
+            seen.add(p);
+            return true;
+        });
     }
     traverse(start, null);
 

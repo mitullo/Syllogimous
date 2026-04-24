@@ -144,8 +144,8 @@ class MixedModeQuestion {
 
         // Generate additional mixed conclusions
         let generatedCount = 1; // Start at 1 since primary is already added
+        let attempts = 0;
         while (generatedCount < numConclusions) {
-            let attempts = 0;
             const [addConclusion, addIsValid] = this.createMixedConclusion(
                 words, allPremises, coordMap, sameSets, dsuBucketMap, neighbors, selectedModes
             );
@@ -157,9 +157,11 @@ class MixedModeQuestion {
                 }
                 // Max attempts reached, skip this conclusion
                 generatedCount++; // Prevent infinite loop
+                attempts = 0;
                 continue;
             }
 
+            attempts = 0; // Reset on success
             // Always add conclusion (may have duplicates if unique ones exhausted)
             usedConclusionTexts.add(addConclusion);
 
@@ -175,7 +177,7 @@ class MixedModeQuestion {
 
         if (savedata.enableMeta && !savedata.minimalMode && !savedata.widePremises) {
             formattedPremises = applyMeta(formattedPremises, p => 
-                p.match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]
+                (p.html ?? p).match(/<span class="relation">(?:<span class="is-negated">)?(.*?)<\/span>/)[1]
             );
         }
 
@@ -366,13 +368,23 @@ buildParityDSU(words, premises) {
         // process explicit premises
         for (const p of premises) {
             if (!p || !p.relation) continue;
-            const a = p.start;
-            const b = p.end;
-            if (!a || !b) continue;
-            if (p.relation === 'is same as' || p.reverse === 'is same as' || p.relationMinimal === '=') {
-                union(a, b, 0);
-            } else if (p.relation === 'is opposite of' || p.reverse === 'is opposite of' || p.relationMinimal === '☍') {
-                union(a, b, 1);
+            // Handle both single-word and set premises
+            const aList = p.startSet || (p.start ? [p.start] : []);
+            const bList = p.endSet || (p.end ? [p.end] : []);
+            if (aList.length === 0 || bList.length === 0) continue;
+            if (p.relation === 'is same as' || p.relation === 'are same as' || p.reverse === 'is same as' || p.reverse === 'are same as' || p.relationMinimal === '=') {
+                // Union all pairs between the two sets
+                for (const a of aList) {
+                    for (const b of bList) {
+                        union(a, b, 0);
+                    }
+                }
+            } else if (p.relation === 'is opposite of' || p.relation === 'are opposite of' || p.reverse === 'is opposite of' || p.reverse === 'are opposite of' || p.relationMinimal === '☍') {
+                for (const a of aList) {
+                    for (const b of bList) {
+                        union(a, b, 1);
+                    }
+                }
             }
         }
 
@@ -411,13 +423,20 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
             // Find a directional premise that references a member of an equivalence component
             for (const comp of components) {
                 for (const original of comp) {
-                    const originalDirs = premises.filter(p => p.relation && p.relation.includes('of') && (p.start === original || p.end === original));
+                    const originalDirs = premises.filter(p => p.relation && p.relation.includes('of') && (
+                        p.start === original || p.end === original ||
+                        (p.startSet && p.startSet.includes(original)) ||
+                        (p.endSet && p.endSet.includes(original))
+                    ));
                     if (originalDirs.length === 0) continue;
                     for (const dirPremise of originalDirs) {
                         const replacements = comp.filter(x => x !== original);
                         if (replacements.length === 0) continue;
                         const equivWord = pickRandomItems(replacements, 1).picked[0];
-                        const otherWord = dirPremise.start === original ? dirPremise.end : dirPremise.start;
+                        // Determine which side of the premise contains the original word
+                        const originalIsStart = dirPremise.start === original || (dirPremise.startSet && dirPremise.startSet.includes(original));
+                        const otherWord = originalIsStart ? (dirPremise.end || (dirPremise.endSet ? dirPremise.endSet[0] : null)) : (dirPremise.start || (dirPremise.startSet ? dirPremise.startSet[0] : null));
+                        if (!otherWord) continue;
                         const relation = dirPremise.relation;
                         const reverse = dirPremise.reverse;
                         const relationMin = dirPremise.relationMinimal;
@@ -425,7 +444,7 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
 
                         if (coinFlip()) {
                             // Valid: preserve relation text but place start/end appropriately
-                            const conclusionObj = (dirPremise.start === original)
+                            const conclusionObj = originalIsStart
                                 ? { start: equivWord, end: otherWord, relation, reverse, relationMinimal: relationMin, reverseMinimal: reverseMin }
                                 : { start: otherWord, end: equivWord, relation, reverse, relationMinimal: relationMin, reverseMinimal: reverseMin };
                             const premiseResult = createPremiseHTML(conclusionObj, true, 0);
@@ -483,8 +502,8 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                                 wrongCoord = validWrongDirs[Math.floor(Math.random() * validWrongDirs.length)];
                             }
                             
-                            const newStartNode = (dirPremise.start === original) ? equivWord : dirPremise.start;
-                            const newEndNode = (dirPremise.end === original) ? equivWord : dirPremise.end;
+                            const newStartNode = originalIsStart ? equivWord : (dirPremise.start || dirPremise.startSet?.[0]);
+                            const newEndNode = !originalIsStart ? equivWord : (dirPremise.end || dirPremise.endSet?.[0]);
                             
                             const conclusionObj = generator.createDirectionStatement(newEndNode, newStartNode, wrongCoord);
                             const premiseResult = createPremiseHTML(conclusionObj, true, 0);
@@ -599,7 +618,7 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
         return [conclusion, isValid];
     }
 
-oppositeDirection(dir) {
+    oppositeDirection(dir) {
         const opposites = {
             'North': 'South',
             'South': 'North',

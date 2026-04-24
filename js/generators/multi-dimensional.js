@@ -107,6 +107,68 @@ function createMultiDimStatement(a, b, dirCoord, dimensions) {
     }
 }
 
+// Create a multi-dimensional set premise combining spatial and additional layers
+function createMultiDimSetStatement(startSet, endSet, dirCoord, dimensions) {
+    if (!dirCoord) {
+        return {
+            startSet: startSet,
+            endSet: endSet,
+            relation: `are at of`,
+            reverse: `are at of`,
+            relationMinimal: '',
+            reverseMinimal: '',
+        }
+    }
+
+    const spatialCoord = dirCoord.slice(0, 3);
+    const direction = dirStringFromCoord(spatialCoord);
+    const reverseDirection = dirStringFromCoord(inverse(spatialCoord));
+
+    let layers = [{ relation: `are ${direction} of`, reverse: `are ${reverseDirection} of` }];
+    let layerMinimals = [dirStringMinimal(spatialCoord)];
+
+    if (dimensions >= 5) {
+        const temporal = temporalLayers[dirCoord[3] + 1];
+        layers.push(temporal);
+        layerMinimals.push(temporal.minimal);
+    }
+
+    if (dimensions >= 6) {
+        const quantity = quantityLayers[dirCoord[4] + 1];
+        layers.push(quantity);
+        layerMinimals.push(quantity.minimal);
+    }
+
+    if (dimensions >= 7) {
+        const membership = membershipLayers[dirCoord[5] + 1];
+        layers.push(membership);
+        layerMinimals.push(membership.minimal);
+    }
+
+    if (savedata.minimalMode) {
+        return {
+            startSet: endSet,
+            endSet: startSet,
+            relation: layerMinimals.join(' '),
+            reverse: layerMinimals.slice().reverse().join(' '),
+            relationMinimal: layerMinimals.join(' '),
+            reverseMinimal: layerMinimals.slice().reverse().join(' '),
+        };
+    } else {
+        const fullRelations = layers.map((layer, i) => i === 0 ? layer.relation : layer.name);
+        const reverseRelations = layers.map((layer, i) => layer.reverse);
+
+        return {
+            startSet: endSet,
+            endSet: startSet,
+            relation: fullRelations.join(', '),
+            reverse: reverseRelations.join(', '),
+            relationMinimal: layerMinimals.join(' '),
+            reverseMinimal: layerMinimals.slice().reverse().join(' '),
+        };
+    }
+}
+
 // 5D Question generator (Spatial + Temporal)
 function createMultiDim5DGenerator(length) {
     return {
@@ -134,25 +196,29 @@ function createMultiDim5DGenerator(length) {
             },
             create: function(length) {
                 const dir4dGen = new Direction4D();
-                const words = createStimuli(length + 1);
+                // When stimulus sets are enabled, we need more words per premise
+                const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+                const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+                const extraWords = useStimSets ? (length * (2 * setSize - 2)) : 0;
+                const words = createStimuli(length + 1 + extraWords);
                 const neighbors = {};
-                
+
                 // Transform split for interleave mode
                 const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
-                
+
                 // Create unified transform state for coordinated transforms
                 let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
-                
-                // Maintain a 4D map for the pathfinder to prevent distance calculation crashes, 
+
+                // Maintain a 4D map for the pathfinder to prevent distance calculation crashes,
                 // and a true 5D map for the logic.
                 const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
                 let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0] };
-                
+
                 // When using transforms, initialize transformState with the wordCoordMap reference
                 if (transformState) {
                     transformState.wordCoordMap = wordCoordMap;
                 }
-                
+
                 // Interleave transforms during premise generation
                 // Pre-calculate evenly distributed positions for interleaved transforms
                 let interleavePositions = [];
@@ -165,32 +231,76 @@ function createMultiDim5DGenerator(length) {
                 // Dimension pool for interleaved transforms (like direction.js)
                 const dimPool5D = repeatArrayUntil(shuffle([0, 1, 2, 3, 4]), numInterleaved * 2);
                 let dimIndex = 0;
-                
+
                 // Build premise chunks for interleaving (like direction.js createWordMapInterleaved)
                 let premiseChunks = [[]];
-                
-                for (let i = 0; i < length; i++) {
-                    const baseWord = words[i];
-                    const nextWord = words[i + 1];
+
+                let premiseIndex = 0;
+                let wordIndex = 1;
+
+                while (wordIndex < words.length && premiseIndex < length) {
+                    const baseWord = words[wordIndex - 1];
                     const dirCoord4D = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap4D);
-                    
+
                     // Generate actual coordinate for 5th dimension
                     const dim5 = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
                     const dirCoord = [...dirCoord4D, dim5];
-                    
-                    wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
-                    wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
-                    
-                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 5);
-                    premiseChunks[premiseChunks.length - 1].push(premise);
-                    
-                    neighbors[baseWord] = neighbors[baseWord] ?? [];
-                    neighbors[baseWord].push(nextWord);
-                    neighbors[nextWord] = neighbors[nextWord] ?? [];
-                    neighbors[nextWord].push(baseWord);
-                    
+
+                    wordCoordMap4D[baseWord] = wordCoordMap4D[baseWord] || [0, 0, 0, 0];
+
+                    if (useStimSets) {
+                        // Stimulus set mode: both sides have setSize words
+                        const baseCompanions = words.slice(wordIndex, wordIndex + (setSize - 1));
+                        wordIndex += baseCompanions.length;
+                        const targetSet = words.slice(wordIndex, wordIndex + setSize);
+                        if (targetSet.length < setSize) break;
+
+                        const baseSet = [baseWord, ...baseCompanions];
+                        // Place base companions at baseWord's coordinate
+                        for (const bc of baseCompanions) {
+                            wordCoordMap4D[bc] = [...(wordCoordMap4D[baseWord] || [0, 0, 0, 0])];
+                            wordCoordMap[bc] = [...(wordCoordMap[baseWord] || [0, 0, 0, 0, 0])];
+                            neighbors[baseWord] = neighbors[baseWord] ?? [];
+                            neighbors[baseWord].push(bc);
+                            neighbors[bc] = neighbors[bc] ?? [];
+                            neighbors[bc].push(baseWord);
+                        }
+                        // Place target words at offset coordinate
+                        for (const w of targetSet) {
+                            wordCoordMap4D[w] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
+                            wordCoordMap[w] = addCoords(wordCoordMap[baseWord], dirCoord);
+                            neighbors[baseWord] = neighbors[baseWord] ?? [];
+                            neighbors[baseWord].push(w);
+                            neighbors[w] = neighbors[w] ?? [];
+                            neighbors[w].push(baseWord);
+                            for (const bc of baseCompanions) {
+                                neighbors[w].push(bc);
+                                neighbors[bc].push(w);
+                            }
+                        }
+
+                        const setStatement = createMultiDimSetStatement(baseSet, targetSet, dirCoord, 5);
+                        premiseChunks[premiseChunks.length - 1].push(setStatement);
+                        premiseIndex++;
+                        wordIndex += targetSet.length;
+                    } else {
+                        const nextWord = words[wordIndex];
+                        wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
+                        wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+
+                        neighbors[baseWord] = neighbors[baseWord] ?? [];
+                        neighbors[baseWord].push(nextWord);
+                        neighbors[nextWord] = neighbors[nextWord] ?? [];
+                        neighbors[nextWord].push(baseWord);
+
+                        const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 5);
+                        premiseChunks[premiseChunks.length - 1].push(premise);
+                        premiseIndex++;
+                        wordIndex++;
+                    }
+
                     // Apply interleaved transform if due
-                    if (nextInterleaveIdx < interleavePositions.length && i === interleavePositions[nextInterleaveIdx]) {
+                    if (nextInterleaveIdx < interleavePositions.length && premiseIndex - 1 === interleavePositions[nextInterleaveIdx]) {
                         // Start a new premise chunk after the transform
                         premiseChunks.push([]);
                         // Pick random moving word (not anchor)
@@ -208,7 +318,7 @@ function createMultiDim5DGenerator(length) {
                         nextInterleaveIdx++;
                     }
                 }
-                
+
                 // Remove empty trailing chunk
                 if (premiseChunks[premiseChunks.length - 1].length === 0) {
                     premiseChunks.pop();
@@ -232,6 +342,20 @@ function createMultiDim5DGenerator(length) {
                 const primaryPair = pairChooser.pickTwoDistantWords(neighbors);
                 if (primaryPair) {
                     [startWord, endWord] = primaryPair;
+                } else {
+                    // Fallback: pick any two words with non-zero coordinate difference
+                    const allWords = Object.keys(wordCoordMap);
+                    for (let attempts = 0; attempts < 20 && (!startWord || !endWord); attempts++) {
+                        const [a, b] = pickRandomItems(allWords, 2).picked;
+                        if (wordCoordMap[a] && wordCoordMap[b]) {
+                            const diff = subCoords(wordCoordMap[a], wordCoordMap[b]);
+                            const normDiff = diff.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+                            if (normDiff.some(c => c !== 0)) {
+                                startWord = a;
+                                endWord = b;
+                            }
+                        }
+                    }
                 }
 
                 // Apply remaining basic transforms (interleaved were already applied via transformState)
@@ -277,8 +401,24 @@ function createMultiDim5DGenerator(length) {
                     }
 
                     if (!sw || !ew) {
-                        generatedCount++; // Prevent infinite loop
-                        continue;
+                        // Fallback: pick any two words with non-zero coordinate difference
+                        const allWords = Object.keys(wordCoordMap);
+                        for (let att = 0; att < 20; att++) {
+                            const [a, b] = pickRandomItems(allWords, 2).picked;
+                            if (wordCoordMap[a] && wordCoordMap[b]) {
+                                const diff = subCoords(wordCoordMap[a], wordCoordMap[b]);
+                                const normDiff = diff.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+                                if (normDiff.some(c => c !== 0)) {
+                                    sw = a;
+                                    ew = b;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!sw || !ew) {
+                            generatedCount++;
+                            continue;
+                        }
                     }
                     usedPairsSet.add(`${sw}-${ew}`);
 
@@ -465,23 +605,27 @@ function createMultiDim6DGenerator(length) {
             },
             create: function(length) {
                 const dir4dGen = new Direction4D();
-                const words = createStimuli(length + 1);
+                // When stimulus sets are enabled, we need more words per premise
+                const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
+                const setSize = useStimSets ? savedata.stimulusSetSize : 1;
+                const extraWords = useStimSets ? (length * (2 * setSize - 2)) : 0;
+                const words = createStimuli(length + 1 + extraWords);
                 const neighbors = {};
-                
+
                 // Transform split for interleave mode
                 const [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
-                
+
                 // Create unified transform state for coordinated transforms
                 let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
-                
+
                 const wordCoordMap4D = { [words[0]]: [0, 0, 0, 0] };
                 let wordCoordMap = { [words[0]]: [0, 0, 0, 0, 0, 0] };
-                
+
                 // When using transforms, initialize transformState with the wordCoordMap reference
                 if (transformState) {
                     transformState.wordCoordMap = wordCoordMap;
                 }
-                
+
                 // Interleave transforms during premise generation
                 // Pre-calculate evenly distributed positions for interleaved transforms
                 let interleavePositions = [];
@@ -494,35 +638,77 @@ function createMultiDim6DGenerator(length) {
                 // Dimension pool for interleaved transforms (like direction.js)
                 const dimPool6D = repeatArrayUntil(shuffle([0, 1, 2, 3, 4, 5]), numInterleaved * 2);
                 let dimIndex = 0;
-                
+
                 // Build premise chunks for interleaving (like direction.js createWordMapInterleaved)
                 let premiseChunks = [[]];
-                
-                for (let i = 0; i < length; i++) {
-                    const baseWord = words[i];
-                    const nextWord = words[i + 1];
+
+                let premiseIndex = 0;
+                let wordIndex = 1;
+
+                while (wordIndex < words.length && premiseIndex < length) {
+                    const baseWord = words[wordIndex - 1];
                     const dirCoord4D = dir4dGen.pickDirection(baseWord, neighbors, wordCoordMap4D);
-                    
+
                     const dim5 = Math.floor(Math.random() * 3) - 1;
                     const dim6 = Math.floor(Math.random() * 3) - 1;
                     const dirCoord = [...dirCoord4D, dim5, dim6];
-                    
-                    wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
-                    wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
-                    
-                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
-                    premiseChunks[premiseChunks.length - 1].push(premise);
-                    
-                    neighbors[baseWord] = neighbors[baseWord] ?? [];
-                    neighbors[baseWord].push(nextWord);
-                    neighbors[nextWord] = neighbors[nextWord] ?? [];
-                    neighbors[nextWord].push(baseWord);
-                    
+
+                    wordCoordMap4D[baseWord] = wordCoordMap4D[baseWord] || [0, 0, 0, 0];
+
+                    if (useStimSets) {
+                        // Stimulus set mode: both sides have setSize words
+                        const baseCompanions = words.slice(wordIndex, wordIndex + (setSize - 1));
+                        wordIndex += baseCompanions.length;
+                        const targetSet = words.slice(wordIndex, wordIndex + setSize);
+                        if (targetSet.length < setSize) break;
+
+                        const baseSet = [baseWord, ...baseCompanions];
+                        // Place base companions at baseWord's coordinate
+                        for (const bc of baseCompanions) {
+                            wordCoordMap4D[bc] = [...(wordCoordMap4D[baseWord] || [0, 0, 0, 0])];
+                            wordCoordMap[bc] = [...(wordCoordMap[baseWord] || [0, 0, 0, 0, 0, 0])];
+                            neighbors[baseWord] = neighbors[baseWord] ?? [];
+                            neighbors[baseWord].push(bc);
+                            neighbors[bc] = neighbors[bc] ?? [];
+                            neighbors[bc].push(baseWord);
+                        }
+                        // Place target words at offset coordinate
+                        for (const w of targetSet) {
+                            wordCoordMap4D[w] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
+                            wordCoordMap[w] = addCoords(wordCoordMap[baseWord], dirCoord);
+                            neighbors[baseWord] = neighbors[baseWord] ?? [];
+                            neighbors[baseWord].push(w);
+                            neighbors[w] = neighbors[w] ?? [];
+                            neighbors[w].push(baseWord);
+                            for (const bc of baseCompanions) {
+                                neighbors[w].push(bc);
+                                neighbors[bc].push(w);
+                            }
+                        }
+
+                        const setStatement = createMultiDimSetStatement(baseSet, targetSet, dirCoord, 6);
+                        premiseChunks[premiseChunks.length - 1].push(setStatement);
+                        premiseIndex++;
+                        wordIndex += targetSet.length;
+                    } else {
+                        const nextWord = words[wordIndex];
+                        wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
+                        wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
+
+                        neighbors[baseWord] = neighbors[baseWord] ?? [];
+                        neighbors[baseWord].push(nextWord);
+                        neighbors[nextWord] = neighbors[nextWord] ?? [];
+                        neighbors[nextWord].push(baseWord);
+
+                        const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
+                        premiseChunks[premiseChunks.length - 1].push(premise);
+                        premiseIndex++;
+                        wordIndex++;
+                    }
+
                     // Apply interleaved transform if due
-                    if (nextInterleaveIdx < interleavePositions.length && i === interleavePositions[nextInterleaveIdx]) {
-                        // Start a new premise chunk after the transform
+                    if (nextInterleaveIdx < interleavePositions.length && premiseIndex - 1 === interleavePositions[nextInterleaveIdx]) {
                         premiseChunks.push([]);
-                        // Pick random moving word (not anchor)
                         const availableWords = Object.keys(wordCoordMap).filter(w => !anchorWords.includes(w));
                         if (availableWords.length > 0) {
                             const movingWord = availableWords[Math.floor(Math.random() * availableWords.length)];
@@ -537,7 +723,7 @@ function createMultiDim6DGenerator(length) {
                         nextInterleaveIdx++;
                     }
                 }
-                
+
                 // Remove empty trailing chunk
                 if (premiseChunks[premiseChunks.length - 1].length === 0) {
                     premiseChunks.pop();
@@ -561,6 +747,20 @@ function createMultiDim6DGenerator(length) {
                 const primaryPair = pairChooser.pickTwoDistantWords(neighbors);
                 if (primaryPair) {
                     [startWord, endWord] = primaryPair;
+                } else {
+                    // Fallback: pick any two words with non-zero coordinate difference
+                    const allWords = Object.keys(wordCoordMap);
+                    for (let attempts = 0; attempts < 20 && (!startWord || !endWord); attempts++) {
+                        const [a, b] = pickRandomItems(allWords, 2).picked;
+                        if (wordCoordMap[a] && wordCoordMap[b]) {
+                            const diff = subCoords(wordCoordMap[a], wordCoordMap[b]);
+                            const normDiff = diff.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+                            if (normDiff.some(c => c !== 0)) {
+                                startWord = a;
+                                endWord = b;
+                            }
+                        }
+                    }
                 }
 
                 // Apply remaining basic transforms (interleaved were already applied via transformState)
@@ -606,8 +806,24 @@ function createMultiDim6DGenerator(length) {
                     }
 
                     if (!sw || !ew) {
-                        generatedCount++; // Prevent infinite loop
-                        continue;
+                        // Fallback: pick any two words with non-zero coordinate difference
+                        const allWords = Object.keys(wordCoordMap);
+                        for (let att = 0; att < 20; att++) {
+                            const [a, b] = pickRandomItems(allWords, 2).picked;
+                            if (wordCoordMap[a] && wordCoordMap[b]) {
+                                const diff = subCoords(wordCoordMap[a], wordCoordMap[b]);
+                                const normDiff = diff.map(c => c === 0 ? 0 : (c > 0 ? 1 : -1));
+                                if (normDiff.some(c => c !== 0)) {
+                                    sw = a;
+                                    ew = b;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!sw || !ew) {
+                            generatedCount++;
+                            continue;
+                        }
                     }
                     usedPairsSet.add(`${sw}-${ew}`);
 
