@@ -142,11 +142,14 @@ function createWidePremiseHTML(premise, allowReversal=true, forceMinimal=null, p
     const bHtml = renderSubject(b);
     const cHtml = renderSubject(c);
 
-    if (!allowReversal || coinFlip()) {
-        return `<span class="subject">${aHtml}</span> <span class="relation">${ab}</span> <span class="subject">${bHtml}</span> <span class="relation">${bc}</span> <span class="subject">${cHtml}</span>`;
-    } else {
-        return `<span class="subject">${cHtml}</span> <span class="relation">${bcRev}</span> <span class="subject">${bHtml}</span> <span class="relation">${abRev}</span> <span class="subject">${aHtml}</span>`;
-    }
+    // Build options array for pickNegatable (wide premises don't support negation yet, so both are normal)
+    const ps = [
+        `<span class="subject">${aHtml}</span> <span class="relation">${ab}</span> <span class="subject">${bHtml}</span> <span class="relation">${bc}</span> <span class="subject">${cHtml}</span>`,
+        `<span class="subject">${cHtml}</span> <span class="relation">${bcRev}</span> <span class="subject">${bHtml}</span> <span class="relation">${abRev}</span> <span class="subject">${aHtml}</span>`
+    ];
+    
+    const result = pickNegatable(ps);
+    return result;
 }
 
 // Create a negated conclusion HTML - wraps the relation in a "not" indicator

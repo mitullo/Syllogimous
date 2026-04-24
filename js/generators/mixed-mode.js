@@ -431,10 +431,11 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                             const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                             let conclusion = premiseResult.html;
                             let isValid = true;
-                            if (premiseResult.isInverted) {
+                            const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                            if (wasInvertedByPremiseHTML) {
                                 isValid = !isValid;
                             }
-                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
+                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj, wasInvertedByPremiseHTML);
                             return [finalConclusion, finalIsValid, ['distinction', 'direction']];
                         } else {
                             // Invalid: Generate a proper incorrect coordinate using the correct space generator
@@ -489,10 +490,11 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                             const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                             let conclusion = premiseResult.html;
                             let isValid = false;
-                            if (premiseResult.isInverted) {
+                            const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                            if (wasInvertedByPremiseHTML) {
                                 isValid = !isValid;
                             }
-                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
+                            const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj, wasInvertedByPremiseHTML);
                             return [finalConclusion, finalIsValid, ['distinction', 'direction']];
                         }
                     }
@@ -509,20 +511,22 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                 const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                 let conclusion = premiseResult.html;
                 let isValid = sameBucket;
-                if (premiseResult.isInverted) {
+                const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                if (wasInvertedByPremiseHTML) {
                     isValid = !isValid;
                 }
-                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
+                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj, wasInvertedByPremiseHTML);
                 return [finalConclusion, finalIsValid, ['distinction']];
             } else {
                 const conclusionObj = createOppositePremise(a, b);
                 const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                 let conclusion = premiseResult.html;
                 let isValid = !sameBucket;
-                if (premiseResult.isInverted) {
+                const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                if (wasInvertedByPremiseHTML) {
                     isValid = !isValid;
                 }
-                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
+                const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj, wasInvertedByPremiseHTML);
                 return [finalConclusion, finalIsValid, ['distinction']];
             }
         }
@@ -546,10 +550,11 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                     const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                     let conclusion = premiseResult.html;
                     let isValid = true;
-                    if (premiseResult.isInverted) {
+                    const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                    if (wasInvertedByPremiseHTML) {
                         isValid = !isValid;
                     }
-                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
+                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj, wasInvertedByPremiseHTML);
                     return [finalConclusion, finalIsValid, ['direction']];
                 } else {
                     let availableDirs = dirCoords.slice(1);
@@ -561,10 +566,11 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                     const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                     let conclusion = premiseResult.html;
                     let isValid = false;
-                    if (premiseResult.isInverted) {
+                    const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                    if (wasInvertedByPremiseHTML) {
                         isValid = !isValid;
                     }
-                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj);
+                    const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj, wasInvertedByPremiseHTML);
                     return [finalConclusion, finalIsValid, ['direction']];
                 }
             }
@@ -575,7 +581,8 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
 
 // Apply conclusion negation if enabled - wraps the conclusion in a "Not" form
     // and flips the validity. This is actual negation, not inversion.
-    applyConclusionNegation(conclusion, isValid, premiseObj) {
+    // alreadyNegated: if true, don't flip validity again (prevents double-negation)
+    applyConclusionNegation(conclusion, isValid, premiseObj, alreadyNegated=false) {
         if (!savedata.enableConclusionNegation || !conclusion) {
             return [conclusion, isValid];
         }
@@ -585,7 +592,8 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
         if (Math.random() * 100 < freq) {
             const negatedConclusion = createNegatedConclusionHTML(premiseObj, false);
             // Negation flips the validity - "A is Not west of B" is true when "A is west of B" is false
-            return [negatedConclusion, !isValid];
+            // But if already negated by pickNegatable, don't flip again
+            return [negatedConclusion, alreadyNegated ? isValid : !isValid];
         }
 
         return [conclusion, isValid];

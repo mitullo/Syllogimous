@@ -158,10 +158,11 @@ class DistinctionQuestion {
             }
             const premiseResult = createPremiseHTML(conclusionObj, true, 0);
             let conclusionHTML = premiseResult.html;
-            if (premiseResult.isInverted) {
+            const wasInvertedByPremiseHTML = premiseResult.isInverted;
+            if (wasInvertedByPremiseHTML) {
                 conclusionIsValid = !conclusionIsValid;
             }
-            [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj);
+            [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj, null, wasInvertedByPremiseHTML);
 
             // Always add conclusion (may have duplicates if unique ones exhausted)
             usedConclusionTexts.add(conclusionHTML);

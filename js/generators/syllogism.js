@@ -156,7 +156,7 @@ class SyllogismQuestion {
                 [, , conclusionText] = getSyllogism(triple[0], triple[1], triple[2], conclusionRule);
             }
 
-            [c, conclusionIsValid] = applyConclusionNegation(conclusionText, conclusionIsValid, null);
+            [c, conclusionIsValid] = applyConclusionNegation(conclusionText, conclusionIsValid, null, null, false);
 
             conclusionsArr.push({
                 conclusion: c,

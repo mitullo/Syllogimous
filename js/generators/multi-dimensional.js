@@ -309,11 +309,12 @@ function createMultiDim5DGenerator(length) {
 
                     const premiseResult = createPremiseHTML(conclusionObj, true, length);
                     let conclusionHTML = premiseResult.html;
-                    if (premiseResult.isInverted) {
+                    const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                    if (wasInvertedByPremiseHTML) {
                         conclusionIsValid = !conclusionIsValid;
                     }
                     [conclusionHTML, conclusionIsValid] = applyConclusionNegation(
-                        conclusionHTML, conclusionIsValid, conclusionObj
+                        conclusionHTML, conclusionIsValid, conclusionObj, null, wasInvertedByPremiseHTML
                     );
 
                     usedConclusionTexts.add(conclusionHTML);
@@ -637,11 +638,12 @@ function createMultiDim6DGenerator(length) {
 
                     const premiseResult = createPremiseHTML(conclusionObj, true, length);
                     let conclusionHTML = premiseResult.html;
-                    if (premiseResult.isInverted) {
+                    const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                    if (wasInvertedByPremiseHTML) {
                         conclusionIsValid = !conclusionIsValid;
                     }
                     [conclusionHTML, conclusionIsValid] = applyConclusionNegation(
-                        conclusionHTML, conclusionIsValid, conclusionObj
+                        conclusionHTML, conclusionIsValid, conclusionObj, null, wasInvertedByPremiseHTML
                     );
 
                     usedConclusionTexts.add(conclusionHTML);

@@ -575,11 +575,15 @@ class DirectionQuestion {
 
             const premiseResult = createPremiseHTML(conclusionObj, true, 0, pattern);
             conclusionHTML = premiseResult.html;
-            // Flip validity if visual inversion was applied
-            if (premiseResult.isInverted) {
+            // Flip validity if visual inversion was applied by pickNegatable
+            // NOTE: This represents the same logical negation as conclusion negation,
+            // so we track it to avoid double-flipping
+            const wasInvertedByPremiseHTML = premiseResult.isInverted;
+            if (wasInvertedByPremiseHTML) {
                 conclusionIsValid = !conclusionIsValid;
             }
-            [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj, pattern);
+            // Apply conclusion negation, but pass flag to avoid double-flipping
+            [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj, pattern, wasInvertedByPremiseHTML);
 
             // Always add conclusion (may have duplicates if unique ones exhausted)
             usedConclusionTexts.add(conclusionHTML);

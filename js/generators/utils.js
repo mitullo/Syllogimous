@@ -37,7 +37,9 @@ function negationRoll() {
 // Apply conclusion negation if enabled - wraps the conclusion in a "Not" form
 // and flips the validity. This is actual negation, not inversion.
 // Returns [conclusionHTML, isValid] tuple
-function applyConclusionNegation(conclusion, isValid, premiseObj, pattern=null) {
+// alreadyNegated: if true, don't flip validity again (prevents double-negation when
+//                 conclusion was already inverted by pickNegatable)
+function applyConclusionNegation(conclusion, isValid, premiseObj, pattern=null, alreadyNegated=false) {
     if (!savedata.enableConclusionNegation || !conclusion) {
         return [conclusion, isValid];
     }
@@ -48,14 +50,15 @@ function applyConclusionNegation(conclusion, isValid, premiseObj, pattern=null) 
         if (premiseObj) {
             const negatedConclusion = createNegatedConclusionHTML(premiseObj, false, null, pattern);
             // Negation flips the validity - "A is Not west of B" is true when "A is west of B" is false
-            return [negatedConclusion, !isValid];
+            // But if already negated by pickNegatable, don't flip again (prevent double-negation)
+            return [negatedConclusion, alreadyNegated ? isValid : !isValid];
         } else {
             // For non-premise conclusions (e.g., syllogism), wrap relation in negation span
             const negatedConclusion = conclusion.replace(
                 /<span class="relation">((?:(?!<\/span>).)*?)<\/span>/g,
                 '<span class="relation"><span class="is-negated">$1</span></span>'
             );
-            return [negatedConclusion, !isValid];
+            return [negatedConclusion, alreadyNegated ? isValid : !isValid];
         }
     }
 
@@ -109,8 +112,9 @@ function pickNegatable(cs) {
     // For 50% frequency, use random pick. Otherwise, weighted choice based on frequency
     if (Math.random() * 100 < freq) {
         const picked = pickRandomItems(cs, 1).picked[0];
-        // cs[1] is the inverted version (with is-negated span)
-        return { html: picked, isInverted: picked === cs[1] };
+        // Check if the picked HTML contains the is-negated class (more robust than string comparison)
+        const isInverted = picked.includes('is-negated') || picked.includes('class="is-negated"');
+        return { html: picked, isInverted };
     }
     return { html: cs[0], isInverted: false };
 }

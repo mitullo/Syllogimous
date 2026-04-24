@@ -202,10 +202,11 @@ class LinearQuestion {
         }
         const premiseResult = createPremiseHTML(conclusionObj, true, 0);
         conclusion = premiseResult.html;
-        if (premiseResult.isInverted) {
+        const wasInvertedByPremiseHTML = premiseResult.isInverted;
+        if (wasInvertedByPremiseHTML) {
             isValid = !isValid;
         }
-        [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj);
+        [conclusion, isValid] = applyConclusionNegation(conclusion, isValid, conclusionObj, null, wasInvertedByPremiseHTML);
 
         return [premises, conclusion, isValid, neighbors];
     }
@@ -376,10 +377,11 @@ class LinearQuestion {
             const conclusionObj = this.conclusion;
             const premiseResult = createPremiseHTML(conclusionObj, true, 0);
             finalConclusion = premiseResult.html;
-            if (premiseResult.isInverted) {
+            const wasInvertedByPremiseHTML = premiseResult.isInverted;
+            if (wasInvertedByPremiseHTML) {
                 finalIsValid = !finalIsValid;
             }
-            [finalConclusion, finalIsValid] = applyConclusionNegation(finalConclusion, finalIsValid, conclusionObj);
+            [finalConclusion, finalIsValid] = applyConclusionNegation(finalConclusion, finalIsValid, conclusionObj, null, wasInvertedByPremiseHTML);
         }
 
         // Generate multiple conclusions if mode is enabled (only for non-backtracking)
@@ -416,10 +418,11 @@ class LinearQuestion {
                 }
                 const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                 let conclusionHTML = premiseResult.html;
-                if (premiseResult.isInverted) {
+                const wasInvertedByPremiseHTML = premiseResult.isInverted;
+                if (wasInvertedByPremiseHTML) {
                     conclusionIsValid = !conclusionIsValid;
                 }
-                [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj);
+                [conclusionHTML, conclusionIsValid] = applyConclusionNegation(conclusionHTML, conclusionIsValid, conclusionObj, null, wasInvertedByPremiseHTML);
 
                 // Always add conclusion (may have duplicates if unique ones exhausted)
                 usedConclusionTexts.add(conclusionHTML);
