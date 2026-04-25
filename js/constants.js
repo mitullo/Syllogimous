@@ -36,6 +36,10 @@ let appState = {
 
     "flatSettings": false,
 
+    "swapButtons": false,
+
+    "navBar": false,
+
     "timerAnimation": "stepEaseOut",
 
     "fontSize": "normal",

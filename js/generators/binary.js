@@ -136,7 +136,10 @@ class BinaryQuestion {
             '<div class="is-connector">Both</div> $a <div class="is-connector">and</div> $b <div class="is-connector">are the same</div>'
         ];
 
-        const pool = createBinaryGeneratorPool();
+        const pool = createBinaryGeneratorPool(length);
+
+        if (pool.length === 0) return null;
+
         let choice;
         let choice2;
         let premises;
@@ -146,7 +149,8 @@ class BinaryQuestion {
         const operandIndex = Math.floor(Math.random()*operands.length);
         const operand = operands[operandIndex];
         while (flip !== isValid) {
-            let [generator, generator2] = pickRandomItems(pool, 2).picked;
+            const generator = pool[Math.floor(Math.random() * pool.length)];
+            const generator2 = pool[Math.floor(Math.random() * pool.length)];
 
             [choice, choice2] = [
                 generator.question.create(Math.floor(length/2)),
@@ -198,7 +202,9 @@ class NestedBinaryQuestion {
             "!(!((a)&&(b))&&((a)||(b)))"
         ];
 
-        const pool = createBinaryGeneratorPool();
+        const pool = createBinaryGeneratorPool(length);
+
+        if (pool.length === 0) return null;
 
         length = Math.max(4, length);
         const halfLength = Math.floor(length / 2);

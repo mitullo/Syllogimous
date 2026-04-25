@@ -1619,6 +1619,12 @@ input[type="number"]::-moz-inner-spin-button {
 
 }
 
+.confirmation-buttons.swap-buttons {
+
+    flex-direction: row-reverse;
+
+}
+
 
 
 .confirmation-true,
@@ -2592,7 +2598,7 @@ label.open {
 
     font-weight: bold;
 
-    padding: 1.2rem 3.2rem;
+    padding: 0.8rem 1.8rem;
 
     position: absolute;
 
@@ -3913,30 +3919,27 @@ table.distinction {
 
 
 
-.settings-label::before {
+.sidebar-button {
 
-    content: '';
+    display: inline-block;
 
-}
+    font-family: "Espionage", sans-serif;
 
+    letter-spacing: 0.15em;
 
-.history-label::before {
-
-    content: '';
-
-}
-
-
-.credits-label::before {
-
-    content: '';
+    text-transform: uppercase;
 
 }
 
+.settings-label::before,
+
+.history-label::before,
+
+.credits-label::before,
 
 .graph-label::before {
 
-    content: '';
+    content: none;
 
 }
 
@@ -7072,33 +7075,44 @@ textarea:focus-visible {
 }
 
 .flat-settings .settings-section .settings-section-header {
-
     display: flex !important;
-
     justify-content: center !important;
-
     cursor: default;
-
     pointer-events: none;
-
-    margin-bottom: 0.75rem;
-
-    border: none;
-
-    border-bottom: 1px solid;
-
+    padding: 0.6rem 1rem 0.8rem;
+    margin: 2rem 0 0.75rem 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
     border-radius: 0;
+    font-size: 1.25rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    opacity: 0.95;
+    position: relative;
+}
 
+.flat-settings .settings-section .settings-section-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, currentColor, transparent);
+    opacity: 0.5;
+}
+
+.flat-settings .settings-section .settings-section-header .section-icon {
+    display: none !important;
 }
 
 .flat-settings .settings-section .settings-section-header .settings-left {
-
     flex: 0 1 auto;
-
     justify-content: center;
-
-    width: 100%;
-
+    width: auto;
+    gap: 0;
 }
 
 .flat-settings .settings-section .settings-section-header .section-arrow {
@@ -7131,6 +7145,268 @@ textarea:focus-visible {
     overflow: visible !important;
 
     padding: 0.5rem 1rem !important;
+
+}
+
+
+
+/* Section Nav Bar mode - compact left-side navigation */
+
+.section-nav-bar .offcanvas-body > div {
+
+    display: flex;
+
+    flex-direction: row;
+
+    height: 100%;
+
+}
+
+.section-nav-bar .offcanvas-body {
+
+    height: 100%;
+
+}
+
+.section-nav-bar .settings-main-menu {
+
+    display: flex !important;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 52px;
+
+    min-width: 52px;
+
+    padding: 0.5rem 0;
+
+    gap: 0.35rem;
+
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+
+    flex-shrink: 0;
+
+}
+
+.section-nav-bar .settings-main-menu.hidden {
+
+    display: flex !important;
+
+}
+
+.section-nav-bar .settings-menu-btn {
+
+    padding: 0;
+
+    background: transparent;
+
+    border: none;
+
+    border-radius: 8px;
+
+    width: 44px;
+
+    height: 44px;
+
+    justify-content: center;
+
+    align-items: center;
+
+    backdrop-filter: none;
+
+    -webkit-backdrop-filter: none;
+
+}
+
+.section-nav-bar .settings-menu-btn::before {
+
+    display: none;
+
+}
+
+.section-nav-bar .settings-menu-btn:hover {
+
+    background: rgba(255, 255, 255, 0.06);
+
+    transform: none;
+
+}
+
+.section-nav-bar .settings-menu-btn:active {
+
+    transform: scale(0.92);
+
+}
+
+.section-nav-bar .settings-menu-btn .btn-icon-wrap {
+
+    width: 36px;
+
+    height: 36px;
+
+    border-radius: 6px;
+
+}
+
+.section-nav-bar .settings-menu-btn .btn-icon-wrap svg {
+
+    width: 22px;
+
+    height: 22px;
+
+}
+
+.section-nav-bar .settings-menu-btn .btn-text-wrap,
+
+.section-nav-bar .settings-menu-btn .btn-chevron {
+
+    display: none;
+
+}
+
+.section-nav-bar .settings-menu-footer {
+
+    display: none;
+
+}
+
+.section-nav-bar .settings-back-btn {
+
+    display: none !important;
+
+}
+
+.section-nav-bar .settings-section.active {
+
+    flex: 1 1 auto;
+
+    overflow-y: auto;
+
+}
+
+.section-nav-bar .settings-section.active .settings-section-header {
+
+    display: flex !important;
+
+    justify-content: center !important;
+
+    padding: 0.6rem 1rem 0.8rem;
+
+    margin: 2rem 0 0.75rem 0;
+
+    cursor: default;
+
+    pointer-events: none;
+
+    background: transparent !important;
+
+    border: none !important;
+
+    box-shadow: none !important;
+
+    border-radius: 0;
+
+    font-size: 1.25rem;
+
+    letter-spacing: 0.15em;
+
+    text-transform: uppercase;
+
+    opacity: 0.95;
+
+    position: relative;
+
+}
+
+.section-nav-bar .settings-section.active .settings-section-header .section-arrow {
+
+    display: none;
+
+}
+
+.section-nav-bar .settings-section.active .settings-section-header .section-icon {
+
+    display: none;
+
+}
+
+.section-nav-bar .settings-section.active .settings-section-header::after {
+
+    content: '';
+
+    position: absolute;
+
+    bottom: 0;
+
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    width: 100px;
+
+    height: 1px;
+
+    background: linear-gradient(90deg, transparent, currentColor, transparent);
+
+    opacity: 0.5;
+
+}
+
+.section-nav-bar .settings-section.active .settings-section-content {
+
+    padding: 1rem !important;
+
+}
+
+.section-nav-bar .settings-section.active .settings-section-header .settings-left {
+
+    flex: 0 1 auto;
+
+    justify-content: center;
+
+    width: 100%;
+
+}
+
+.section-nav-bar .settings-menu-btn[data-active] {
+
+    background: rgba(255, 255, 255, 0.08);
+
+}
+
+.light-mode .section-nav-bar .settings-main-menu {
+
+    border-right-color: rgba(0, 0, 0, 0.06);
+
+}
+
+.light-mode .section-nav-bar .settings-menu-btn:hover {
+
+    background: rgba(0, 0, 0, 0.06);
+
+}
+
+.light-mode .section-nav-bar .settings-menu-btn[data-active] {
+
+    background: rgba(0, 0, 0, 0.08);
+
+}
+
+.light-mode .section-nav-bar .settings-section.active .settings-section-header {
+
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+
+}
+
+
+
+.section-nav-bar.offcanvas {
+
+    max-width: 560px;
 
 }
 

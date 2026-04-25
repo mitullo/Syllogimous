@@ -1139,6 +1139,10 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-flat-settings').checked = appState.flatSettings;
 
+    document.getElementById('p-swap-buttons').checked = appState.swapButtons;
+
+    document.getElementById('p-nav-bar').checked = appState.navBar;
+
     document.getElementById('p-timer-anim').value = appState.timerAnimation;
 
     document.getElementById('p-font-size').value = appState.fontSize;
@@ -1180,6 +1184,10 @@ function populateAppearanceSettings() {
     applyAppearanceSettings();
 
     applyFlatSettings();
+
+    applySwapButtons();
+
+    applyNavBar();
 
     applyHideSideButtons();
 
@@ -2039,6 +2047,16 @@ function handleFlatSettingsChange(event) {
 
     appState.flatSettings = event.target.checked;
 
+    if (appState.flatSettings && appState.navBar) {
+
+        appState.navBar = false;
+
+        document.getElementById('p-nav-bar').checked = false;
+
+        applyNavBar();
+
+    }
+
     applyFlatSettings();
 
     save();
@@ -2060,6 +2078,80 @@ function applyFlatSettings() {
     } else {
 
         sidebar.classList.remove('flat-settings');
+
+    }
+
+}
+
+
+
+function handleSwapButtonsChange(event) {
+
+    appState.swapButtons = event.target.checked;
+
+    applySwapButtons();
+
+    save();
+
+}
+
+
+
+function applySwapButtons() {
+
+    const btns = document.querySelector('.confirmation-buttons');
+
+    if (!btns) return;
+
+    if (appState.swapButtons) {
+
+        btns.classList.add('swap-buttons');
+
+    } else {
+
+        btns.classList.remove('swap-buttons');
+
+    }
+
+}
+
+
+
+function handleNavBarChange(event) {
+
+    appState.navBar = event.target.checked;
+
+    if (appState.navBar && appState.flatSettings) {
+
+        appState.flatSettings = false;
+
+        document.getElementById('p-flat-settings').checked = false;
+
+        applyFlatSettings();
+
+    }
+
+    applyNavBar();
+
+    save();
+
+}
+
+
+
+function applyNavBar() {
+
+    const sidebar = document.getElementById('sidebar-settings');
+
+    if (!sidebar) return;
+
+    if (appState.navBar) {
+
+        sidebar.classList.add('section-nav-bar');
+
+    } else {
+
+        sidebar.classList.remove('section-nav-bar');
 
     }
 
@@ -2675,6 +2767,8 @@ function generateQuestion() {
 
     const banNormalModes = savedata.onlyAnalogy || savedata.onlyBinary || savedata.onlyMixedModes;
 
+
+
     if (!banNormalModes) {
 
         if (savedata.enableDistinction)
@@ -2759,7 +2853,7 @@ function generateQuestion() {
 
      savedata.enableBinary
 
-     && !savedata.onlyAnalogy
+     && (savedata.onlyBinary || !savedata.onlyAnalogy)
 
      && binaryEnable
 
@@ -2791,7 +2885,7 @@ function generateQuestion() {
 
     if (savedata.enableBinary && !binaryEnable) {
 
-        customAlert('BINARY needs at least 2 other question class (ANALOGY do not count).');
+        customAlert('BINARY needs at least 2 other question classes (ANALOGY does not count).');
 
         if (savedata.onlyBinary)
 
@@ -3978,7 +4072,9 @@ function handleKeyPress(event) {
 
         case "ArrowLeft":
 
-            checkIfTrue();
+            if (appState.swapButtons) checkIfFalse();
+
+            else checkIfTrue();
 
             break;
 
@@ -3988,7 +4084,9 @@ function handleKeyPress(event) {
 
         case "ArrowRight":
 
-            checkIfFalse();
+            if (appState.swapButtons) checkIfTrue();
+
+            else checkIfFalse();
 
             break;
 

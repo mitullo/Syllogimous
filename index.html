@@ -2812,6 +2812,42 @@
 
 								</div>
 
+								<div class="mb-1">
+
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
+										<div>
+
+											<input hidden id="p-swap-buttons" type="checkbox" onchange="handleSwapButtonsChange(event)">
+
+											<label class="switch" for="p-swap-buttons"></label>
+
+										</div>
+
+										<label for="p-swap-buttons">Swap TRUE/FALSE</label>
+
+									</div>
+
+								</div>
+
+								<div class="mb-1">
+
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
+										<div>
+
+											<input hidden id="p-nav-bar" type="checkbox" onchange="handleNavBarChange(event)">
+
+											<label class="switch" for="p-nav-bar"></label>
+
+										</div>
+
+										<label for="p-nav-bar">Navigation Bar</label>
+
+									</div>
+
+								</div>
+
 								<div class="mb-2">
 
 									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
@@ -3702,13 +3738,13 @@
 
 			</div>
 
-			<label class="open metal-gear side-btn-reveal" for="offcanvas-settings"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg><span class="sidebar-button settings-label"></span></label>
+			<label class="open metal-gear side-btn-reveal" for="offcanvas-settings"><span class="sidebar-button settings-label">SETTINGS</span></label>
 
-			<label class="open metal-gear side-btn-reveal" for="offcanvas-credits"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span class="sidebar-button credits-label"></span></label>
+			<label class="open metal-gear side-btn-reveal" for="offcanvas-credits"><span class="sidebar-button credits-label">INFO</span></label>
 
-			<label class="open metal-gear side-btn-reveal" for="offcanvas-history"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg><span class="sidebar-button history-label"></span></label>
+			<label class="open metal-gear side-btn-reveal" for="offcanvas-history"><span class="sidebar-button history-label">HISTORY</span></label>
 
-			<label id="graph-label" class="open metal-gear side-btn-reveal" for="offcanvas-graph"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg><span class="sidebar-button graph-label"></span></label>
+			<label id="graph-label" class="open metal-gear side-btn-reveal" for="offcanvas-graph"><span class="sidebar-button graph-label">GRAPH</span></label>
 
 		</div>
 
