@@ -7075,9 +7075,29 @@ textarea:focus-visible {
 
     display: flex !important;
 
+    justify-content: center !important;
+
     cursor: default;
 
     pointer-events: none;
+
+    margin-bottom: 0.75rem;
+
+    border: none;
+
+    border-bottom: 1px solid;
+
+    border-radius: 0;
+
+}
+
+.flat-settings .settings-section .settings-section-header .settings-left {
+
+    flex: 0 1 auto;
+
+    justify-content: center;
+
+    width: 100%;
 
 }
 
@@ -7090,6 +7110,10 @@ textarea:focus-visible {
 .flat-settings .settings-section .settings-section-header:hover {
 
     background: inherit;
+
+    transform: none;
+
+    box-shadow: none;
 
 }
 
