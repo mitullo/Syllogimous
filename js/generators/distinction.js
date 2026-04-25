@@ -208,6 +208,7 @@ class DistinctionQuestion {
             type: "distinction",
             startedAt: new Date().getTime(),
             buckets: this.buckets,
+            bucket: [...this.buckets[0], ...this.buckets[1]],
             premises: this.premises,
             ...(savedata.widePremises && { plen: length }),
             isValid,

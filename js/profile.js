@@ -142,10 +142,9 @@ class ProfileStore {
                 deleteButton.textContent = 'X';
                 deleteButton.addEventListener('click', (event) => {
                     event.stopPropagation();
-                    const confirmed = confirm(`Delete ${profile.name}?`);
-                    if (confirmed) {
+                    customConfirm(`Delete ${profile.name}?`, () => {
                         this.deleteProfile(index);
-                    }
+                    }, 'Delete', 'Cancel');
                 });
 
                 selectButton.appendChild(deleteButton);

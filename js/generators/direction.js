@@ -861,6 +861,7 @@ class DirectionQuestion {
             modifiers,
             startedAt: new Date().getTime(),
             wordCoordMap,
+            bucket: Object.keys(wordCoordMap),
             isValid,
             premises,
             ...(savedata.widePremises && { plen: length }),

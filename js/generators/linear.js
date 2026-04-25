@@ -558,7 +558,7 @@ class LinearQuestion {
             category: 'Analogy: ' + this.generator.getName(),
             type: normalizeString('linear'),
             startedAt: new Date().getTime(),
-            ...(this.bucket && { bucket: this.bucket }),
+            bucket: this.bucket || Object.keys(this.bucketMap || {}),
             ...(this.buckets && { buckets: this.buckets, modifiers: ['180'] }),
             premises: this.premises,
             ...(savedata.widePremises && { plen: length }),

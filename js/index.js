@@ -1,3 +1,171 @@
+// Custom modal helpers — replace native confirm() / alert()
+
+function customConfirm(message, onConfirm, confirmLabel = 'Confirm', cancelLabel = 'Cancel') {
+
+    const overlay = document.getElementById('custom-modal-overlay');
+
+    const iconEl = document.getElementById('custom-modal-icon');
+
+    const msgEl = document.getElementById('custom-modal-message');
+
+    const btnsEl = document.getElementById('custom-modal-buttons');
+
+    iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+    msgEl.textContent = message;
+
+    btnsEl.innerHTML = '';
+
+    const cancelBtn = document.createElement('button');
+
+    cancelBtn.className = 'modal-btn-cancel';
+
+    cancelBtn.textContent = cancelLabel;
+
+    cancelBtn.onclick = () => { overlay.style.display = 'none'; };
+
+    const confirmBtn = document.createElement('button');
+
+    confirmBtn.className = 'modal-btn-confirm';
+
+    confirmBtn.textContent = confirmLabel;
+
+    confirmBtn.onclick = () => { overlay.style.display = 'none'; onConfirm(); };
+
+    btnsEl.appendChild(cancelBtn);
+
+    btnsEl.appendChild(confirmBtn);
+
+    overlay.style.display = 'flex';
+
+}
+
+
+
+function customAlert(message, okLabel = 'OK') {
+
+    const overlay = document.getElementById('custom-modal-overlay');
+
+    const iconEl = document.getElementById('custom-modal-icon');
+
+    const msgEl = document.getElementById('custom-modal-message');
+
+    const btnsEl = document.getElementById('custom-modal-buttons');
+
+    iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+    msgEl.textContent = message;
+
+    btnsEl.innerHTML = '';
+
+    const okBtn = document.createElement('button');
+
+    okBtn.className = 'modal-btn-ok';
+
+    okBtn.textContent = okLabel;
+
+    okBtn.onclick = () => { overlay.style.display = 'none'; };
+
+    btnsEl.appendChild(okBtn);
+
+    overlay.style.display = 'flex';
+
+}
+
+
+
+function updateGamemodeEmptyState() {
+
+    const emptyEl = document.getElementById('gamemode-empty');
+
+    const gameArea = document.getElementById('game-area');
+
+    if (!emptyEl || !gameArea) return;
+
+    const anyActive = savedata.enableDistinction || savedata.enableLinear || savedata.enableDirection ||
+
+        savedata.enableDirection3D || savedata.enableDirection4D || savedata.enableDirection5D ||
+
+        savedata.enableDirection6D || savedata.enableSyllogism || savedata.enableAnalogy ||
+
+        savedata.enableBinary || savedata.enableNestedBinary;
+
+    if (anyActive) {
+
+        emptyEl.style.display = 'none';
+
+        for (const child of gameArea.children) {
+
+            if (child !== emptyEl) child.style.display = '';
+
+        }
+
+    } else {
+
+        emptyEl.style.display = 'flex';
+
+        for (const child of gameArea.children) {
+
+            if (child !== emptyEl) child.style.display = 'none';
+
+        }
+
+    }
+
+}
+
+
+
+function filterSection(input) {
+
+    const query = input.value.trim().toLowerCase();
+
+    const content = input.closest('.settings-section-content');
+
+    if (!content) return;
+
+    const items = content.querySelectorAll('.mb-1, .mb-2, .folder, hr.divider');
+
+
+
+    if (!query) {
+
+        items.forEach(el => el.style.display = '');
+
+        return;
+
+    }
+
+
+
+    items.forEach(el => {
+
+        if (el.classList.contains('divider')) {
+
+            el.style.display = 'none';
+
+            return;
+
+        }
+
+        const text = el.textContent.toLowerCase();
+
+        if (text.includes(query)) {
+
+            el.style.display = '';
+
+        } else {
+
+            el.style.display = 'none';
+
+        }
+
+    });
+
+}
+
+
+
 // Get rid of all the PWA stuff
 
 if ('serviceWorker' in navigator)
@@ -351,6 +519,8 @@ function load() {
 
     populateSettings();
 
+    updateGamemodeEmptyState();
+
 }
 
 
@@ -428,6 +598,8 @@ function refresh() {
     save();
 
     populateSettings();
+
+    updateGamemodeEmptyState();
 
     init();
 
@@ -965,15 +1137,17 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-dark-mode').checked = appState.darkMode;
 
+    document.getElementById('p-flat-settings').checked = appState.flatSettings;
+
     document.getElementById('p-timer-anim').value = appState.timerAnimation;
 
     document.getElementById('p-font-size').value = appState.fontSize;
 
     document.getElementById('p-density').value = appState.uiDensity;
 
-    document.getElementById('p-bracket-color').value = appState.bracketColor || '#217fe4';
+    document.getElementById('p-bracket-color').value = appState.bracketColor || '#3377ff';
 
-    document.getElementById('p-bracket-color-picker').value = appState.bracketColor || '#217fe4';
+    document.getElementById('p-bracket-color-picker').value = appState.bracketColor || '#3377ff';
 
     document.getElementById('p-color-words').checked = appState.colorWords;
 
@@ -995,13 +1169,22 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-button-style').value = appState.buttonStyle;
 
+    document.getElementById('p-premise-font').value = appState.premiseFont || 'default';
+
     document.getElementById('p-score-mode').value = appState.scoreMode || 'net';
 
     document.getElementById('p-hide-side-buttons').checked = appState.hideSideButtons || false;
 
+    document.getElementById('p-71').value = appState.stimulusSize || 'normal';
+
     applyAppearanceSettings();
 
+    applyFlatSettings();
+
     applyHideSideButtons();
+
+    // Sync palette button highlights with saved theme color
+    syncPaletteHighlights();
 
 }
 
@@ -1155,6 +1338,121 @@ function handlePresetColorClick(button) {
 
 }
 
+const PALETTE_COLORS = {
+    red: '#f42536',
+    orange: '#f97a1f',
+    yellow: '#f9ce1f',
+    green: '#18dc6a',
+    blue: '#3377ff',
+    indigo: '#7e47eb',
+    violet: '#bf4de6'
+};
+
+const PALETTE_HUES = {
+    red: 0,
+    orange: 25,
+    yellow: 48,
+    green: 145,
+    blue: 220,
+    indigo: 255,
+    violet: 285
+};
+
+function handlePaletteChange(palette) {
+    const color = PALETTE_COLORS[palette] || '#3377ff';
+    const hue = PALETTE_HUES[palette] || 220;
+    document.getElementById('p-bracket-color').value = color;
+    document.getElementById('p-bracket-color-picker').value = color;
+    appState.bracketColor = color;
+    // Immediately set CSS variables to ensure change is visible
+    const root = document.documentElement;
+    root.style.setProperty('--theme-color', color);
+    root.style.setProperty('--accent-h', hue);
+    root.style.setProperty('--accent-color', color);
+    // Highlight selected palette button
+    document.querySelectorAll('#palette-picker button').forEach(btn => {
+        btn.style.border = '2px solid transparent';
+        btn.style.transform = 'scale(1)';
+    });
+    const selected = document.querySelector(`#palette-picker button[data-palette="${palette}"]`);
+    if (selected) {
+        selected.style.border = '2px solid #fff';
+        selected.style.transform = 'scale(1.2)';
+    }
+    applyAppearanceSettings();
+    save();
+}
+
+const CONCLUSION_PALETTE_COLORS = {
+    white: '#ffffff',
+    red: '#f42536',
+    orange: '#f97a1f',
+    yellow: '#f9ce1f',
+    green: '#18dc6a',
+    blue: '#3377ff',
+    indigo: '#7e47eb',
+    violet: '#bf4de6'
+};
+
+function handleConclusionPaletteChange(palette) {
+    const color = CONCLUSION_PALETTE_COLORS[palette] || '#ffffff';
+    document.getElementById('p-conclusion-color').value = color;
+    document.getElementById('p-conclusion-color-picker').value = color;
+    appState.conclusionColor = color;
+    // Highlight selected palette button
+    document.querySelectorAll('#conclusion-palette-picker button').forEach(btn => {
+        btn.style.border = '2px solid transparent';
+        btn.style.transform = 'scale(1)';
+    });
+    const selected = document.querySelector(`#conclusion-palette-picker button[data-conclusion-palette="${palette}"]`);
+    if (selected) {
+        selected.style.border = '2px solid #fff';
+        selected.style.transform = 'scale(1.2)';
+    }
+    applyAppearanceSettings();
+    save();
+}
+
+function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function syncPaletteHighlights() {
+    // Sync theme palette
+    const themeColor = (appState.bracketColor || '#3377ff').toLowerCase();
+    document.querySelectorAll('#palette-picker button').forEach(btn => {
+        const palette = btn.getAttribute('data-palette');
+        const color = PALETTE_COLORS[palette];
+        if (color && color.toLowerCase() === themeColor) {
+            btn.style.border = '2px solid #fff';
+            btn.style.transform = 'scale(1.2)';
+        } else {
+            btn.style.border = '2px solid transparent';
+            btn.style.transform = 'scale(1)';
+        }
+    });
+    // Sync conclusion palette
+    const conclusionColor = (appState.conclusionColor || '#ffffff').toLowerCase();
+    document.querySelectorAll('#conclusion-palette-picker button').forEach(btn => {
+        const palette = btn.getAttribute('data-conclusion-palette');
+        const color = CONCLUSION_PALETTE_COLORS[palette];
+        if (color && color.toLowerCase() === conclusionColor) {
+            btn.style.border = '2px solid #fff';
+            btn.style.transform = 'scale(1.2)';
+        } else {
+            btn.style.border = '2px solid transparent';
+            btn.style.transform = 'scale(1)';
+        }
+    });
+}
+
 
 
 function handleBracketColorChange(event) {
@@ -1216,6 +1514,30 @@ function handleColorTimerChange(event) {
 function handleButtonStyleChange(event) {
 
     appState.buttonStyle = event.target.value;
+
+    applyAppearanceSettings();
+
+    save();
+
+}
+
+
+
+function handlePremiseFontChange(event) {
+
+    appState.premiseFont = event.target.value;
+
+    applyAppearanceSettings();
+
+    save();
+
+}
+
+
+
+function handleStimulusSizeChange(event) {
+
+    appState.stimulusSize = event.target.value;
 
     applyAppearanceSettings();
 
@@ -1507,7 +1829,7 @@ function applyAppearanceSettings() {
 
     // Theme color - sets glow, borders, buttons, and bracket colors
 
-    const themeColor = appState.bracketColor || '#217fe4';
+    const themeColor = appState.bracketColor || '#3377ff';
 
     root.style.setProperty('--theme-color', themeColor);
 
@@ -1560,6 +1882,18 @@ function applyAppearanceSettings() {
     root.style.setProperty('--accent-gear-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`);
 
     root.style.setProperty('--accent-gear-bg-strong', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)`);
+
+    // Compute hue for body background gradients
+    const rN = rgb.r / 255, gN = rgb.g / 255, bN = rgb.b / 255;
+    const max = Math.max(rN, gN, bN), min = Math.min(rN, gN, bN);
+    let h = 0;
+    if (max !== min) {
+        const d = max - min;
+        if (max === rN) h = ((gN - bN) / d + (gN < bN ? 6 : 0)) / 6;
+        else if (max === gN) h = ((bN - rN) / d + 2) / 6;
+        else h = ((rN - gN) / d + 4) / 6;
+    }
+    root.style.setProperty('--accent-h', Math.round(h * 360));
 
     
 
@@ -1641,6 +1975,26 @@ function applyAppearanceSettings() {
 
     }
 
+
+
+    // Premise font
+
+    document.body.classList.remove('premise-mono');
+
+    if (appState.premiseFont === 'mono') {
+
+        document.body.classList.add('premise-mono');
+
+    }
+
+
+
+    // Stimulus size (emoji, voronoi, topo)
+
+    const stimulusSizes = { small: '0.85em', normal: '1.125em', large: '1.5em', huge: '2em' };
+
+    root.style.setProperty('--stimulus-size', stimulusSizes[appState.stimulusSize] || '1.125em');
+
 }
 
 
@@ -1676,6 +2030,38 @@ function handleDarkModeChange(event) {
     appState.darkMode = isDarkMode;
 
     refresh();
+
+}
+
+
+
+function handleFlatSettingsChange(event) {
+
+    appState.flatSettings = event.target.checked;
+
+    applyFlatSettings();
+
+    save();
+
+}
+
+
+
+function applyFlatSettings() {
+
+    const sidebar = document.getElementById('sidebar-settings');
+
+    if (!sidebar) return;
+
+    if (appState.flatSettings) {
+
+        sidebar.classList.add('flat-settings');
+
+    } else {
+
+        sidebar.classList.remove('flat-settings');
+
+    }
 
 }
 
@@ -2393,7 +2779,7 @@ function generateQuestion() {
 
     if (savedata.enableAnalogy && !analogyEnable) {
 
-        alert('ANALOGY needs at least 1 other question class (SYLLOGISM and BINARY do not count).');
+        customAlert('ANALOGY needs at least 1 other question class (SYLLOGISM and BINARY do not count).');
 
         if (savedata.onlyAnalogy)
 
@@ -2405,7 +2791,7 @@ function generateQuestion() {
 
     if (savedata.enableBinary && !binaryEnable) {
 
-        alert('BINARY needs at least 2 other question class (ANALOGY do not count).');
+        customAlert('BINARY needs at least 2 other question class (ANALOGY do not count).');
 
         if (savedata.onlyBinary)
 
@@ -3025,9 +3411,7 @@ function timeElapsed() {
 
 function resetApp() {
 
-    const confirmed = confirm("Are you sure?");
-
-    if (confirmed) {
+    customConfirm("Are you sure you want to reset? This cannot be undone.", () => {
 
         localStorage.removeItem(oldSettingsKey);
 
@@ -3047,7 +3431,7 @@ function resetApp() {
 
         });
 
-    }
+    }, 'Reset', 'Cancel');
 
 }
 
@@ -3055,9 +3439,7 @@ function resetApp() {
 
 function clearHistory() {
 
-    const confirmed = confirm("Are you sure? (does not remove progress graph history)");
-
-    if (confirmed) {
+    customConfirm("Clear session history? (does not remove progress graph history)", () => {
 
         appState.questions = [];
 
@@ -3067,7 +3449,7 @@ function clearHistory() {
 
         renderHQL();
 
-    }
+    }, 'Clear', 'Cancel');
 
 }
 
@@ -3085,9 +3467,9 @@ function deleteQuestion(i, isRight) {
 
 }
 
-
-
 function renderHQL(didAddSingleQuestion=false) {
+
+    const emptyEl = document.getElementById('history-empty');
 
     if (didAddSingleQuestion) {
 
@@ -3099,10 +3481,12 @@ function renderHQL(didAddSingleQuestion=false) {
 
         historyList.insertBefore(createHQLI(recentQuestion, index), firstChild);
 
+        // Hide empty state placeholder
+        if (emptyEl) emptyEl.style.display = 'none';
+
     } else {
 
         historyList.innerHTML = "";
-
 
 
         const len = appState.questions.length;
@@ -3122,6 +3506,9 @@ function renderHQL(didAddSingleQuestion=false) {
             })
 
             .forEach(el => historyList.appendChild(el));
+
+        // Show/hide empty state based on whether there are questions
+        if (emptyEl) emptyEl.style.display = len > 0 ? 'none' : 'flex';
 
     }
 
@@ -3241,7 +3628,7 @@ function createHQLI(question, i) {
 
     const htmlPremises = q.premises
 
-        .map(p => `<div class="hqli-premise">${p}</div>`)
+        .map(p => `<div class="hqli-premise" style="margin-bottom:0.4rem">${p}</div>`)
 
         .join("\n");
 

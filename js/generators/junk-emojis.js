@@ -267,6 +267,9 @@ function renderJunkEmojisText(text, pattern = null) {
         return REUSABLE_SVGS[id];
     });
 
+    // Wrap Unicode emoji characters in span.emoji for stimulus size control
+    text = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]\uFE0F?/gu, m => `<span class="emoji">${m}</span>`);
+
     return text;
 }
 

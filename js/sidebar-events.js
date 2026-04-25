@@ -4,6 +4,10 @@
 function openSettingsSection(sectionId) {
     console.log('Opening section:', sectionId);   // for debugging
 
+    // In flat mode, no navigation needed
+    const sidebar = document.getElementById('sidebar-settings');
+    if (sidebar && sidebar.classList.contains('flat-settings')) return;
+
     // Hide main menu
     const mainMenu = document.querySelector('.settings-main-menu');
     if (mainMenu) mainMenu.classList.add('hidden');

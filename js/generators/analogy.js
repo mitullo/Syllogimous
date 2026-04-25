@@ -1,3 +1,47 @@
+function invertAnalogyConclusion(conclusion, isValid) {
+    // Find all subject spans: first two are (a, b), last two are (c, d)
+    // Randomly invert either the first pair or the second pair
+    const subjects = [...conclusion.matchAll(/<span class="subject">(.*?)<\/span>/g)];
+    if (subjects.length < 4) return { conclusion, isValid };
+
+    const invertedStyle = ' style="color: #e84057;"';
+    const invertFirstPair = coinFlip(); // randomly choose which pair to invert
+
+    let result = conclusion;
+    let flipValidity = true;
+
+    if (invertFirstPair) {
+        // Swap a and b (first pair)
+        const aMatch = subjects[0];
+        const bMatch = subjects[1];
+        const aText = aMatch[1];
+        const bText = bMatch[1];
+        const bReplacement = `<span class="subject"${invertedStyle}>${aText}</span>`;
+        const aReplacement = `<span class="subject"${invertedStyle}>${bText}</span>`;
+        // Replace from end to preserve indices
+        result = result.substring(0, bMatch.index) + bReplacement + result.substring(bMatch.index + bMatch[0].length);
+        result = result.substring(0, aMatch.index) + aReplacement + result.substring(aMatch.index + aMatch[0].length);
+    } else {
+        // Swap c and d (second pair)
+        const cMatch = subjects[2];
+        const dMatch = subjects[3];
+        const cText = cMatch[1];
+        const dText = dMatch[1];
+        const dReplacement = `<span class="subject"${invertedStyle}>${cText}</span>`;
+        const cReplacement = `<span class="subject"${invertedStyle}>${dText}</span>`;
+        result = result.substring(0, dMatch.index) + dReplacement + result.substring(dMatch.index + dMatch[0].length);
+        result = result.substring(0, cMatch.index) + cReplacement + result.substring(cMatch.index + cMatch[0].length);
+    }
+
+    return { conclusion: result, isValid: !isValid };
+}
+
+function shouldInvertAnalogy() {
+    if (!savedata.invertAnalogyConclusion) return false;
+    const freq = savedata.invertAnalogyConclusionFreq || 50;
+    return Math.random() * 100 < freq;
+}
+
 function pickAnalogyStatementSameTwoOptions() {
     return pickNegatable([
         '<div class="analogy-statement">is the same as</div>',
@@ -69,6 +113,14 @@ class AnalogyQuestion {
         }
 
         let question = g.question.createAnalogy(Math.max(g.premiseCount + premiseOffset, 3));
+
+        // Invert conclusion pair if option is enabled (frequency-based)
+        if (shouldInvertAnalogy() && question.conclusion) {
+            const inverted = invertAnalogyConclusion(question.conclusion, question.isValid);
+            question.conclusion = inverted.conclusion;
+            question.isValid = inverted.isValid;
+        }
+
         question.plen = g.premiseCount;
         question.tlen = question.countdown || savedata.timer;
         question.tags = ['analogy'];
@@ -132,10 +184,16 @@ class AnalogyQuestion {
 
                 const [indexOfA, indexOfB] = [sourceBucket.indexOf(a), sourceBucket.indexOf(b)];
                 const [indexOfC, indexOfD] = [sourceBucket.indexOf(c), sourceBucket.indexOf(d)];
-                const isValidSame =
+                let isValidSame =
                     (indexOfA > indexOfB && indexOfC > indexOfD) ||
                     (indexOfA < indexOfB && indexOfC < indexOfD) ||
                     (indexOfA === indexOfB && indexOfC === indexOfD);
+
+                // Invert: randomly pick a pair, flip isValidSame
+                const doInvert = shouldInvertAnalogy();
+                const invertFirst = doInvert && coinFlip();
+                const invertSecond = doInvert && !invertFirst;
+                if (doInvert) isValidSame = !isValidSame;
 
                 let conclusion = analogyTo(a, b);
                 let conclusionIsValid;
@@ -148,7 +206,21 @@ class AnalogyQuestion {
                     conclusionIsValid = !isValidSame;
                 }
 
-                conclusion += analogyTo(c, d);
+                if (invertFirst) {
+                    conclusion += analogyTo(c, d);
+                } else if (invertSecond) {
+                    conclusion += `<span class="subject" style="color: #e84057;">${d}</span> to <span class="subject" style="color: #e84057;">${c}</span>`;
+                } else {
+                    conclusion += analogyTo(c, d);
+                }
+
+                // Re-wrap first pair with red if inverted
+                if (invertFirst) {
+                    conclusion = conclusion.replace(
+                        `<span class="subject">${a}</span> to <span class="subject">${b}</span>`,
+                        `<span class="subject" style="color: #e84057;">${b}</span> to <span class="subject" style="color: #e84057;">${a}</span>`
+                    );
+                }
 
                 conclusionsArr.push({
                     conclusion,

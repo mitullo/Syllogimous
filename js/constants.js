@@ -34,6 +34,8 @@ let appState = {
 
     "darkMode": true,
 
+    "flatSettings": false,
+
     "timerAnimation": "stepEaseOut",
 
     "fontSize": "normal",
@@ -48,7 +50,7 @@ let appState = {
 
     "timeBonusPerConclusion": 3,
 
-    "bracketColor": "#217fe4",
+    "bracketColor": "#3377ff",
 
     "colorWords": false,
 
@@ -69,6 +71,8 @@ let appState = {
     "scoreMode": "correct",
 
     "hideSideButtons": false,
+
+    "stimulusSize": "normal",
 
 };
 
@@ -91,6 +95,10 @@ let savedata = {
     "enableSyllogism": false,
 
     "enableAnalogy": false,
+
+    "invertAnalogyConclusion": false,
+
+    "invertAnalogyConclusionFreq": 50,
 
     "enableDirection": true,
 
@@ -625,6 +633,8 @@ const keySettingMap = {
     "p-4-premises": "offsetAnalogyPremises",
     "p-4-time": "offsetAnalogyTime",
     "p-4-scramble": "overrideAnalogyScramble",
+    "p-4-invert": "invertAnalogyConclusion",
+    "p-4-invert-freq": "invertAnalogyConclusionFreq",
     "p-5": "premises",
     "p-6": "enableDirection",
     "p-6-premises": "overrideDirectionPremises",
@@ -693,6 +703,7 @@ const keySettingMap = {
     "p-38": "useVisualNoise",
     "p-39": "visualNoiseSplits",
     "p-70": "useTopo",
+    "p-71": "stimulusSize",
     "p-40": "enableTransformInterleave",
     "p-41": "autoProgression",
     "p-42": "autoProgressionGoal",

@@ -136,7 +136,7 @@ class TopoMap {
     static buildAngles(mixedSeed, count) {
         const rnd = seededRandom(TopoMap.mix32(mixedSeed) ^ 0x2f6b2e1d);
         const rot0 = rnd() * Math.PI * 2;
-        const irregular = 0.35 + rnd() * 0.35;
+        const irregular = 0.45 + rnd() * 0.45;
         const angles = [];
         for (let j = 0; j < count; j++) {
             angles.push(rot0 + (j / count) * Math.PI * 2 + (rnd() - 0.5) * irregular);
@@ -147,10 +147,10 @@ class TopoMap {
     static blobRing(cx, cy, angles, meanR, layerSeed, depth01) {
         const rnd = seededRandom(TopoMap.mix32(layerSeed));
         const pts = [];
-        const wobble = 0.55 * (0.5 + 0.5 * (1 - depth01));
+        const wobble = 0.7 * (0.5 + 0.5 * (1 - depth01));
         for (let j = 0; j < angles.length; j++) {
-            const t = angles[j] + (rnd() - 0.5) * (0.18 + 0.22 * (1 - depth01));
-            const rr = meanR * (0.65 + rnd() * wobble);
+            const t = angles[j] + (rnd() - 0.5) * (0.25 + 0.3 * (1 - depth01));
+            const rr = meanR * (0.55 + rnd() * wobble);
             pts.push([cx + Math.cos(t) * rr, cy + Math.sin(t) * rr]);
         }
         return pts;
@@ -205,9 +205,7 @@ class TopoMap {
         const H = 50;
         const mixed = TopoMap.mix32(seed);
         const raw = splits | 0;
-        const maxPaletteBands = 35;
-        // More depth: higher base layers, up to 35
-        const numLayers = Math.max(12, Math.min(maxPaletteBands, Math.min(50, raw || 18)));
+        const numLayers = Math.max(12, Math.min(40, Math.min(50, raw || 20)));
         const nVerts = 11 + (mixed % 9);
         const domKey = `t${(++TopoMap._domSeq).toString(36)}${mixed.toString(16)}`;
         const clipId = `tc-${domKey}`;
@@ -215,36 +213,49 @@ class TopoMap {
 
         const palette = TopoMap.pickPaletteExcluding(mixed, excludePalettes);
 
-        // More variation: -3 to +12 bias toward more layers
         const layerVaryRnd = seededRandom(mixed ^ 0x5a5a5a5a);
-        const actualLayers = Math.max(12, Math.min(maxPaletteBands,
-            numLayers + Math.floor(layerVaryRnd() * 15) - 3));
+        const actualLayers = Math.max(12, Math.min(40,
+            numLayers + Math.floor(layerVaryRnd() * 14) - 3));
+
+        const baseColor = palette[palette.length - 1];
 
         let paths = "";
-        const maxR = 60 + (TopoMap.mix32(seed + 99) % 20);
-        const minR = 2 + (TopoMap.mix32(seed + 7) % 6);
+        // Outer contours extend well beyond the 50×50 viewBox for dramatic mountain effect
+        const maxR = 100 + (TopoMap.mix32(seed + 99) % 50);
+        const minR = 2 + (TopoMap.mix32(seed + 7) % 3);
+
+        // Shared peak center with slight per-layer drift (concentric contours)
+        const peakRnd = seededRandom(mixed ^ 0x3c3c3c3c);
+        const peakX = 20 + peakRnd() * 10;
+        const peakY = 20 + peakRnd() * 10;
+
+        // Generate all contour shapes first
+        const contours = [];
         for (let L = 0; L < actualLayers; L++) {
             const layerMixed = TopoMap.mix32(seed + L * 0x85ebca6b);
             const rndL = seededRandom(layerMixed);
             const depth = L / Math.max(1, actualLayers - 1);
             const meanR = (maxR * (1 - depth) + minR * depth) * (0.93 + (rndL() - 0.5) * 0.12);
-            // Full canvas jitter - inner layer can spawn anywhere, even on edges
-            const edgePadding = 5;
-            const jitterRange = 50 - edgePadding * 2;
-            const cx = edgePadding + rndL() * jitterRange;
-            const cy = edgePadding + rndL() * jitterRange;
+            // Slight drift from peak center — outer layers drift more
+            const drift = 3 + depth * 5;
+            const cx = peakX + (rndL() - 0.5) * drift;
+            const cy = peakY + (rndL() - 0.5) * drift;
             const angles = TopoMap.buildAngles(seed + L * 0x9e3779b1, nVerts);
             const pts = TopoMap.blobRing(cx, cy, angles, meanR, seed + L * 10007 + 0x51bace, depth);
             const d = TopoMap.smoothClosedQuadraticPath(pts);
             if (!d) continue;
             const fill = TopoMap.colorForLayer(palette, L, actualLayers);
-            paths += `<path d="${d}" fill="${fill}" stroke="#000000" stroke-width="0.8"></path>`;
+            contours.push({ d, fill, depth, L });
         }
 
-        const bg = palette[palette.length - 1];
+        // Render: each contour band drawn with fill + black stroke (outermost first)
+        for (const c of contours) {
+            paths += `<path d="${c.d}" fill="${c.fill}" stroke="#000000" stroke-width="0.8" stroke-linejoin="round"/>`;
+        }
+
         return `<svg id="${svgId}" class="noise topo topo-stimulus" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
             + `<defs><clipPath id="${clipId}"><rect width="${W}" height="${H}"></rect></clipPath></defs>`
-            + `<rect width="${W}" height="${H}" fill="${bg}"></rect>`
+            + `<rect width="${W}" height="${H}" fill="${baseColor}"></rect>`
             + `<g clip-path="url(#${clipId})">${paths}</g></svg>`;
     }
 }
