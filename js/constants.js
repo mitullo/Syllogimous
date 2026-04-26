@@ -38,6 +38,10 @@ let appState = {
 
     "swapButtons": false,
 
+    "dynamicSwapButtons": false,
+
+    "cyanPreset": false,
+
     "navBar": false,
 
     "timerAnimation": "stepEaseOut",
@@ -178,6 +182,10 @@ let savedata = {
 
     "overrideAnchorSpacePremises": null,
 
+    "overrideMultiDim5DPremises": null,
+
+    "overrideMultiDim6DPremises": null,
+
     "overrideDistinctionTime": null,
 
     "overrideLinearTime": null,
@@ -195,6 +203,10 @@ let savedata = {
     "overrideDirection4DTime": null,
 
     "overrideAnchorSpaceTime": null,
+
+    "overrideMultiDim5DTime": null,
+
+    "overrideMultiDim6DTime": null,
 
     "overrideDistinctionWeight": 150,
 
@@ -228,6 +240,10 @@ let savedata = {
 
     "overrideAnchorSpaceV2Weight": 100,
 
+    "overrideSpace5DScramble": null,
+
+    "overrideSpace6DScramble": null,
+
     "useJunkEmoji": false,
 
     "useVisualNoise": false,
@@ -245,6 +261,8 @@ let savedata = {
     "space5DHardModeLevel": 0,
 
     "space6DHardModeLevel": 0,
+
+    "binaryHardModeLevel": 0,
 
     "anchorSpaceHardModeLevel": 0,
 
@@ -325,6 +343,12 @@ let savedata = {
     "enableStimulusSets": false,
 
     "stimulusSetSize": 2,
+
+    "enableDoubleDistance": false,
+
+    "doubleDistanceFrequency": 100,
+
+    "enableDoubleDistanceConclusions": false,
 
 };
 
@@ -517,6 +541,8 @@ const compressedSettings = {
     "space5DHardModeLevel": "transform5D",
 
     "space6DHardModeLevel": "transform6D",
+
+    "binaryHardModeLevel": "transformBinary",
 
     "anchorSpaceHardModeLevel": "ancTfm",
 
@@ -760,6 +786,10 @@ const keySettingMap = {
     "p-69": "autoProgressionTimeBump",
     "p-stim-sets": "enableStimulusSets",
     "p-stim-set-size": "stimulusSetSize",
+    "p-double-distance": "enableDoubleDistance",
+    "p-double-distance-freq": "doubleDistanceFrequency",
+    "p-double-distance-conclusions": "enableDoubleDistanceConclusions",
+    "p-binary-transform": "binaryHardModeLevel",
 };
 
 
@@ -8934,27 +8964,44 @@ const dirCoords = [
 
 
 
+const repeatDirectionWord = (word, count) => {
+    const c = Math.abs(count);
+    if (c <= 1) return [word];
+    const superscripts = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+    const supStr = String(c).split('').map(d => superscripts[d] || d).join('');
+    return [word + supStr];
+};
+
+
+
 const dirString = (x, y, z) => {
 
-    let str = '';
+    let parts = [];
 
-    if (z === 1) str = 'Above';
+    if (z) parts.push(...repeatDirectionWord(z > 0 ? 'Above' : 'Below', z));
 
-    if (z === -1) str = 'Below';
+    let xyParts = [];
+    const xWord = x > 0 ? 'East' : 'West';
+    const yWord = y > 0 ? 'North' : 'South';
+    const diagonalCount = Math.min(Math.abs(x || 0), Math.abs(y || 0));
 
-    if (z && (x || y)) str += ' and ';
+    if (diagonalCount > 0) {
+        xyParts.push(...repeatDirectionWord(`${yWord}-${xWord}`, diagonalCount));
+    }
 
-    if (y === 1) str += 'North';
+    if (Math.abs(y || 0) > diagonalCount) {
+        xyParts.push(...repeatDirectionWord(yWord, Math.abs(y) - diagonalCount));
+    }
 
-    if (y === -1) str += 'South';
+    if (Math.abs(x || 0) > diagonalCount) {
+        xyParts.push(...repeatDirectionWord(xWord, Math.abs(x) - diagonalCount));
+    }
 
-    if (y && x) str += '-';
+    if (parts.length > 0 && xyParts.length > 0) {
+        return `${parts.join(' + ')} and ${xyParts.join(' + ')}`;
+    }
 
-    if (x === 1) str += 'East';
-
-    if (x === -1) str += 'West';
-
-    return str;
+    return [...parts, ...xyParts].join(' + ');
 
 }
 
@@ -8992,7 +9039,26 @@ function twoDToArrow(coord) {
 
 
 
-    return arrowMap[coord.slice(0, 2).join(",")] || '<i class="ci-Wifi_None"></i>';
+    const [x, y] = coord.slice(0, 2);
+    if (!x && !y) return '<i class="ci-Wifi_None"></i>';
+    const xSign = x === 0 ? 0 : x / Math.abs(x);
+    const ySign = y === 0 ? 0 : y / Math.abs(y);
+    const diagonalCount = Math.min(Math.abs(x || 0), Math.abs(y || 0));
+    const pieces = [];
+
+    for (let i = 0; i < diagonalCount; i++) {
+        pieces.push(arrowMap[[xSign, ySign].join(",")]);
+    }
+
+    for (let i = 0; i < Math.abs(y || 0) - diagonalCount; i++) {
+        pieces.push(arrowMap[[0, ySign].join(",")]);
+    }
+
+    for (let i = 0; i < Math.abs(x || 0) - diagonalCount; i++) {
+        pieces.push(arrowMap[[xSign, 0].join(",")]);
+    }
+
+    return pieces.join('') || '<i class="ci-Wifi_None"></i>';
 
 }
 
@@ -9008,13 +9074,13 @@ function threeDToTriangle(coord) {
 
 
 
-    if (coord[2] === 1) {
+    if (coord[2] > 0) {
 
-        return '▼';
+        return Array(coord[2]).fill('▼').join('');
 
-    } else if (coord[2] === -1) {
+    } else if (coord[2] < 0) {
 
-        return '▲';
+        return Array(Math.abs(coord[2])).fill('▲').join('');
 
     } else {
 

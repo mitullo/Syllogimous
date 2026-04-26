@@ -1366,15 +1366,15 @@
 
 										</div>
 
-										<label for="p-13-5d">Enable 5D (Space + Time layers)</label>
+										<label for="p-13-5d">Enable 5D (Space + Time + Quantity)</label>
 
 									</div>
 
 									<ul class="explainer">
 
-										<li>A is South of B and was before B</li>
+										<li>A is South of B, was before B, and has more than B</li>
 
-										<li>Spatial + Temporal relation layers</li>
+										<li>Spatial + Temporal + Quantity layers</li>
 
 									</ul>
 
@@ -1448,15 +1448,15 @@
 
 										</div>
 
-										<label for="p-13-6d">Enable 6D (Space + Time + Quantity)</label>
+										<label for="p-13-6d">Enable 6D (Space + Time + Quantity + Membership)</label>
 
 									</div>
 
 									<ul class="explainer">
 
-										<li>A is South of B, was before B, and has more than B</li>
+										<li>A is South of B, was before B, has more than B, and contains B</li>
 
-										<li>Spatial + Temporal + Comparative layers</li>
+										<li>Spatial + Temporal + Comparative + Membership layers</li>
 
 									</ul>
 
@@ -1744,6 +1744,64 @@
 												</div>
 
 											</span>
+
+										</div>
+
+									</div>
+
+									<div class="mb-1">
+
+										<div class="ctrl__inner">
+
+											<div>
+
+												<input hidden id="p-double-distance" type="checkbox">
+
+												<label class="switch" for="p-double-distance"></label>
+
+											</div>
+
+											<label for="p-double-distance">Double Distance Directions</label>
+
+											<span class="tooltip-container" tabindex="0">?
+
+												<div class="tooltip-text pos-left-150">
+
+													Allows directions to span 2 positions<br>
+
+													instead of just 1<br>
+
+													<br>
+
+													Example: "west west" instead of "west"<br>
+
+													(2 spots west instead of 1 spot west)
+
+												</div>
+
+											</span>
+
+										</div>
+
+										<div class="sub-option">
+
+											<label for="p-double-distance-freq">Frequency %</label>
+
+											<input id="p-double-distance-freq" type="number" min="0" max="100" step="5" style="width: 4em;">
+
+										</div>
+
+										<div class="sub-option">
+
+											<div>
+
+												<input hidden id="p-double-distance-conclusions" type="checkbox">
+
+												<label class="switch" for="p-double-distance-conclusions"></label>
+
+											</div>
+
+											<label for="p-double-distance-conclusions">Double Distance Conclusions</label>
 
 										</div>
 
@@ -2710,11 +2768,19 @@
 
 										<div class="multi-input mt-05">
 
-											<span class="single-input" style="flex: 0 0 100%;">
+											<span class="single-input">
 
 												Scramble
 
 												<span class="inline-premise-spinner"><input id="p-7-scramble" type="number" placeholder="" min="0" max="100" value="" style="width: 4ch">%</span>
+
+											</span>
+
+											<span class="single-input shrink">
+
+												Transforms
+
+												<span class="inline-premise-spinner"><input id="p-binary-transform" type="number" min="0" max="10" value="0" style="width: 4ch">lvl</span>
 
 											</span>
 
@@ -2792,6 +2858,26 @@
 
 									</div>
 
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
+										<div>
+
+											<input hidden id="p-cyan-preset" type="checkbox" onchange="applyCyanPreset()">
+
+											<label class="switch" for="p-cyan-preset"></label>
+
+										</div>
+
+										<label for="p-cyan-preset">Cyan Theme</label>
+
+										<span class="tooltip-container" tabindex="0">?
+											<div class="tooltip-text" style="bottom: 125%; left: 50%; transform: translateX(-90%); white-space: normal; width: 360px; text-align: center;">
+												Low-saturation cyan backgrounds enhance working memory performance (fNIRS study).
+											</div>
+										</span>
+
+									</div>
+
 								</div>
 
 								<div class="mb-1">
@@ -2825,6 +2911,20 @@
 										</div>
 
 										<label for="p-swap-buttons">Swap TRUE/FALSE</label>
+
+									</div>
+
+									<div class="sub-option">
+
+										<div>
+
+											<input hidden id="p-dynamic-swap" type="checkbox" onchange="handleDynamicSwapChange(event)">
+
+											<label class="switch" for="p-dynamic-swap"></label>
+
+										</div>
+
+										<label for="p-dynamic-swap">Dynamic Swap (per question)</label>
 
 									</div>
 
@@ -3439,13 +3539,39 @@
 
 									<div class="symbol-category">
 
-										<h5>6D Quantity</h5>
+										<h5>5D Quantity</h5>
 
 										<p>&gt; More than</p>
 
 										<p>=q Equal to</p>
 
 										<p>&lt; Less than</p>
+
+									</div>
+
+									<div class="symbol-category">
+
+										<h5>6D Membership</h5>
+
+										<p>⊂ Within</p>
+
+										<p>≠m Separate</p>
+
+										<p>⊃ Contains</p>
+
+									</div>
+
+									<div class="symbol-category">
+
+										<h5>Double Distance</h5>
+
+										<p>▲² / ▼² Double height</p>
+
+										<p>◀² / ▶² Double time</p>
+
+										<p>←t² / t→² Double temporal</p>
+
+										<p>North² Double direction (text)</p>
 
 									</div>
 

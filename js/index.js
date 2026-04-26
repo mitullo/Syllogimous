@@ -84,9 +84,11 @@ function updateGamemodeEmptyState() {
 
     const anyActive = savedata.enableDistinction || savedata.enableLinear || savedata.enableDirection ||
 
-        savedata.enableDirection3D || savedata.enableDirection4D || savedata.enableDirection5D ||
+        savedata.enableDirection3D || savedata.enableDirection4D || savedata.enableMultiDim5D ||
 
-        savedata.enableDirection6D || savedata.enableSyllogism || savedata.enableAnalogy ||
+        savedata.enableMultiDim6D || savedata.enableAnchorSpace || savedata.enableAnchorSpaceV2 ||
+
+        savedata.enableSyllogism || savedata.enableAnalogy ||
 
         savedata.enableBinary || savedata.enableNestedBinary;
 
@@ -538,6 +540,7 @@ function populateSettings() {
         
 
         const input = document.querySelector("#" + id);
+        if (!input) continue;
 
         if (input.type === "checkbox") {
 
@@ -627,6 +630,13 @@ function carouselInit() {
 
 function displayInit() {
 
+    if (appState.dynamicSwapButtons) {
+        appState.swapButtons = !appState.swapButtons;
+        applySwapButtons();
+        const swapCheckbox = document.getElementById('p-swap-buttons');
+        if (swapCheckbox) swapCheckbox.checked = appState.swapButtons;
+    }
+
     const q = renderJunkEmojis(question);
 
     displayLabelType.textContent = q.category.split(":")[0];
@@ -691,7 +701,7 @@ function displayInit() {
         const currentIdx = isMulti ? (q.currentConclusionIndex || 0) : 0;
         const currentConc = isMulti && q.conclusions[currentIdx] ? q.conclusions[currentIdx].conclusion : q.conclusion;
         const concLabel = isMulti ? `Conclusion ${currentIdx + 1} of ${q.conclusions.length}` : 'Conclusion';
-        displayText.innerHTML = buildPremisesHTML(q.premises, q.operations, currentConc, easy, halfMinimal, concLabel);
+        displayText.innerHTML = buildPremisesHTML(q.premises, q.operations, currentConc, easy, halfMinimal, concLabel, q);
 
     }
 
@@ -1053,15 +1063,44 @@ function showPremisesAfterPattern(premises, operations, conclusion, easy, halfMi
 
 
 
-function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, conclusionLabel) {
+function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, conclusionLabel, question) {
 
     const label = conclusionLabel || 'Conclusion';
+
+    // Check if this is a binary mode question with subresults for visual grouping
+    const isBinaryWithGroups = question && question.type === 'binary' && question.subresults && question.subresults.length > 0;
+    
+    let premisesHTML;
+    if (isBinaryWithGroups) {
+        // Group premises by their source subresult
+        const groups = [];
+        let currentIndex = 0;
+        
+        for (const subresult of question.subresults) {
+            const groupPremises = premises.slice(currentIndex, currentIndex + subresult.premises.length);
+            groups.push(groupPremises);
+            currentIndex += subresult.premises.length;
+        }
+        
+        // Render grouped premises with visual separation
+        premisesHTML = groups.map((group, groupIndex) => {
+            const groupClass = `premise-group premise-group-${groupIndex + 1}`;
+            const groupPremises = group.map((p, i) => {
+                const globalIndex = groups.slice(0, groupIndex).reduce((sum, g) => sum + g.length, 0) + i;
+                return `<div class="formatted-premise ${halfMinimal && globalIndex % 2 === 0 ? 'minimal-style' : ''}">${p.html ?? p}</div>`;
+            }).join('');
+            return `<div class="${groupClass}">${groupPremises}</div>`;
+        }).join('');
+    } else {
+        // Standard premise rendering
+        premisesHTML = premises.map((p, i) => `<div class="formatted-premise ${halfMinimal && i % 2 === 0 ? 'minimal-style' : ''}">${p.html ?? p}</div>`).join('');
+    }
 
     return [
 
         `<div class="preamble">Premises${easy}</div>`,
 
-        ...premises.map((p, i) => `<div class="formatted-premise ${halfMinimal && i % 2 === 0 ? 'minimal-style' : ''}">${p.html ?? p}</div>`),
+        premisesHTML,
 
         ...((operations && operations.length > 0) ? ['<div class="transform-header">Transformations</div>'] : []),
 
@@ -1137,9 +1176,19 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-dark-mode').checked = appState.darkMode;
 
+    document.getElementById('p-cyan-preset').checked = appState.cyanPreset;
+    if (appState.cyanPreset) {
+        document.body.style.background = CYAN_BODY;
+        const sidebar = document.getElementById('sidebar-settings');
+        if (sidebar) sidebar.style.background = CYAN_BOX;
+        document.documentElement.style.setProperty('--overlay-background-color', CYAN_OVERLAY);
+    }
+
     document.getElementById('p-flat-settings').checked = appState.flatSettings;
 
     document.getElementById('p-swap-buttons').checked = appState.swapButtons;
+
+    document.getElementById('p-dynamic-swap').checked = appState.dynamicSwapButtons;
 
     document.getElementById('p-nav-bar').checked = appState.navBar;
 
@@ -1234,6 +1283,38 @@ function handleColorChange(event) {
 
     refresh();
 
+}
+
+
+
+const CYAN_GAME = '#1A3A3ACC';
+const CYAN_BODY = '#0D2626';
+const CYAN_BOX = '#122E2E';
+const CYAN_OVERLAY = '#0a2020';
+
+function applyCyanPreset() {
+    const checked = document.getElementById('p-cyan-preset').checked;
+    appState.cyanPreset = checked;
+    const colorInput = document.getElementById('color-input');
+    const root = document.documentElement;
+    if (!checked) {
+        // Turn off — restore previous color
+        document.body.style.background = '';
+        const sidebar = document.getElementById('sidebar-settings');
+        if (sidebar) sidebar.style.background = '';
+        root.style.removeProperty('--overlay-background-color');
+        const defaultColor = appState.darkMode ? '#293247CC' : '#EFEFEF';
+        colorInput.value = defaultColor;
+        handleColorChange({target:{value: defaultColor}});
+    } else {
+        // Turn on
+        document.body.style.background = CYAN_BODY;
+        const sidebar = document.getElementById('sidebar-settings');
+        if (sidebar) sidebar.style.background = CYAN_BOX;
+        root.style.setProperty('--overlay-background-color', CYAN_OVERLAY);
+        colorInput.value = CYAN_GAME;
+        handleColorChange({target:{value: CYAN_GAME}});
+    }
 }
 
 
@@ -2112,6 +2193,16 @@ function applySwapButtons() {
         btns.classList.remove('swap-buttons');
 
     }
+
+}
+
+
+
+function handleDynamicSwapChange(event) {
+
+    appState.dynamicSwapButtons = event.target.checked;
+
+    save();
 
 }
 

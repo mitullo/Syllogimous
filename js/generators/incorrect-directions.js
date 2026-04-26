@@ -14,7 +14,7 @@ class IncorrectDirections {
                 alternatives.push([...currentCoord]);
                 return;
             }
-            for (let d of [-1, 0, 1]) {
+            for (let d of directionValues()) {
                 currentCoord.push(d);
                 generateCoords(currentCoord);
                 currentCoord.pop();
@@ -38,7 +38,7 @@ class IncorrectDirections {
                 }
                 return;
             }
-            for (let direction of [-1, 0, 1]) {
+            for (let direction of directionValues()) {
                 permutation[i] = direction;
                 permutate(i+1);
             }
@@ -97,7 +97,7 @@ class IncorrectDirections {
             for (const shift of shifts) {
                 let newCombo = correctCoord.slice();
                 newCombo[d] += shift;
-                if (newCombo.some(d => Math.abs(d) > 1)) {
+                if (newCombo.some(d => Math.abs(d) > directionLimit())) {
                     continue;
                 }
                 if (newCombo.every(d => d === 0)) {

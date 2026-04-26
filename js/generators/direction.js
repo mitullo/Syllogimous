@@ -11,6 +11,75 @@ function normalize(a) {
     return a.map(c => c === 0 ? 0 : c / Math.abs(c));
 }
 
+function directionLimit() {
+    if (!savedata.enableDoubleDistance) return 1;
+    if (Math.random() * 100 < (savedata.doubleDistanceFrequency ?? 100)) return 2;
+    return 1;
+}
+
+function normalizeDirectionCoord(a) {
+    if (a.every(c => c === 0)) return null;
+    const limit = directionLimit();
+    return a.map(c => Math.max(-limit, Math.min(limit, c)));
+}
+
+function normalizeConclusionCoord(a) {
+    if (a.every(c => c === 0)) return null;
+    if (savedata.enableDoubleDistanceConclusions) {
+        const limit = directionLimit();
+        return a.map(c => Math.max(-limit, Math.min(limit, c)));
+    }
+    return a.map(c => c === 0 ? 0 : c / Math.abs(c));
+}
+
+function directionValues() {
+    const limit = directionLimit();
+    let values = [];
+    for (let i = -limit; i <= limit; i++) {
+        values.push(i);
+    }
+    return values;
+}
+
+function createDirectionCoords(dimensions, spatialDimensions=dimensions) {
+    const values = directionValues();
+    let coords = [];
+    const build = (current) => {
+        if (current.length === dimensions) {
+            if (current.every(c => c === 0)) return;
+            coords.push(current.slice());
+            return;
+        }
+        const dimension = current.length;
+        const dimensionValues = dimension < spatialDimensions ? values : [-1, 0, 1];
+        for (const value of dimensionValues) {
+            current.push(value);
+            build(current);
+            current.pop();
+        }
+    };
+    build([]);
+    return coords;
+}
+
+function get2DDirCoords() {
+    return savedata.enableDoubleDistance ? createDirectionCoords(2) : dirCoords.slice(1);
+}
+
+function get3DDirCoords() {
+    return savedata.enableDoubleDistance ? createDirectionCoords(3) : dirCoords3D;
+}
+
+function get4DDirCoords() {
+    return savedata.enableDoubleDistance ? createDirectionCoords(4, 3) : dirCoords4D;
+}
+
+function getDirectionCoordsForLength(length) {
+    if (length === 4) return get4DDirCoords();
+    if (length === 3) return get3DDirCoords();
+    return get2DDirCoords();
+}
+
 function inverse(a) {
     if (!a) return null;
     return a.map(c => -c);
@@ -23,13 +92,13 @@ function dirCoordsEqual(a, b) {
 }
 
 function findDirection(a, b) {
-    return normalize(diffCoords(a, b));
+    return normalizeDirectionCoord(diffCoords(a, b));
 }
 
 function getConclusionCoords(wordCoordMap, startWord, endWord) {
     const [start, end] = [wordCoordMap[startWord], wordCoordMap[endWord]];
     const diffCoord = diffCoords(start, end);
-    const conclusionCoord = normalize(diffCoord);
+    const conclusionCoord = normalizeConclusionCoord(diffCoord);
     return [diffCoord, conclusionCoord];
 }
 
@@ -82,7 +151,7 @@ class Direction2D {
     }
 
     pickDirection(baseWord, neighbors, wordCoordMap) {
-        return pickWeightedRandomDirection(dirCoords.slice(1), baseWord, neighbors, wordCoordMap);
+        return pickWeightedRandomDirection(get2DDirCoords(), baseWord, neighbors, wordCoordMap);
     }
 
     createDirectionStatement(a, b, dirCoord) {
@@ -154,7 +223,7 @@ class Direction3D {
     }
 
     pickDirection(baseWord, neighbors, wordCoordMap) {
-        return pickWeightedRandomDirection(dirCoords3D, baseWord, neighbors, wordCoordMap);
+        return pickWeightedRandomDirection(get3DDirCoords(), baseWord, neighbors, wordCoordMap);
     }
 
     createDirectionStatement(a, b, dirCoord) {
@@ -214,7 +283,7 @@ class Direction4D {
     pickDirection(baseWord, neighbors, wordCoordMap) {
         let dirCoord
         do {
-            dirCoord = pickWeightedRandomDirection(dirCoords4D, baseWord, neighbors, wordCoordMap);
+            dirCoord = pickWeightedRandomDirection(get4DDirCoords(), baseWord, neighbors, wordCoordMap);
         } while (dirCoord.slice(0, 3).every(c => c === 0))
         return dirCoord
     }
@@ -462,7 +531,7 @@ class DirectionQuestion {
                         const [a, b] = pickRandomItems(allWords, 2).picked;
                         if (wordCoordMap[a] && wordCoordMap[b]) {
                             const diff = diffCoords(wordCoordMap[a], wordCoordMap[b]);
-                            const norm = normalize(diff);
+                            const norm = normalizeDirectionCoord(diff);
                             if (isNonZeroConclusion(norm)) {
                                 fallbackPair = [a, b];
                             }
@@ -1954,7 +2023,7 @@ class AnchorSpaceV2 {
     }
 
     pickDirection(baseWord, neighbors, wordCoordMap) {
-        return pickWeightedRandomDirection(dirCoords.slice(1), baseWord, neighbors, wordCoordMap);
+        return pickWeightedRandomDirection(get2DDirCoords(), baseWord, neighbors, wordCoordMap);
     }
 
     createDirectionStatement(a, b, dirCoord) {

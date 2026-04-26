@@ -325,6 +325,9 @@ class SpaceHardMode {
                 w !== leftStart && w !== rightStart && !this.isAnchorWord(w)
             );
             
+            // Track which words have been used as moving words to prevent duplicates
+            const usedMovingWords = new Set();
+            
             for (let i = 0; i < this.numTransforms && wordSequence.length > 0; i++) {
                 const target = wordSequence.shift(); // Reference word (what we transform around)
                 
@@ -347,6 +350,15 @@ class SpaceHardMode {
                         movingWord = safeWords[Math.floor(Math.random() * safeWords.length)];
                     }
                 }
+                
+                // CRITICAL FIX: Skip if this movingWord+target combination was already used
+                // This prevents the same word from being transformed twice in the same direction
+                const transformKey = `${movingWord}-${target}`;
+                if (usedMovingWords.has(transformKey)) {
+                    // Skip this transform to avoid duplicate movement
+                    continue;
+                }
+                usedMovingWords.add(transformKey);
                 
                 const chain = this.directionize([target], movingWord, leftDimensions, rightDimensions, dimensionPool, wordCoordMap);
                 leftChains.push(chain);

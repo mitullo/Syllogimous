@@ -107,8 +107,26 @@ function getBinaryCountdown(offset=0) {
 }
 
 class BinaryQuestion {
-    create(length) {
+    create(length, transforms = {}) {
         length = Math.max(4, length);
+
+        // When binaryHardModeLevel > 0, temporarily override sub-generators' hard mode levels
+        const btfm = savedata.binaryHardModeLevel || 0;
+        const overriddenKeys = [];
+        const savedValues = {};
+        if (btfm > 0) {
+            const hardModeKeys = [
+                'space2DHardModeLevel', 'space3DHardModeLevel', 'space4DHardModeLevel',
+                'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel'
+            ];
+            for (const key of hardModeKeys) {
+                if (savedata[key] < btfm) {
+                    overriddenKeys.push(key);
+                    savedValues[key] = savedata[key];
+                    savedata[key] = btfm;
+                }
+            }
+        }
         const operands = [
             "a&&b",                 // and
             "!(a&&b)",              // nand
@@ -153,8 +171,8 @@ class BinaryQuestion {
             const generator2 = pool[Math.floor(Math.random() * pool.length)];
 
             [choice, choice2] = [
-                generator.question.create(Math.floor(length/2)),
-                generator2.question.create(Math.ceil(length/2))
+                generator.question.create(Math.floor(length/2), transforms),
+                generator2.question.create(Math.ceil(length/2), transforms)
             ];
     
             premises = [...choice.premises, ...choice2.premises];
@@ -168,6 +186,12 @@ class BinaryQuestion {
         }
 
         const countdown = getBinaryCountdown();
+
+        // Restore overridden hard mode levels
+        for (const key of overriddenKeys) {
+            savedata[key] = savedValues[key];
+        }
+
         return {
             category: `Binary: ${choice.category} ${operandNames[operandIndex]} ${choice2.category}`,
             type: "binary",
@@ -183,7 +207,26 @@ class BinaryQuestion {
 }
 
 class NestedBinaryQuestion {
-    create(length) {
+    create(length, transforms = {}) {
+
+        // When binaryHardModeLevel > 0, temporarily override sub-generators' hard mode levels
+        const btfm = savedata.binaryHardModeLevel || 0;
+        const overriddenKeys = [];
+        const savedValues = {};
+        if (btfm > 0) {
+            const hardModeKeys = [
+                'space2DHardModeLevel', 'space3DHardModeLevel', 'space4DHardModeLevel',
+                'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel'
+            ];
+            for (const key of hardModeKeys) {
+                if (savedata[key] < btfm) {
+                    overriddenKeys.push(key);
+                    savedValues[key] = savedata[key];
+                    savedata[key] = btfm;
+                }
+            }
+        }
+
         const humanOperands = [
             '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">AND</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
             '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">NAND</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
@@ -209,7 +252,7 @@ class NestedBinaryQuestion {
         length = Math.max(4, length);
         const halfLength = Math.floor(length / 2);
         const questions = Array(halfLength).fill(0)
-            .map(() => pool[Math.floor(Math.random() * pool.length)].question.create(2));
+            .map(() => pool[Math.floor(Math.random() * pool.length)].question.create(2, transforms));
 
         let numOperands = +savedata.maxNestedBinaryDepth;
         let leafIndex = 0;
@@ -251,6 +294,11 @@ class NestedBinaryQuestion {
         const premises = questions.reduce((a, q) => [ ...a, ...q.premises ], [])
         const conclusion = generated.human.replaceAll(/(\d+)/g, m => questions[m].conclusion);
         const countdown = getBinaryCountdown();
+
+        // Restore overridden hard mode levels
+        for (const key of overriddenKeys) {
+            savedata[key] = savedValues[key];
+        }
 
         return {
             category: `Nested Binary: ${category}`,

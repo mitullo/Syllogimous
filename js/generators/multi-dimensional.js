@@ -175,7 +175,7 @@ function createMultiDim5DGenerator(length) {
         question: {
             category: "SPACE FIVE D",
             getCountdown: function() {
-                return countdownFromOverride(savedata.overrideMultiDim5DPremises, savedata.overrideMultiDim5DTime);
+                return savedata.overrideMultiDim5DTime;
             },
             hardModeAllowed: function() {
                 return savedata.space5DHardModeLevel > 0;
@@ -279,7 +279,7 @@ function createMultiDim5DGenerator(length) {
                             }
                         }
 
-                        const setStatement = createMultiDimSetStatement(baseSet, targetSet, dirCoord, 5);
+                        const setStatement = createMultiDimSetStatement(baseSet, targetSet, dirCoord, 6);
                         premiseChunks[premiseChunks.length - 1].push(setStatement);
                         premiseIndex++;
                         wordIndex += targetSet.length;
@@ -293,7 +293,7 @@ function createMultiDim5DGenerator(length) {
                         neighbors[nextWord] = neighbors[nextWord] ?? [];
                         neighbors[nextWord].push(baseWord);
 
-                        const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 5);
+                        const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
                         premiseChunks[premiseChunks.length - 1].push(premise);
                         premiseIndex++;
                         wordIndex++;
@@ -429,22 +429,22 @@ function createMultiDim5DGenerator(length) {
                     let conclusionObj;
 
                     if (conclusionIsValid) {
-                        conclusionObj = createMultiDimStatement(sw, ew, normDiff, 5);
+                        conclusionObj = createMultiDimStatement(sw, ew, normDiff, 6);
                     } else {
                         const wrongCoord = [...normDiff];
                         const interferenceLevel = savedata.space5DInterference || 0;
 
                         if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
-                            const currentVal = wrongCoord[3];
+                            const currentVal = wrongCoord[4];
                             const options = [-1, 0, 1].filter(v => v !== currentVal);
-                            wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
+                            wrongCoord[4] = options[Math.floor(Math.random() * options.length)];
                         } else {
                             const axisToChange = Math.floor(Math.random() * 5);
                             const currentVal = wrongCoord[axisToChange];
                             const options = [-1, 0, 1].filter(v => v !== currentVal);
                             wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
                         }
-                        conclusionObj = createMultiDimStatement(sw, ew, wrongCoord, 5);
+                        conclusionObj = createMultiDimStatement(sw, ew, wrongCoord, 6);
                     }
 
                     const premiseResult = createPremiseHTML(conclusionObj, true, length);
@@ -476,6 +476,8 @@ function createMultiDim5DGenerator(length) {
                     modifiers.push(`op${totalTransforms}`);
                 }
 
+                const countdown = this.getCountdown();
+
                 return {
                     premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
                     conclusion: primary.conclusion,
@@ -489,6 +491,7 @@ function createMultiDim5DGenerator(length) {
                     wordCoordMap: wordCoordMap,
                     modifiers,
                     operations,
+                    ...(countdown && { countdown }),
                 };
             },
             createAnalogy: function(length) {
@@ -510,7 +513,7 @@ function createMultiDim5DGenerator(length) {
                     wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
                     wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
 
-                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 5);
+                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
                     premises.push(premise);
 
                     neighbors[baseWord] = neighbors[baseWord] ?? [];
@@ -584,7 +587,7 @@ function createMultiDim6DGenerator(length) {
         question: {
             category: "SPACE SIX D",
             getCountdown: function() {
-                return countdownFromOverride(savedata.overrideMultiDim6DPremises, savedata.overrideMultiDim6DTime);
+                return savedata.overrideMultiDim6DTime;
             },
             hardModeAllowed: function() {
                 return savedata.space6DHardModeLevel > 0;
@@ -686,7 +689,7 @@ function createMultiDim6DGenerator(length) {
                             }
                         }
 
-                        const setStatement = createMultiDimSetStatement(baseSet, targetSet, dirCoord, 6);
+                        const setStatement = createMultiDimSetStatement(baseSet, targetSet, dirCoord, 7);
                         premiseChunks[premiseChunks.length - 1].push(setStatement);
                         premiseIndex++;
                         wordIndex += targetSet.length;
@@ -700,7 +703,7 @@ function createMultiDim6DGenerator(length) {
                         neighbors[nextWord] = neighbors[nextWord] ?? [];
                         neighbors[nextWord].push(baseWord);
 
-                        const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
+                        const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 7);
                         premiseChunks[premiseChunks.length - 1].push(premise);
                         premiseIndex++;
                         wordIndex++;
@@ -834,22 +837,22 @@ function createMultiDim6DGenerator(length) {
                     let conclusionObj;
 
                     if (conclusionIsValid) {
-                        conclusionObj = createMultiDimStatement(sw, ew, normDiff, 6);
+                        conclusionObj = createMultiDimStatement(sw, ew, normDiff, 7);
                     } else {
                         const wrongCoord = [...normDiff];
                         const interferenceLevel = savedata.space6DInterference || 0;
 
                         if (interferenceLevel > 0 && Math.random() * 100 < interferenceLevel) {
-                            const currentVal = wrongCoord[3];
+                            const currentVal = wrongCoord[5];
                             const options = [-1, 0, 1].filter(v => v !== currentVal);
-                            wrongCoord[3] = options[Math.floor(Math.random() * options.length)];
+                            wrongCoord[5] = options[Math.floor(Math.random() * options.length)];
                         } else {
                             const axisToChange = Math.floor(Math.random() * 6);
                             const currentVal = wrongCoord[axisToChange];
                             const options = [-1, 0, 1].filter(v => v !== currentVal);
                             wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
                         }
-                        conclusionObj = createMultiDimStatement(sw, ew, wrongCoord, 6);
+                        conclusionObj = createMultiDimStatement(sw, ew, wrongCoord, 7);
                     }
 
                     const premiseResult = createPremiseHTML(conclusionObj, true, length);
@@ -881,6 +884,8 @@ function createMultiDim6DGenerator(length) {
                     modifiers.push(`op${totalTransforms}`);
                 }
 
+                const countdown = this.getCountdown();
+
                 return {
                     premises: premises.map((p, i) => createPremiseHTML(p, true, i)),
                     conclusion: primary.conclusion,
@@ -894,6 +899,7 @@ function createMultiDim6DGenerator(length) {
                     wordCoordMap: wordCoordMap,
                     modifiers,
                     operations,
+                    ...(countdown && { countdown }),
                 };
             },
             createAnalogy: function(length) {
@@ -916,7 +922,7 @@ function createMultiDim6DGenerator(length) {
                     wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
                     wordCoordMap[nextWord] = addCoords(wordCoordMap[baseWord], dirCoord);
 
-                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 6);
+                    const premise = createMultiDimStatement(baseWord, nextWord, dirCoord, 7);
                     premises.push(premise);
 
                     neighbors[baseWord] = neighbors[baseWord] ?? [];

@@ -265,7 +265,7 @@ class ProfileStore {
             }
         }
 
-        for (const [key, defaultValue] in Object.entries(defaultSavedata)) {
+        for (const [key, defaultValue] of Object.entries(defaultSavedata)) {
             if (!savedataObj.hasOwnProperty(key)) {
                 savedataObj[key] = defaultValue;
             }

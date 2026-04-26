@@ -391,8 +391,8 @@ function createExplanation(question) {
         const pattern = question.pattern || null;
         const grid = createGridFromMap(question.wordCoordMap);
         const coordDims = Object.values(question.wordCoordMap)[0]?.length || 0;
-        const is5D = coordDims === 5;
         const is6D = coordDims === 6;
+        const is5D = coordDims === 5;
         
         if (is6D || (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]) && Array.isArray(grid[0][0][0][0][0]))) {
             return createExplanation6D(ensureGridDepth(grid, 6), pattern);

@@ -1767,6 +1767,8 @@ input[type="number"]::-moz-inner-spin-button {
 
     top: 0;
 
+    z-index: 2;
+
     left: 0;
 
     text-shadow: var(--text-outline);
@@ -2052,6 +2054,118 @@ input[type="number"]::-moz-inner-spin-button {
 .formatted-operation {
 
     margin-bottom: 1rem;
+
+}
+
+
+
+/* Binary mode premise grouping - visual separation for sub-questions */
+
+.premise-group {
+
+    padding: 0.75rem;
+
+    margin-bottom: 1.25rem;
+
+    border: 2px solid rgba(var(--accent-rgb, 51, 119, 255), 0.3);
+
+    border-radius: 8px;
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.05);
+
+}
+
+
+
+.premise-group .formatted-premise {
+
+    margin-bottom: 0.75rem;
+
+}
+
+
+
+.premise-group .formatted-premise:last-child {
+
+    margin-bottom: 0;
+
+}
+
+
+
+/* Different visual styles for each group */
+
+.premise-group-1 {
+
+    border-color: rgba(var(--accent-rgb, 51, 119, 255), 0.4);
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.06);
+
+}
+
+
+
+.premise-group-2 {
+
+    border-color: rgba(var(--accent-rgb, 51, 119, 255), 0.35);
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.04);
+
+    border-style: dashed;
+
+}
+
+
+
+.premise-group-3 {
+
+    border-color: rgba(var(--accent-rgb, 51, 119, 255), 0.3);
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.03);
+
+    border-style: dotted;
+
+}
+
+
+
+/* Light mode adjustments */
+
+.light-mode .premise-group {
+
+    border-color: rgba(var(--accent-rgb, 51, 119, 255), 0.25);
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.03);
+
+}
+
+
+
+.light-mode .premise-group-1 {
+
+    border-color: rgba(var(--accent-rgb, 51, 119, 255), 0.35);
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.04);
+
+}
+
+
+
+.light-mode .premise-group-2 {
+
+    border-color: rgba(var(--accent-rgb, 51, 119, 255), 0.3);
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.025);
+
+}
+
+
+
+.light-mode .premise-group-3 {
+
+    border-color: rgba(var(--accent-rgb, 51, 119, 255), 0.25);
+
+    background: rgba(var(--accent-rgb, 51, 119, 255), 0.02);
 
 }
 
@@ -6201,6 +6315,26 @@ input:checked + .slider:before {
     font-size: var(--step--1);
 
     flex: 1;
+
+}
+
+
+
+.sub-option {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 0.5rem;
+
+    margin-left: 1.5rem;
+
+    padding: 0.15rem 0;
+
+    font-size: var(--step--2);
+
+    opacity: 0.85;
 
 }
 

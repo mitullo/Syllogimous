@@ -162,9 +162,11 @@ class ProgressStore {
         trailingProgress.sort((a, b) => a.timeElapsed - b.timeElapsed);
         const successes = trailingProgress.filter(p => p.correctness === 'right');
         const commonTypes = this.findCommonTypes(question);
-        if (trailingProgress.length < findAutoProgressionTrailing()) {
+        const trailing = findAutoProgressionTrailing();
+        if (trailing === 0) return; // Guard against division by zero
+        if (trailingProgress.length < trailing) {
             const numFailures = trailingProgress.length - successes.length;
-            const bestPercentagePossible = 100 * (findAutoProgressionTrailing() - numFailures) / findAutoProgressionTrailing();
+            const bestPercentagePossible = 100 * (trailing - numFailures) / trailing;
             if (bestPercentagePossible <= findFailureCriteria()) {
                 for (const type of commonTypes) {
                     this.fail(q, trailingProgress, successes, type);
@@ -175,7 +177,7 @@ class ProgressStore {
             return;
         }
         for (const type of commonTypes) {
-            const percentageRight = 100 * successes.length / findAutoProgressionTrailing();
+            const percentageRight = trailing > 0 ? (100 * successes.length / trailing) : 0;
             if (percentageRight >= findSuccessCriteria()) {
                 this.success(q, trailingProgress, successes, type);
                 q.didTriggerProgress = true;

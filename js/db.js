@@ -148,8 +148,6 @@ const getAllRRTProgress = async () => {
         getAll.onsuccess = () => resolve(getAll.result);
         getAll.onerror = () => reject(getAll.error);
     });
-
-    request.onerror = () => reject(request.error);
 }
 
 const getTodayRRTProgress = async () => {

@@ -97,9 +97,9 @@ class MixedModeQuestion {
                 const dirCoord = this.pickDirectionCoord(relationType, source, neighbors, coordMap);
                 coordMap[target] = addCoords(coordMap[source], dirCoord);
                 if (relationType === 'multiDim5D') {
-                    premise = createMultiDimStatement(source, target, dirCoord, 5);
-                } else if (relationType === 'multiDim6D') {
                     premise = createMultiDimStatement(source, target, dirCoord, 6);
+                } else if (relationType === 'multiDim6D') {
+                    premise = createMultiDimStatement(source, target, dirCoord, 7);
                 } else {
                     premise = generator.createDirectionStatement(source, target, dirCoord);
                 }
@@ -297,17 +297,17 @@ class MixedModeQuestion {
         let availableDirs;
         if (mode === 'multiDim6D' || mode === 'multiDim5D') {
             // For multi-dim modes, generate a 4D direction + extra dims
-            const spatialDirs = dirCoords4D.filter(c => !arraysEqual(c, [0,0,0,0]));
+            const spatialDirs = get4DDirCoords();
             const spatial = spatialDirs[Math.floor(Math.random() * spatialDirs.length)];
             const extraDims = mode === 'multiDim6D' ? 2 : 1;
             const extra = Array.from({length: extraDims}, () => Math.floor(Math.random() * 3) - 1);
             return [...spatial, ...extra];
         } else if (mode === 'direction3D') {
-            availableDirs = dirCoords3D.filter(c => !arraysEqual(c, [0,0,0]));
+            availableDirs = get3DDirCoords();
         } else if (mode === 'direction4D') {
-            availableDirs = dirCoords4D.filter(c => !arraysEqual(c, [0,0,0,0]));
+            availableDirs = get4DDirCoords();
         } else {
-            availableDirs = dirCoords.slice(1); // Exclude [0,0]
+            availableDirs = get2DDirCoords();
         }
 
         // Pick a direction that doesn't conflict with existing neighbors
@@ -326,7 +326,7 @@ class MixedModeQuestion {
     // Normalize a coordinate vector to its sign (-1,0,1) per axis
     normalizeCoord(coord) {
         if (!coord) return coord;
-        return coord.map(c => (c > 0) ? 1 : (c < 0) ? -1 : 0);
+        return normalizeDirectionCoord(coord);
     }
 
     // Build a parity-enabled DSU (union-find) from distinction premises and equivalenceMap
@@ -458,11 +458,11 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                             return [finalConclusion, finalIsValid, ['distinction', 'direction']];
                         } else {
                             // Invalid: Generate a proper incorrect coordinate using the correct space generator
-                            const startNode = dirPremise.start;
-                            const endNode = dirPremise.end;
+                            const startNode = dirPremise.start || (dirPremise.startSet && dirPremise.startSet[0]);
+                            const endNode = dirPremise.end || (dirPremise.endSet && dirPremise.endSet[0]);
                             
-                            // Safety check: ensure both nodes have coordinates
-                            if (!coordMap[startNode] || !coordMap[endNode]) {
+                            // Safety check: ensure both nodes exist and have coordinates
+                            if (!startNode || !endNode || !coordMap[startNode] || !coordMap[endNode]) {
                                 // Can't generate a valid mixed conclusion without coordinates
                                 // Skip this premise and let the code fall through to simple distinction
                                 continue;
@@ -479,33 +479,45 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                             }
                             
                             let generator;
-                            if (actualCoord.length === 4) generator = new Direction4D();
-                            else if (actualCoord.length === 3) generator = new Direction3D();
-                            else generator = new Direction2D();
-                            
-                            let availableDirs = dirCoords.slice(1);
-                            if (actualCoord.length === 4) availableDirs = dirCoords4D.filter(c => !arraysEqual(c, [0,0,0,0]));
-                            else if (actualCoord.length === 3) availableDirs = dirCoords3D.filter(c => !arraysEqual(c, [0,0,0]));
+                            const isMultiDim = actualCoord.length >= 5;
+                            const multiDimDim = actualCoord.length + 1; // 5 coords → dim=6, 6 coords → dim=7
+                            if (!isMultiDim) {
+                                if (actualCoord.length === 4) generator = new Direction4D();
+                                else if (actualCoord.length === 3) generator = new Direction3D();
+                                else generator = new Direction2D();
+                            }
                             
                             // Pick a wrong coord
                             let wrongCoord;
                             const avoidOpposite = savedata.enableHarderConclusions;
                             const oppositeCoord = actualCoord.map(x => -x);
                             
-                            if (avoidOpposite) {
-                                const validWrongDirs = availableDirs.filter(c => !arraysEqual(c, actualCoord) && !arraysEqual(c, oppositeCoord));
-                                wrongCoord = validWrongDirs.length > 0 
-                                    ? validWrongDirs[Math.floor(Math.random() * validWrongDirs.length)] 
-                                    : oppositeCoord; // fallback
+                            if (isMultiDim) {
+                                // Generate wrong multi-dim coord by flipping one axis
+                                const axisToChange = Math.floor(Math.random() * actualCoord.length);
+                                const currentVal = actualCoord[axisToChange];
+                                const options = [-1, 0, 1].filter(v => v !== currentVal);
+                                wrongCoord = [...actualCoord];
+                                wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
                             } else {
-                                const validWrongDirs = availableDirs.filter(c => !arraysEqual(c, actualCoord));
-                                wrongCoord = validWrongDirs[Math.floor(Math.random() * validWrongDirs.length)];
+                                let availableDirs = getDirectionCoordsForLength(actualCoord.length);
+                                if (avoidOpposite) {
+                                    const validWrongDirs = availableDirs.filter(c => !arraysEqual(c, actualCoord) && !arraysEqual(c, oppositeCoord));
+                                    wrongCoord = validWrongDirs.length > 0 
+                                        ? validWrongDirs[Math.floor(Math.random() * validWrongDirs.length)] 
+                                        : oppositeCoord; // fallback
+                                } else {
+                                    const validWrongDirs = availableDirs.filter(c => !arraysEqual(c, actualCoord));
+                                    wrongCoord = validWrongDirs[Math.floor(Math.random() * validWrongDirs.length)];
+                                }
                             }
                             
                             const newStartNode = originalIsStart ? equivWord : (dirPremise.start || dirPremise.startSet?.[0]);
                             const newEndNode = !originalIsStart ? equivWord : (dirPremise.end || dirPremise.endSet?.[0]);
                             
-                            const conclusionObj = generator.createDirectionStatement(newEndNode, newStartNode, wrongCoord);
+                            const conclusionObj = isMultiDim
+                                ? createMultiDimStatement(newEndNode, newStartNode, wrongCoord, multiDimDim)
+                                : generator.createDirectionStatement(newEndNode, newStartNode, wrongCoord);
                             const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                             let conclusion = premiseResult.html;
                             let isValid = false;
@@ -559,13 +571,20 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                 if (!rawDir) return [null, false, []];
                 const actualCoord = this.normalizeCoord(rawDir);
 
-                let generator;
-                if (actualCoord.length === 4) generator = new Direction4D();
-                else if (actualCoord.length === 3) generator = new Direction3D();
-                else generator = new Direction2D();
+                const isMultiDim = actualCoord.length >= 5;
+                const multiDimDim = actualCoord.length + 1; // 5 coords → dim=6, 6 coords → dim=7
 
                 if (coinFlip()) {
-                    const conclusionObj = generator.createDirectionStatement(a, b, actualCoord);
+                    let conclusionObj;
+                    if (isMultiDim) {
+                        conclusionObj = createMultiDimStatement(a, b, actualCoord, multiDimDim);
+                    } else {
+                        let generator;
+                        if (actualCoord.length === 4) generator = new Direction4D();
+                        else if (actualCoord.length === 3) generator = new Direction3D();
+                        else generator = new Direction2D();
+                        conclusionObj = generator.createDirectionStatement(a, b, actualCoord);
+                    }
                     const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                     let conclusion = premiseResult.html;
                     let isValid = true;
@@ -576,12 +595,29 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                     const [finalConclusion, finalIsValid] = this.applyConclusionNegation(conclusion, isValid, conclusionObj, wasInvertedByPremiseHTML);
                     return [finalConclusion, finalIsValid, ['direction']];
                 } else {
-                    let availableDirs = dirCoords.slice(1);
-                    if (actualCoord.length === 4) availableDirs = dirCoords4D.filter(c => !arraysEqual(c, [0,0,0,0]));
-                    else if (actualCoord.length === 3) availableDirs = dirCoords3D.filter(c => !arraysEqual(c, [0,0,0]));
-
-                    const wrongCoord = availableDirs[Math.floor(Math.random() * availableDirs.length)];
-                    const conclusionObj = generator.createDirectionStatement(a, b, wrongCoord);
+                    let wrongCoord;
+                    if (isMultiDim) {
+                        // Generate wrong multi-dim coord by flipping one axis
+                        const axisToChange = Math.floor(Math.random() * actualCoord.length);
+                        const currentVal = actualCoord[axisToChange];
+                        const options = [-1, 0, 1].filter(v => v !== currentVal);
+                        wrongCoord = [...actualCoord];
+                        wrongCoord[axisToChange] = options[Math.floor(Math.random() * options.length)];
+                    } else {
+                        let availableDirs = getDirectionCoordsForLength(actualCoord.length);
+                        const wrongCoords = availableDirs.filter(c => !arraysEqual(c, actualCoord));
+                        wrongCoord = wrongCoords[Math.floor(Math.random() * wrongCoords.length)];
+                    }
+                    let conclusionObj;
+                    if (isMultiDim) {
+                        conclusionObj = createMultiDimStatement(a, b, wrongCoord, multiDimDim);
+                    } else {
+                        let generator;
+                        if (actualCoord.length === 4) generator = new Direction4D();
+                        else if (actualCoord.length === 3) generator = new Direction3D();
+                        else generator = new Direction2D();
+                        conclusionObj = generator.createDirectionStatement(a, b, wrongCoord);
+                    }
                     const premiseResult = createPremiseHTML(conclusionObj, true, 0);
                     let conclusion = premiseResult.html;
                     let isValid = false;

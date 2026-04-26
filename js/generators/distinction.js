@@ -47,14 +47,14 @@ function createOppositeSetPremise(startSet, endSet) {
 }
 
 class DistinctionQuestion {
-    generate(length) {
+    generate(length, transforms = {}) {
         length++;
 
         // When stimulus sets are enabled, we need more words per premise
         const useStimSets = savedata.enableStimulusSets && savedata.stimulusSetSize >= 2;
         const setSize = useStimSets ? savedata.stimulusSetSize : 1;
         const extraWords = useStimSets ? ((length - 1) * (2 * setSize - 2)) : 0;
-        const words = createStimuli(length + extraWords);
+        const words = createStimuli(length + extraWords, transforms);
 
         let premiseMap = {};
         let first = words[0];
@@ -217,8 +217,8 @@ class DistinctionQuestion {
         };
     }
 
-    create(length) {
-        this.generate(length);
+    create(length, transforms = {}) {
+        this.generate(length, transforms);
 
         // Generate multiple conclusions if mode is enabled
         const numConclusions = (savedata.multipleConclusionsMode && savedata.numConclusions > 1)
