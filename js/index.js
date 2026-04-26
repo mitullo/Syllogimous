@@ -631,7 +631,7 @@ function carouselInit() {
 function displayInit() {
 
     if (appState.dynamicSwapButtons) {
-        appState.swapButtons = !appState.swapButtons;
+        appState.swapButtons = Math.random() < 0.5;
         applySwapButtons();
         const swapCheckbox = document.getElementById('p-swap-buttons');
         if (swapCheckbox) swapCheckbox.checked = appState.swapButtons;
