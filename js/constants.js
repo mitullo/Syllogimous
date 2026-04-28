@@ -122,6 +122,8 @@ let savedata = {
 
     "enableBinary": false,
 
+    "enableBinaryAnalogy": false,
+
     "useMeaningfulWords": false,
 
     "enableCarouselMode": false,
@@ -296,6 +298,8 @@ let savedata = {
 
     "enableTransformInterleave": false,
 
+    "enableTransformContinuous": false,
+
     "autoProgression": false,
 
     "autoProgressionGoal": 10,
@@ -381,6 +385,8 @@ const compressedSettings = {
     "enableAnchorSpace": "anc",
 
     "enableBinary": "bin",
+
+    "enableBinaryAnalogy": "binanl",
 
     "useMeaningfulWords": "words",
 
@@ -576,6 +582,8 @@ const compressedSettings = {
 
     "enableTransformInterleave": "tInterleave",
 
+    "enableTransformContinuous": "tContinuous",
+
     "autoProgression": "auto",
 
     "autoProgressionGoal": "goal",
@@ -671,6 +679,8 @@ const keySettingMap = {
     "p-6-time": "overrideDirectionTime",
     "p-6-scramble": "overrideSpace2DScramble",
     "p-7": "enableBinary",
+
+    "p-7a": "enableBinaryAnalogy",
     "p-7-premises": "overrideBinaryPremises",
     "p-7-time": "overrideBinaryTime",
     "p-7-scramble": "overrideBinaryScramble",
@@ -735,6 +745,8 @@ const keySettingMap = {
     "p-70": "useTopo",
     "p-71": "stimulusSize",
     "p-40": "enableTransformInterleave",
+
+    "p-40c": "enableTransformContinuous",
     "p-41": "autoProgression",
     "p-42": "autoProgressionGoal",
     "p-43": "enableAnchorSpace",
@@ -804,6 +816,8 @@ const legacySettings = [
 
     "enableBinary",
 
+    "enableBinaryAnalogy",
+
     "enableCarouselMode",
 
     "enableNegation",
@@ -863,6 +877,8 @@ const legacySettings = [
     "enableTransformRotate",
 
     "enableTransformInterleave",
+
+    "enableTransformContinuous",
 
     "enableStimulusSets",
 

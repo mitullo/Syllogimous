@@ -409,6 +409,7 @@ class DirectionQuestion {
         let anchorWords = null;
         let pattern = null;
         let wordsInPremises = new Set();
+        let continuousOps = [];
         
         // Create unified transform state if any transforms are needed
         // This will be initialized with wordCoordMap once it's created
@@ -433,17 +434,18 @@ class DirectionQuestion {
                 }
             }
             
+            continuousOps = [];
             if (this.generator.shouldUseAnchor()) {
                 if (numInterleaved > 0) {
                     // Use interleaved version for anchor spaces when interleave mode is on
                     [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchorInterleaved(length, numInterleaved, transformState, branchesAllowed);
                 } else {
-                    [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchor(length, branchesAllowed);
+                    [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps, anchorWords] = this.createWordMapAnchor(length, branchesAllowed);
                 }
             } else if (numInterleaved > 0) {
                 [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMapInterleaved(length, numInterleaved, transformState, null);
             } else {
-                [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMap(length, branchesAllowed);
+                [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps] = this.createWordMap(length, branchesAllowed);
             }
             // Extract all words that actually appear in premises
             wordsInPremises = new Set();
@@ -587,6 +589,12 @@ class DirectionQuestion {
                     premises.push(...operations);
                     operations = [];
                 }
+            }
+            
+            // Add continuous transform operations to operations list only (not premises)
+            // Continuous transforms apply silently to coordinates; their descriptions go in the Transformations section
+            if (continuousOps.length > 0) {
+                operations.push(...continuousOps);
             }
             
             // Recalculate conclusion coords AFTER transforms
@@ -740,6 +748,9 @@ class DirectionQuestion {
         if (numInterleaved > 0) {
             modifiers.push(`interleave`);
         }
+        if (continuousOps.length > 0) {
+            modifiers.push(`continuous`);
+        }
         // Pattern already generated above for v2, regular Anchor Space doesn't need pattern
 
         // For V2, filter wordCoordMap to only include words that appear in premises
@@ -827,6 +838,7 @@ class DirectionQuestion {
         let anchorWords = null;
         let pattern = null;
         let a, b, c, d;
+        let continuousOps = [];
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
         const branchesAllowed = Math.random() > 0.2;
         const flip = coinFlip();
@@ -849,13 +861,14 @@ class DirectionQuestion {
                 }
             }
             
+            continuousOps = [];
             if (this.generator.shouldUseAnchor()) {
                 if (numInterleaved > 0) {
                     // Use interleaved version for anchor spaces when interleave mode is on
                     [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchorInterleaved(length, numInterleaved, transformState, branchesAllowed);
                 } else {
-                    // Capture anchorWords (5th return value) for transform protection
-                    [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchor(length, branchesAllowed);
+                    // Capture anchorWords (6th return value) and continuousOps (5th) for transform protection
+                    [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps, anchorWords] = this.createWordMapAnchor(length, branchesAllowed);
                 }
                 // Generate pattern for V2 to show memorization stage
                 if (isV2 && anchorWords) {
@@ -865,7 +878,7 @@ class DirectionQuestion {
                 [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMapInterleaved(length, numInterleaved, transformState, null);
                 anchorWords = null;
             } else {
-                [wordCoordMap, neighbors, premises, usedDirCoords] = this.createWordMap(length, branchesAllowed);
+                [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps] = this.createWordMap(length, branchesAllowed);
                 anchorWords = null;
             }
             [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
@@ -899,6 +912,10 @@ class DirectionQuestion {
                     operations = [];
                 }
             }
+            // Add continuous transform operations to operations list only (not premises)
+            if (continuousOps.length > 0) {
+                operations.push(...continuousOps);
+            }
             const dirAB = findDirection(wordCoordMap[a], wordCoordMap[b]);
             const dirCD = findDirection(wordCoordMap[c], wordCoordMap[d]);
             // Handle null directions (words at same position) - treat as not equal
@@ -923,6 +940,9 @@ class DirectionQuestion {
         }
         if (numInterleaved > 0) {
             modifiers.push(`interleave`);
+        }
+        if (continuousOps.length > 0) {
+            modifiers.push(`continuous`);
         }
         return {
             category: 'Analogy: ' + this.generator.getName(),
@@ -956,9 +976,14 @@ class DirectionQuestion {
     }
 
     getNumTransformsSplit(numPremises) {
-        const totalTransforms = this.generator.hardModeLevel();
+        let totalTransforms = this.generator.hardModeLevel();
         if (!this.generator.hardModeAllowed() || totalTransforms === 0) {
             return [0, 0];
+        }
+
+        // When continuous transforms are enabled, reserve one slot for the continuous transform
+        if (savedata.enableTransformContinuous && totalTransforms > 0) {
+            totalTransforms = Math.max(0, totalTransforms - 1);
         }
 
         if (!savedata.enableTransformInterleave) {
@@ -1056,6 +1081,8 @@ class DirectionQuestion {
 
         // Create local transformState if not provided (for coordination)
         const localTransformState = transformState || (numInterleaved > 0 ? new TransformState(wordCoordMap, []) : null);
+        let continuousTransforms = [];
+        const continuousHardMode = new SpaceHardMode(1, anchorWords || [], localTransformState);
 
         let baseCompanionBuffer = [];  // Buffer for base companion words
         let targetBuffer = [];  // Buffer for target words
@@ -1101,19 +1128,30 @@ class DirectionQuestion {
                 if (premiseChunks[premiseChunks.length - 1].length !== 0) {
                     premiseChunks.push([]);
                 }
-                // Use coordinated SpaceHardMode with shared transformState
                 const hardMode = new SpaceHardMode(1, anchorWords || [], localTransformState);
-                let [newWordMap, operation] = hardMode.oneTransform(
-                    localTransformState ? localTransformState.wordCoordMap : wordCoordMap,
-                    lastWord,
-                    dimensionPool[dimensionIndex],
-                    dimensionPool[dimensionIndex+1]
-                );
+                let operation;
+                if (savedata.enableTransformContinuous && continuousTransforms.length === 0 && Math.random() < 0.5) {
+                    const continuous = hardMode.createContinuousTransform(localTransformState ? localTransformState.wordCoordMap : wordCoordMap, dimensionPool[dimensionIndex]);
+                    if (continuous) {
+                        continuousTransforms.push(continuous);
+                        operation = continuous.operation;
+                    }
+                }
+                if (!operation) {
+                    let newWordMap;
+                    [newWordMap, operation] = hardMode.oneTransform(
+                        localTransformState ? localTransformState.wordCoordMap : wordCoordMap,
+                        lastWord,
+                        dimensionPool[dimensionIndex],
+                        dimensionPool[dimensionIndex+1]
+                    );
+                    wordCoordMap = newWordMap;
+                }
                 dimensionIndex++;
-                wordCoordMap = newWordMap;
                 operations.push(operation);
             } else {
                 const nextWord = command[1];
+                let didCreatePremise = false;
 
                 if (useStimSets) {
                     // Buffer words for set grouping
@@ -1160,6 +1198,7 @@ class DirectionQuestion {
                         baseCompanionBuffer = [];
                         targetBuffer = [];
                         setBaseWord = null;
+                        didCreatePremise = true;
                     }
                 } else {
                     // Standard single-word premise
@@ -1174,6 +1213,12 @@ class DirectionQuestion {
                     neighbors[nextWord] = neighbors[nextWord] ?? [];
                     neighbors[nextWord].push(baseWord);
                     lastWord = nextWord;
+                    didCreatePremise = true;
+                }
+                if (didCreatePremise) {
+                    for (const continuous of continuousTransforms) {
+                        continuousHardMode.applyContinuousTransform(wordCoordMap, continuous);
+                    }
                 }
             }
         }
@@ -1182,13 +1227,7 @@ class DirectionQuestion {
             premiseChunks.pop();
         }
 
-        let divisions = words.length - 2;
-        let unbreakableDivisions = Math.round((100 - savedata.scrambleFactor) * divisions / 100);
-        premiseChunks = premiseChunks.map(chunk => {
-            let chosenDivisions = Math.min(unbreakableDivisions, chunk.length - 1);
-            unbreakableDivisions -= chosenDivisions;
-            return scrambleWithLimit(chunk, chosenDivisions);
-        });
+        premiseChunks = scramblePremiseChunks(premiseChunks, savedata.scrambleFactor);
 
         let merged = interleaveArrays(premiseChunks, operations);
         let premises = merged.flatMap(p => {
@@ -1212,6 +1251,7 @@ class DirectionQuestion {
         const words = baseWords.slice(1, baseWords.length);
         let wordCoordMap = {[start]: this.generator.initialCoord() };
         let neighbors = {[start]: []};
+
         return this.buildOntoWordMap(words, wordCoordMap, neighbors, branchesAllowed);
     }
 
@@ -1739,6 +1779,16 @@ class DirectionQuestion {
         let premiseMap = {};
         let usedDirCoords = [];
 
+        // Continuous transforms: create after first premise when enough words exist
+        let continuousTransforms = [];
+        let transformState = null;
+        let continuousHardMode = null;
+        let continuousCreated = false;
+        if (savedata.enableTransformContinuous && this.generator.hardModeAllowed() && this.generator.hardModeLevel() > 0) {
+            transformState = new TransformState(wordCoordMap, []);
+            continuousHardMode = new SpaceHardMode(1, [], transformState);
+        }
+
         // Get the set of anchor words (shapes) - these are the words already in wordCoordMap
         const anchorWords = new Set(Object.keys(wordCoordMap));
         const wordsInPremises = new Set(anchorWords);
@@ -1839,6 +1889,21 @@ class DirectionQuestion {
                 if (anchorWords.has(baseWord)) {
                     usedShapes.add(baseWord);
                 }
+                // Apply continuous transforms after each set premise
+                if (continuousHardMode) {
+                    if (!continuousCreated && Object.keys(wordCoordMap).length >= 2) {
+                        const initialCoord = this.generator.initialCoord();
+                        const preferredDim = Math.floor(Math.random() * initialCoord.length);
+                        const continuous = continuousHardMode.createContinuousTransform(wordCoordMap, preferredDim);
+                        if (continuous) {
+                            continuousTransforms.push(continuous);
+                        }
+                        continuousCreated = true;
+                    }
+                    for (const continuous of continuousTransforms) {
+                        continuousHardMode.applyContinuousTransform(wordCoordMap, continuous);
+                    }
+                }
             } else {
                 // Standard single-word premise
                 const nextWord = words[wordIndex];
@@ -1855,6 +1920,21 @@ class DirectionQuestion {
                 if (anchorWords.has(baseWord)) {
                     usedShapes.add(baseWord);
                 }
+                // Apply continuous transforms after each premise
+                if (continuousHardMode) {
+                    if (!continuousCreated && Object.keys(wordCoordMap).length >= 2) {
+                        const initialCoord = this.generator.initialCoord();
+                        const preferredDim = Math.floor(Math.random() * initialCoord.length);
+                        const continuous = continuousHardMode.createContinuousTransform(wordCoordMap, preferredDim);
+                        if (continuous) {
+                            continuousTransforms.push(continuous);
+                        }
+                        continuousCreated = true;
+                    }
+                    for (const continuous of continuousTransforms) {
+                        continuousHardMode.applyContinuousTransform(wordCoordMap, continuous);
+                    }
+                }
             }
         }
 
@@ -1863,7 +1943,10 @@ class DirectionQuestion {
             premises = createWidePremises(premises, premiseMap);
         }
 
-        return [wordCoordMap, neighbors, premises, usedDirCoords];
+        // Collect continuous transform operation strings
+        const continuousOps = continuousTransforms.map(ct => ct.operation).filter(Boolean);
+
+        return [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps];
     }
 }
 

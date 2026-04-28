@@ -184,9 +184,13 @@ function createMultiDim5DGenerator(length) {
                 return savedata.space5DHardModeLevel;
             },
             getNumTransformsSplit: function(numPremises) {
-                const totalTransforms = this.hardModeLevel();
+                let totalTransforms = this.hardModeLevel();
                 if (!this.hardModeAllowed() || totalTransforms === 0) {
                     return [0, 0];
+                }
+                // When continuous transforms are enabled, reserve one slot for the continuous transform
+                if (savedata.enableTransformContinuous && totalTransforms > 0) {
+                    totalTransforms = Math.max(0, totalTransforms - 1);
                 }
                 if (!savedata.enableTransformInterleave) {
                     return [0, totalTransforms];
@@ -237,6 +241,9 @@ function createMultiDim5DGenerator(length) {
 
                 let premiseIndex = 0;
                 let wordIndex = 1;
+                let continuousTransforms = [];
+                const continuousHardMode = new SpaceHardMode(1, anchorWords, transformState);
+                let continuousCreated = false;
 
                 while (wordIndex < words.length && premiseIndex < length) {
                     const baseWord = words[wordIndex - 1];
@@ -283,6 +290,16 @@ function createMultiDim5DGenerator(length) {
                         premiseChunks[premiseChunks.length - 1].push(setStatement);
                         premiseIndex++;
                         wordIndex += targetSet.length;
+                        // Create continuous transform after first premise if enabled
+                        if (!continuousCreated && savedata.enableTransformContinuous && this.hardModeAllowed() && this.hardModeLevel() > 0 && Object.keys(wordCoordMap).length >= 2) {
+                            const preferredDim = dimPool5D[dimIndex] || 0;
+                            const continuous = continuousHardMode.createContinuousTransform(wordCoordMap, preferredDim);
+                            if (continuous) continuousTransforms.push(continuous);
+                            continuousCreated = true;
+                        }
+                        for (const continuous of continuousTransforms) {
+                            continuousHardMode.applyContinuousTransform(wordCoordMap, continuous);
+                        }
                     } else {
                         const nextWord = words[wordIndex];
                         wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
@@ -297,6 +314,16 @@ function createMultiDim5DGenerator(length) {
                         premiseChunks[premiseChunks.length - 1].push(premise);
                         premiseIndex++;
                         wordIndex++;
+                        // Create continuous transform after first premise if enabled
+                        if (!continuousCreated && savedata.enableTransformContinuous && this.hardModeAllowed() && this.hardModeLevel() > 0 && Object.keys(wordCoordMap).length >= 2) {
+                            const preferredDim = dimPool5D[dimIndex] || 0;
+                            const continuous = continuousHardMode.createContinuousTransform(wordCoordMap, preferredDim);
+                            if (continuous) continuousTransforms.push(continuous);
+                            continuousCreated = true;
+                        }
+                        for (const continuous of continuousTransforms) {
+                            continuousHardMode.applyContinuousTransform(wordCoordMap, continuous);
+                        }
                     }
 
                     // Apply interleaved transform if due
@@ -307,10 +334,21 @@ function createMultiDim5DGenerator(length) {
                         const availableWords = Object.keys(wordCoordMap).filter(w => !anchorWords.includes(w));
                         if (availableWords.length > 0) {
                             const movingWord = availableWords[Math.floor(Math.random() * availableWords.length)];
-                            const [newMap, operation] = new SpaceHardMode(1, anchorWords, transformState)
-                                .oneTransform(wordCoordMap, movingWord, dimPool5D[dimIndex], dimPool5D[dimIndex + 1]);
+                            const hardMode = new SpaceHardMode(1, anchorWords, transformState);
+                            let operation;
+                            if (savedata.enableTransformContinuous && continuousTransforms.length === 0 && Math.random() < 0.5) {
+                                const continuous = hardMode.createContinuousTransform(wordCoordMap, dimPool5D[dimIndex]);
+                                if (continuous) {
+                                    continuousTransforms.push(continuous);
+                                    operation = continuous.operation;
+                                }
+                            }
+                            if (!operation) {
+                                const [newMap, oneTimeOperation] = hardMode.oneTransform(wordCoordMap, movingWord, dimPool5D[dimIndex], dimPool5D[dimIndex + 1]);
+                                wordCoordMap = newMap;
+                                operation = oneTimeOperation;
+                            }
                             dimIndex++;
-                            wordCoordMap = newMap;
                             if (operation) {
                                 interleavedOps.push(operation);
                             }
@@ -326,6 +364,8 @@ function createMultiDim5DGenerator(length) {
                 
                 // Merge premise chunks with interleaved operations (same as direction.js)
                 let premises;
+                const scrambleFactor = getScrambleFactor('overrideSpace5DScramble');
+                premiseChunks = scramblePremiseChunks(premiseChunks, scrambleFactor);
                 if (numInterleaved > 0 && interleavedOps.length > 0) {
                     let merged = interleaveArrays(premiseChunks, interleavedOps);
                     premises = merged.flatMap(p => Array.isArray(p) ? p : [p]);
@@ -475,6 +515,15 @@ function createMultiDim5DGenerator(length) {
                 if (totalTransforms > 0) {
                     modifiers.push(`op${totalTransforms}`);
                 }
+                if (continuousTransforms.length > 0) {
+                    modifiers.push(`continuous`);
+                }
+
+                // Add continuous transform operations to operations list only (not premises)
+                const continuousOps5D = continuousTransforms.map(ct => ct.operation).filter(Boolean);
+                if (continuousOps5D.length > 0) {
+                    operations.push(...continuousOps5D);
+                }
 
                 const countdown = this.getCountdown();
 
@@ -596,9 +645,13 @@ function createMultiDim6DGenerator(length) {
                 return savedata.space6DHardModeLevel;
             },
             getNumTransformsSplit: function(numPremises) {
-                const totalTransforms = this.hardModeLevel();
+                let totalTransforms = this.hardModeLevel();
                 if (!this.hardModeAllowed() || totalTransforms === 0) {
                     return [0, 0];
+                }
+                // When continuous transforms are enabled, reserve one slot for the continuous transform
+                if (savedata.enableTransformContinuous && totalTransforms > 0) {
+                    totalTransforms = Math.max(0, totalTransforms - 1);
                 }
                 if (!savedata.enableTransformInterleave) {
                     return [0, totalTransforms];
@@ -647,6 +700,9 @@ function createMultiDim6DGenerator(length) {
 
                 let premiseIndex = 0;
                 let wordIndex = 1;
+                let continuousTransforms = [];
+                const continuousHardMode = new SpaceHardMode(1, anchorWords, transformState);
+                let continuousCreated = false;
 
                 while (wordIndex < words.length && premiseIndex < length) {
                     const baseWord = words[wordIndex - 1];
@@ -693,6 +749,16 @@ function createMultiDim6DGenerator(length) {
                         premiseChunks[premiseChunks.length - 1].push(setStatement);
                         premiseIndex++;
                         wordIndex += targetSet.length;
+                        // Create continuous transform after first premise if enabled
+                        if (!continuousCreated && savedata.enableTransformContinuous && this.hardModeAllowed() && this.hardModeLevel() > 0 && Object.keys(wordCoordMap).length >= 2) {
+                            const preferredDim = dimPool6D[dimIndex] || 0;
+                            const continuous = continuousHardMode.createContinuousTransform(wordCoordMap, preferredDim);
+                            if (continuous) continuousTransforms.push(continuous);
+                            continuousCreated = true;
+                        }
+                        for (const continuous of continuousTransforms) {
+                            continuousHardMode.applyContinuousTransform(wordCoordMap, continuous);
+                        }
                     } else {
                         const nextWord = words[wordIndex];
                         wordCoordMap4D[nextWord] = addCoords(wordCoordMap4D[baseWord], dirCoord4D);
@@ -707,6 +773,16 @@ function createMultiDim6DGenerator(length) {
                         premiseChunks[premiseChunks.length - 1].push(premise);
                         premiseIndex++;
                         wordIndex++;
+                        // Create continuous transform after first premise if enabled
+                        if (!continuousCreated && savedata.enableTransformContinuous && this.hardModeAllowed() && this.hardModeLevel() > 0 && Object.keys(wordCoordMap).length >= 2) {
+                            const preferredDim = dimPool6D[dimIndex] || 0;
+                            const continuous = continuousHardMode.createContinuousTransform(wordCoordMap, preferredDim);
+                            if (continuous) continuousTransforms.push(continuous);
+                            continuousCreated = true;
+                        }
+                        for (const continuous of continuousTransforms) {
+                            continuousHardMode.applyContinuousTransform(wordCoordMap, continuous);
+                        }
                     }
 
                     // Apply interleaved transform if due
@@ -715,10 +791,21 @@ function createMultiDim6DGenerator(length) {
                         const availableWords = Object.keys(wordCoordMap).filter(w => !anchorWords.includes(w));
                         if (availableWords.length > 0) {
                             const movingWord = availableWords[Math.floor(Math.random() * availableWords.length)];
-                            const [newMap, operation] = new SpaceHardMode(1, anchorWords, transformState)
-                                .oneTransform(wordCoordMap, movingWord, dimPool6D[dimIndex], dimPool6D[dimIndex + 1]);
+                            const hardMode = new SpaceHardMode(1, anchorWords, transformState);
+                            let operation;
+                            if (savedata.enableTransformContinuous && continuousTransforms.length === 0 && Math.random() < 0.5) {
+                                const continuous = hardMode.createContinuousTransform(wordCoordMap, dimPool6D[dimIndex]);
+                                if (continuous) {
+                                    continuousTransforms.push(continuous);
+                                    operation = continuous.operation;
+                                }
+                            }
+                            if (!operation) {
+                                const [newMap, oneTimeOperation] = hardMode.oneTransform(wordCoordMap, movingWord, dimPool6D[dimIndex], dimPool6D[dimIndex + 1]);
+                                wordCoordMap = newMap;
+                                operation = oneTimeOperation;
+                            }
                             dimIndex++;
-                            wordCoordMap = newMap;
                             if (operation) {
                                 interleavedOps.push(operation);
                             }
@@ -734,6 +821,8 @@ function createMultiDim6DGenerator(length) {
                 
                 // Merge premise chunks with interleaved operations (same as direction.js)
                 let premises;
+                const scrambleFactor = getScrambleFactor('overrideSpace6DScramble');
+                premiseChunks = scramblePremiseChunks(premiseChunks, scrambleFactor);
                 if (numInterleaved > 0 && interleavedOps.length > 0) {
                     let merged = interleaveArrays(premiseChunks, interleavedOps);
                     premises = merged.flatMap(p => Array.isArray(p) ? p : [p]);
@@ -882,6 +971,15 @@ function createMultiDim6DGenerator(length) {
                 let modifiers = [];
                 if (totalTransforms > 0) {
                     modifiers.push(`op${totalTransforms}`);
+                }
+                if (continuousTransforms.length > 0) {
+                    modifiers.push(`continuous`);
+                }
+
+                // Add continuous transform operations to operations list only (not premises)
+                const continuousOps6D = continuousTransforms.map(ct => ct.operation).filter(Boolean);
+                if (continuousOps6D.length > 0) {
+                    operations.push(...continuousOps6D);
                 }
 
                 const countdown = this.getCountdown();

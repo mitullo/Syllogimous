@@ -46,13 +46,16 @@ function orderPremises(premiseMap, neighbors) {
     return premises;
 }
 
-function scramble(premises) {
+function scramble(premises, scrambleFactor = savedata.scrambleFactor) {
     const divisions = premises.length - 1;
-    const unbreakableDivisions = Math.floor((100 - savedata.scrambleFactor) * divisions / 100);
+    const unbreakableDivisions = Math.floor((100 - scrambleFactor) * divisions / 100);
     return scrambleWithLimit(premises, unbreakableDivisions);
 }
 
 function scrambleWithLimit(premises, unbreakableDivisions) {
+    if (premises.length <= 1) {
+        return premises.slice();
+    }
     const indices = Array.from({ length: premises.length - 1 }, (_, i) => i + 1);
     const selected = pickRandomItems(indices, unbreakableDivisions).picked;
 
@@ -95,4 +98,19 @@ function scrambleWithLimit(premises, unbreakableDivisions) {
         }
     }
     return scrambledPremises;
+}
+
+function getScrambleFactor(overrideKey) {
+    const override = savedata[overrideKey];
+    return override === null || override === undefined || override === '' ? savedata.scrambleFactor : override;
+}
+
+function scramblePremiseChunks(premiseChunks, scrambleFactor = savedata.scrambleFactor) {
+    let divisions = premiseChunks.map(chunk => Math.max(0, chunk.length - 1)).reduce((a, b) => a + b, 0);
+    let unbreakableDivisions = Math.round((100 - scrambleFactor) * divisions / 100);
+    return premiseChunks.map(chunk => {
+        const chosenDivisions = Math.min(unbreakableDivisions, Math.max(0, chunk.length - 1));
+        unbreakableDivisions -= chosenDivisions;
+        return scrambleWithLimit(chunk, chosenDivisions);
+    });
 }

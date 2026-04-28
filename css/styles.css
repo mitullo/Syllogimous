@@ -2588,6 +2588,26 @@ input[type="number"]::-moz-inner-spin-button {
 
 
 
+.binary-sub-conclusion {
+
+    display: inline-block;
+
+    padding: 0.25rem 0.75rem;
+
+    border: 1px solid rgba(255, 255, 255, 0.3);
+
+    border-radius: 4px;
+
+    background: rgba(255, 255, 255, 0.05);
+
+    margin: 0.15rem 0;
+
+    vertical-align: middle;
+
+}
+
+
+
 .is-negated {
 
     color: #e84057;

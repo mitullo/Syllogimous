@@ -255,6 +255,7 @@ let isPatternMemorizationPhase = false;
 let timerRunning = false;
 
 let processingAnswer = false;
+let answerCooldownUntil = 0;
 
 
 
@@ -2840,6 +2841,10 @@ function generateQuestion() {
 
         savedata.enableAnchorSpaceV2,
 
+        savedata.enableMultiDim5D,
+
+        savedata.enableMultiDim6D,
+
         savedata.enableSyllogism
 
     ].reduce((a, c) => a + +c, 0) > 1;
@@ -2950,7 +2955,11 @@ function generateQuestion() {
 
     ) {
 
-        if ((savedata.maxNestedBinaryDepth ?? 1) <= 1)
+        if (savedata.enableBinaryAnalogy && analogyEnable)
+
+            generators.push(createBinaryAnalogyGenerator(quota));
+
+        else if ((savedata.maxNestedBinaryDepth ?? 1) <= 1)
 
             generators.push(createBinaryGenerator(quota));
 
@@ -3402,11 +3411,12 @@ function checkIfFalse() {
 
 // Single state machine for all answer handling
 function handleConclusionAnswer(userAnswer) {
-    if (processingAnswer) return;
+    if (processingAnswer || Date.now() < answerCooldownUntil) return;
 
     trueButton.blur();
     falseButton.blur();
     processingAnswer = true;
+    answerCooldownUntil = Date.now() + 1000;
 
     const q = question;
     const isMulti = savedata.multipleConclusionsMode && q.conclusions && q.conclusions.length > 1;
@@ -3448,8 +3458,6 @@ function handleConclusionAnswer(userAnswer) {
 
         wowFeedback();
 
-        processingAnswer = false;
-
         return;
 
     }
@@ -3490,6 +3498,7 @@ function handleConclusionAnswer(userAnswer) {
             }
 
             refreshDisplayForNextConclusion();
+            answerCooldownUntil = Date.now() + 1000;
             processingAnswer = false;
         } else {
             // All conclusions answered - calculate final result
@@ -3516,6 +3525,7 @@ function handleConclusionAnswer(userAnswer) {
             renderHQL(true);
             // Move to next puzzle after final conclusion feedback
             init();
+            answerCooldownUntil = Date.now() + 1000;
             processingAnswer = false;
         }
     }, isIntermediateConclusion);

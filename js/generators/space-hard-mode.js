@@ -219,6 +219,84 @@ class SpaceHardMode {
         return [newWordMap, operation];
     }
 
+    createContinuousTransform(wordCoordMap, preferredDimension = 0) {
+        const words = Object.keys(wordCoordMap);
+        if (words.length < 2) {
+            return null;
+        }
+
+        const [axisWord, movingWord] = pickRandomItems(words, 2).picked;
+        const coordLength = wordCoordMap[movingWord].length;
+        const dimensions = Array.from({ length: Math.min(coordLength, 4) }, (_, i) => i);
+        const canRotate = savedata.enableTransformRotate && dimensions.length >= 2;
+        const canOscillate = savedata.enableTransformMirror;
+        if (!canRotate && !canOscillate) {
+            return null;
+        }
+
+        if (canRotate && (!canOscillate || coinFlip())) {
+            let plane = pickRandomItems(dimensions, 2).picked;
+            plane.sort();
+            const clockwise = coinFlip();
+            const planeName = dimensionNames[plane[0]] + dimensionNames[plane[1]];
+            return {
+                type: 'rotate',
+                axisWord,
+                movingWord,
+                plane,
+                clockwise,
+                operation: createContinuousRotationTemplate(axisWord, movingWord, planeName, clockwise),
+            };
+        }
+
+        const dimension = dimensions.includes(preferredDimension) ? preferredDimension : pickRandomItems(dimensions, 1).picked[0];
+        const originalCoord = wordCoordMap[movingWord].slice();
+        const alternateCoord = wordCoordMap[movingWord].slice();
+        const diff = wordCoordMap[movingWord][dimension] - wordCoordMap[axisWord][dimension];
+        alternateCoord[dimension] = wordCoordMap[axisWord][dimension] - diff;
+        return {
+            type: 'oscillate',
+            axisWord,
+            movingWord,
+            dimension,
+            originalCoord,
+            alternateCoord,
+            step: 0,
+            operation: createOscillationTemplate(axisWord, movingWord, dimensionNames[dimension]),
+        };
+    }
+
+    applyContinuousTransform(wordCoordMap, transform) {
+        if (!transform || !wordCoordMap[transform.axisWord] || !wordCoordMap[transform.movingWord]) {
+            return wordCoordMap;
+        }
+
+        if (transform.type === 'rotate') {
+            const [m, n] = transform.plane;
+            const axisCoord = wordCoordMap[transform.axisWord];
+            const movingCoord = wordCoordMap[transform.movingWord];
+            const newCoord = movingCoord.slice();
+            const diffM = movingCoord[m] - axisCoord[m];
+            const diffN = movingCoord[n] - axisCoord[n];
+            if (transform.clockwise) {
+                newCoord[m] = axisCoord[m] + diffN;
+                newCoord[n] = axisCoord[n] - diffM;
+            } else {
+                newCoord[m] = axisCoord[m] - diffN;
+                newCoord[n] = axisCoord[n] + diffM;
+            }
+            wordCoordMap[transform.movingWord] = newCoord;
+        } else if (transform.type === 'oscillate') {
+            transform.step++;
+            if (transform.step % 2 === 0) {
+                const currentlyAlternate = arraysEqual(wordCoordMap[transform.movingWord], transform.alternateCoord);
+                wordCoordMap[transform.movingWord] = (currentlyAlternate ? transform.originalCoord : transform.alternateCoord).slice();
+            }
+        }
+
+        return wordCoordMap;
+    }
+
     applyHardMode(wordCoordMap, leftStart, rightStart, existingDimensions = []) {
         const [leftChains, rightChains] = this.createChains(wordCoordMap, leftStart, rightStart);
         // Use existingDimensions as base if provided (for coordinated transforms), otherwise build from chains
@@ -589,5 +667,16 @@ function createSetTemplate(a, b, dimension) {
 
 function createRotationTemplate(a, b, planeOp, planeName, degree) {
     const relation = savedata.minimalMode ? `${planeName} ${degree}` : `is ${planeOp} ${degree} around`;
+    return `<span class="subject">${b}</span> <span class="relation">${relation}</span> <span class="subject">${a}</span>`;
+}
+
+function createContinuousRotationTemplate(a, b, planeName, clockwise) {
+    const degree = clockwise ? `<span class="pos-degree">90°↷</span>` : `<span class="neg-degree">-90°↺</span>`;
+    const relation = savedata.minimalMode ? `${planeName} ${degree} each` : `<span class="highlight">${planeName}</span>-rotates ${degree} around with every new premise`;
+    return `<span class="subject">${b}</span> <span class="relation">${relation}</span> <span class="subject">${a}</span>`;
+}
+
+function createOscillationTemplate(a, b, dimension) {
+    const relation = savedata.minimalMode ? `${dimension} ⇄ each2` : `oscillates across <span class="highlight">${dimension}</span> every other premise from`;
     return `<span class="subject">${b}</span> <span class="relation">${relation}</span> <span class="subject">${a}</span>`;
 }
