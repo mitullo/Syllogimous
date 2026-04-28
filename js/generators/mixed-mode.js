@@ -38,6 +38,7 @@ class MixedModeQuestion {
         if (this.availableModes.length < 2) {
             return null;
         }
+        resetDirectionLimit();
 
         // Pick which modes to mix (at least 2)
         const numModes = Math.min(this.availableModes.length, 2 + Math.floor(Math.random() * (this.availableModes.length - 1)));

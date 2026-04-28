@@ -2604,6 +2604,24 @@ input[type="number"]::-moz-inner-spin-button {
 
     vertical-align: middle;
 
+    max-width: 100%;
+
+    box-sizing: border-box;
+
+    overflow-wrap: break-word;
+
+}
+
+@media (max-width: 600px) {
+
+    .binary-sub-conclusion {
+
+        display: block;
+
+        margin: 0.3rem 0;
+
+    }
+
 }
 
 

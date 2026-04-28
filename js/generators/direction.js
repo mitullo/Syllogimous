@@ -11,10 +11,21 @@ function normalize(a) {
     return a.map(c => c === 0 ? 0 : c / Math.abs(c));
 }
 
+let _cachedDirectionLimit = null;
+
+function resetDirectionLimit() {
+    if (!savedata.enableDoubleDistance) {
+        _cachedDirectionLimit = 1;
+    } else if (Math.random() * 100 < (savedata.doubleDistanceFrequency ?? 100)) {
+        _cachedDirectionLimit = 2;
+    } else {
+        _cachedDirectionLimit = 1;
+    }
+}
+
 function directionLimit() {
-    if (!savedata.enableDoubleDistance) return 1;
-    if (Math.random() * 100 < (savedata.doubleDistanceFrequency ?? 100)) return 2;
-    return 1;
+    if (_cachedDirectionLimit === null) resetDirectionLimit();
+    return _cachedDirectionLimit;
 }
 
 function normalizeDirectionCoord(a) {
@@ -406,6 +417,7 @@ class DirectionQuestion {
         let usedDirCoords = [];
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
         const branchesAllowed = Math.random() < 0.75;
+        resetDirectionLimit();
         let anchorWords = null;
         let pattern = null;
         let wordsInPremises = new Set();
@@ -435,6 +447,7 @@ class DirectionQuestion {
             }
             
             continuousOps = [];
+            operations = [];
             if (this.generator.shouldUseAnchor()) {
                 if (numInterleaved > 0) {
                     // Use interleaved version for anchor spaces when interleave mode is on
@@ -830,6 +843,7 @@ class DirectionQuestion {
     createAnalogy(length) {
         let isValid;
         let isValidSame;
+        resetDirectionLimit();
         let wordCoordMap = {};
         let neighbors = {};
         let premises = [];
@@ -862,6 +876,7 @@ class DirectionQuestion {
             }
             
             continuousOps = [];
+            operations = [];
             if (this.generator.shouldUseAnchor()) {
                 if (numInterleaved > 0) {
                     // Use interleaved version for anchor spaces when interleave mode is on

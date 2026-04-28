@@ -368,6 +368,10 @@ function renderJunkEmojis(question) {
         question.operations = question.operations.map(text => renderJunkEmojisText(text, question.pattern));
     }
 
+    if (question.subOperations) {
+        question.subOperations = question.subOperations.map(ops => ops.map(text => renderJunkEmojisText(text, question.pattern)));
+    }
+
     if (question.conclusion) {
         question.conclusion = renderJunkEmojisText(question.conclusion, question.pattern);
     }

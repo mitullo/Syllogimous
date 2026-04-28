@@ -1069,33 +1069,45 @@ function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, 
     const label = conclusionLabel || 'Conclusion';
 
     // Check if this is a binary mode question with subresults for visual grouping
-    const isBinaryWithGroups = question && question.type === 'binary' && question.subresults && question.subresults.length > 0;
-    
+    const isBinaryWithGroups = question && (question.type === 'binary' || question.type === 'binary-analogy') && question.subresults && question.subresults.length > 0;
+
     let premisesHTML;
     if (isBinaryWithGroups) {
         // Group premises by their source subresult
         const groups = [];
+        const groupOps = [];
         let currentIndex = 0;
-        
-        for (const subresult of question.subresults) {
+
+        for (let gi = 0; gi < question.subresults.length; gi++) {
+            const subresult = question.subresults[gi];
             const groupPremises = premises.slice(currentIndex, currentIndex + subresult.premises.length);
             groups.push(groupPremises);
+            // Get this subresult's operations
+            groupOps.push(question.subOperations ? (question.subOperations[gi] || []) : (subresult.operations || []));
             currentIndex += subresult.premises.length;
         }
-        
-        // Render grouped premises with visual separation
+
+        // Render grouped premises with their transforms interleaved
         premisesHTML = groups.map((group, groupIndex) => {
             const groupClass = `premise-group premise-group-${groupIndex + 1}`;
             const groupPremises = group.map((p, i) => {
                 const globalIndex = groups.slice(0, groupIndex).reduce((sum, g) => sum + g.length, 0) + i;
                 return `<div class="formatted-premise ${halfMinimal && globalIndex % 2 === 0 ? 'minimal-style' : ''}">${p.html ?? p}</div>`;
             }).join('');
-            return `<div class="${groupClass}">${groupPremises}</div>`;
+            // Add this group's transforms inline
+            const ops = groupOps[groupIndex];
+            const opsHTML = ops.length > 0
+                ? '<div class="transform-header">Transformations</div>' + ops.map(o => `<div class="formatted-operation">${o}</div>`).join('')
+                : '';
+            return `<div class="${groupClass}">${groupPremises}${opsHTML}</div>`;
         }).join('');
     } else {
         // Standard premise rendering
         premisesHTML = premises.map((p, i) => `<div class="formatted-premise ${halfMinimal && i % 2 === 0 ? 'minimal-style' : ''}">${p.html ?? p}</div>`).join('');
     }
+
+    // For binary questions, transforms are already shown inline within each group
+    const showGlobalTransforms = !isBinaryWithGroups && operations && operations.length > 0;
 
     return [
 
@@ -1103,9 +1115,9 @@ function buildPremisesHTML(premises, operations, conclusion, easy, halfMinimal, 
 
         premisesHTML,
 
-        ...((operations && operations.length > 0) ? ['<div class="transform-header">Transformations</div>'] : []),
+        ...(showGlobalTransforms ? ['<div class="transform-header">Transformations</div>'] : []),
 
-        ...(operations ? operations.map(o => `<div class="formatted-operation">${o}</div>`) : []),
+        ...(showGlobalTransforms ? operations.map(o => `<div class="formatted-operation">${o}</div>`) : []),
 
         `<div class="postamble">${label}</div>`,
 
