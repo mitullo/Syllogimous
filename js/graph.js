@@ -4,6 +4,7 @@ class ProgressGraph {
         this.countChart = null;
         this.timeChart = null;
         this.timePerPremiseChart = null;
+        this.colorCursor = 0;
     }
 
     findDay(question) {
@@ -106,19 +107,49 @@ class ProgressGraph {
         await this.plotScore();
     }
 
-    randomColor() {
-        const r = Math.floor(Math.random() * 128 + 72);
-        const g = Math.floor(Math.random() * 128 + 72);
-        const b = Math.floor(Math.random() * 128 + 72);
-        return `rgb(${r}, ${g}, ${b})`;
+    randomColor(alpha = 0.92) {
+        const styles = getComputedStyle(document.documentElement);
+        const accentHue = parseFloat(styles.getPropertyValue('--accent-h')) || 220;
+        const hue = (accentHue + this.colorCursor * 47) % 360;
+        this.colorCursor += 1;
+        return `hsla(${hue}, 82%, 64%, ${alpha})`;
+    }
+
+    updateSummary(data) {
+        if (!graphSummaryDays || !graphSummaryTotal || !graphSummaryAccuracy || !graphSummaryTime) {
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            graphSummaryDays.textContent = '—';
+            graphSummaryTotal.textContent = '—';
+            graphSummaryAccuracy.textContent = '—';
+            graphSummaryTime.textContent = '—';
+            return;
+        }
+
+        const days = new Set(data.map(q => this.findDay(q))).size;
+        const total = data.length;
+        const correct = data.filter(q => q.correctness === 'right').length;
+        const accuracy = total > 0 ? (100 * correct / total) : 0;
+        const totalMinutes = data.reduce((sum, q) => sum + (q.timeElapsed || 0), 0) / 1000 / 60;
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = Math.round(totalMinutes % 60);
+
+        graphSummaryDays.textContent = days;
+        graphSummaryTotal.textContent = total;
+        graphSummaryAccuracy.textContent = `${accuracy.toFixed(0)}%`;
+        graphSummaryTime.textContent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
     }
 
     async plotScore() {
         let data = await getAllRRTProgress();
         data = data.filter(q => q.timeElapsed >= 1500);
+        this.updateSummary(data);
         if (!data || data.length === 0) {
             return;
         }
+        this.colorCursor = 0;
         const typeData = this.calculateTypeData(data, false);
         const premiseLevelData = this.calculateTypeData(data, true);
 
@@ -130,6 +161,11 @@ class ProgressGraph {
                 label: type,
                 data: premiseLevelData[type].map((entry) => ({ x: entry.day, y: entry.averageTime })),
                 borderColor: this.randomColor(),
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 2,
+                pointHoverRadius: 5,
+                tension: 0.32,
                 fill: false,
             };
         });
@@ -139,6 +175,11 @@ class ProgressGraph {
                 label: type,
                 data: premiseLevelData[type].map((entry) => ({ x: entry.day, y: entry.numPremises / entry.averageTime })),
                 borderColor: this.randomColor(),
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 2,
+                pointHoverRadius: 5,
+                tension: 0.32,
                 fill: false,
             };
         });
@@ -148,6 +189,9 @@ class ProgressGraph {
                 label: type,
                 data: typeData[type].map((entry) => ({ x: entry.day, y: entry.count })),
                 borderColor: this.randomColor(),
+                backgroundColor: this.randomColor(0.18),
+                borderWidth: 2,
+                borderRadius: 6,
             };
         });
 
@@ -159,7 +203,10 @@ class ProgressGraph {
         const timeDatasets = [{
             label: `Time Spent (Minutes)`,
             data: timeData.map(entry => ({ x: entry.day, y: entry.time })),
-            backgroundColor: this.randomColor(),
+            backgroundColor: this.randomColor(0.42),
+            borderColor: this.randomColor(),
+            borderWidth: 2,
+            borderRadius: 8,
         }];
 
         const scoreCtx = canvasScore.getContext('2d');
@@ -186,7 +233,14 @@ class ProgressGraph {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: {
-                    duration: 0,
+                    duration: 260,
+                    easing: 'easeOutQuart',
+                },
+                normalized: true,
+                resizeDelay: 120,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
                 },
                 scales: {
                     x: {
@@ -205,6 +259,7 @@ class ProgressGraph {
                         },
                         grid: {
                             color: gridColor,
+                            drawBorder: false,
                         },
                     },
                     y: {
@@ -216,7 +271,7 @@ class ProgressGraph {
                         ticks: {
                             color: textColor,
                             callback: function (value) {
-                                return value.toFixed(1);
+                                return value.toFixed(tickDecimals);
                             }
                         },
                         grid: {
@@ -229,7 +284,7 @@ class ProgressGraph {
                         callbacks: {
                             label: function(tooltipItem) {
                                 let value = tooltipItem.raw;
-                                return `${tooltipItem.dataset.label}: ${value.y.toFixed(2)}${unit}`;
+                                return `${tooltipItem.dataset.label}: ${value.y.toFixed(tooltipDecimals)}${unit}`;
                             }
                         }
                     },
@@ -240,8 +295,13 @@ class ProgressGraph {
                         color: isLightMode ? '#555' : '#EEEEEE',
                     },
                     legend: {
+                        position: 'bottom',
                         labels: {
                             color: textColor,
+                            boxWidth: 10,
+                            boxHeight: 10,
+                            usePointStyle: true,
+                            padding: 14,
                         },
                     },
                 },
@@ -262,6 +322,10 @@ class ProgressGraph {
 const graphPopup = document.getElementById('graph-popup');
 const graphClose = document.getElementById('graph-close-popup');
 const graphButton = document.getElementById('graph-label');
+const graphSummaryDays = document.getElementById('graph-summary-days');
+const graphSummaryTotal = document.getElementById('graph-summary-total');
+const graphSummaryAccuracy = document.getElementById('graph-summary-accuracy');
+const graphSummaryTime = document.getElementById('graph-summary-time');
 
 const graphTime = document.getElementById('graph-popup-time');
 const graphCount = document.getElementById('graph-popup-count');
@@ -321,6 +385,12 @@ graphButton.addEventListener('click', () => {
 
 document.addEventListener('click', (event) => {
   if (graphPopup.classList.contains('visible') && !graphPopup.contains(event.target) && !graphButton.contains(event.target)) {
+      PROGRESS_GRAPH.clearGraph();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && graphPopup.classList.contains('visible')) {
       PROGRESS_GRAPH.clearGraph();
   }
 });

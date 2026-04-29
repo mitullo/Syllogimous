@@ -274,6 +274,9 @@ const averageDisplay = document.getElementById("average-display");
 const averageCorrectDisplay = document.getElementById("average-correct-display");
 
 const percentCorrectDisplay = document.getElementById("percent-correct-display");
+const historyFilterButtons = document.querySelectorAll("[data-history-filter]");
+const historyFilterSummary = document.getElementById("history-filter-summary");
+let historyFilter = "all";
 
 
 
@@ -519,6 +522,8 @@ function load() {
     renderHQL();
 
     renderFolders();
+
+    loadSavedCustomFonts();
 
     populateSettings();
 
@@ -1191,11 +1196,11 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-cyan-preset').checked = appState.cyanPreset;
     if (appState.cyanPreset) {
-        document.body.style.background = CYAN_BODY;
-        const sidebar = document.getElementById('sidebar-settings');
-        if (sidebar) sidebar.style.background = CYAN_BOX;
-        document.documentElement.style.setProperty('--overlay-background-color', CYAN_OVERLAY);
+        applyCyanColors();
     }
+    // Cyan preset is dark-mode only — hide toggle in light mode
+    const cyanRow = document.getElementById('p-cyan-preset')?.closest('.ctrl__inner');
+    if (cyanRow) cyanRow.style.display = appState.darkMode ? '' : 'none';
 
     document.getElementById('p-flat-settings').checked = appState.flatSettings;
 
@@ -1205,11 +1210,35 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-nav-bar').checked = appState.navBar;
 
+    if (document.getElementById('p-side-tab-style')) document.getElementById('p-side-tab-style').value = appState.sideTabStyle || 'classic';
+
     document.getElementById('p-timer-anim').value = appState.timerAnimation;
 
-    document.getElementById('p-font-size').value = appState.fontSize;
+    // Font size slider - migrate legacy string values to numeric
+    const fontSizeMap = { smallest: 0.75, small: 0.85, normal: 1, large: 1.15, huge: 1.3 };
+    const fsVal = typeof appState.fontSize === 'number' ? appState.fontSize : (fontSizeMap[appState.fontSize] || 1);
+    appState.fontSize = fsVal;
+    document.getElementById('p-font-size').value = fsVal;
+    const fsLabel = fsVal <= 0.8 ? 'Tiny' : fsVal <= 0.9 ? 'Small' : fsVal <= 1.05 ? 'Normal' : fsVal <= 1.2 ? 'Large' : 'Huge';
+    document.getElementById('p-font-size-label').textContent = fsLabel;
 
-    document.getElementById('p-density').value = appState.uiDensity;
+    if (document.getElementById('p-ui-font')) {
+        document.getElementById('p-ui-font').value = appState.uiFont === 'custom' ? 'custom' : (appState.uiFont || 'default');
+        const uiFontFile = document.getElementById('p-ui-font-file');
+        if (appState.uiFont === 'custom' && uiFontFile) {
+            uiFontFile.style.display = '';
+        } else if (uiFontFile) {
+            uiFontFile.style.display = 'none';
+        }
+    }
+
+    // UI Density slider - migrate legacy string values to numeric
+    const densityMap = { 'super-compact': 0.25, compact: 0.5, normal: 1, spacious: 1.5 };
+    const denVal = typeof appState.uiDensity === 'number' ? appState.uiDensity : (densityMap[appState.uiDensity] || 1);
+    appState.uiDensity = denVal;
+    document.getElementById('p-density').value = denVal;
+    const denLabel = denVal <= 0.35 ? 'Super Compact' : denVal <= 0.65 ? 'Compact' : denVal <= 1.15 ? 'Normal' : 'Spacious';
+    document.getElementById('p-density-label').textContent = denLabel;
 
     document.getElementById('p-bracket-color').value = appState.bracketColor || '#3377ff';
 
@@ -1219,7 +1248,13 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-color-timer').checked = appState.colorTimer;
 
-    document.getElementById('p-timer-height').value = appState.timerHeight;
+    // Timer height slider - migrate legacy string values to numeric
+    const timerHeightMap = { thin: 10, normal: 20, thick: 30 };
+    const thVal = typeof appState.timerHeight === 'number' ? appState.timerHeight : (timerHeightMap[appState.timerHeight] || 20);
+    appState.timerHeight = thVal;
+    document.getElementById('p-timer-height').value = thVal;
+    const thLabel = thVal <= 10 ? 'Thin' : thVal <= 24 ? 'Normal' : 'Thick';
+    document.getElementById('p-timer-height-label').textContent = thLabel + ' (' + thVal + 'px)';
 
     document.getElementById('p-border-radius').value = appState.borderRadius;
 
@@ -1235,13 +1270,25 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-button-style').value = appState.buttonStyle;
 
-    document.getElementById('p-premise-font').value = appState.premiseFont || 'default';
+    document.getElementById('p-premise-font').value = appState.premiseFont === 'custom' ? 'custom' : (appState.premiseFont || 'default');
+    const premiseFontFile = document.getElementById('p-premise-font-file');
+    if (appState.premiseFont === 'custom' && premiseFontFile) {
+        premiseFontFile.style.display = '';
+    } else if (premiseFontFile) {
+        premiseFontFile.style.display = 'none';
+    }
 
     document.getElementById('p-score-mode').value = appState.scoreMode || 'net';
 
     document.getElementById('p-hide-side-buttons').checked = appState.hideSideButtons || false;
 
-    document.getElementById('p-71').value = appState.stimulusSize || 'normal';
+    // Stimulus size slider - migrate legacy string values to numeric
+    const stimMap = { small: 0.85, normal: 1.125, large: 1.5, huge: 2 };
+    const ssVal = typeof appState.stimulusSize === 'number' ? appState.stimulusSize : (stimMap[appState.stimulusSize] || 1.125);
+    appState.stimulusSize = ssVal;
+    document.getElementById('p-71').value = ssVal;
+    const ssLabel = ssVal <= 0.9 ? 'Small' : ssVal <= 1.2 ? 'Normal' : ssVal <= 1.6 ? 'Large' : 'Huge';
+    document.getElementById('p-71-label').textContent = ssLabel;
 
     applyAppearanceSettings();
 
@@ -1300,10 +1347,10 @@ function handleColorChange(event) {
 
 
 
-const CYAN_GAME = '#1A3A3ACC';
-const CYAN_BODY = '#0D2626';
-const CYAN_BOX = '#122E2E';
-const CYAN_OVERLAY = '#0a2020';
+const CYAN_GAME = '#1A5A5ACC';
+const CYAN_BODY = '#082E2E';
+const CYAN_BOX = '#0D3A3A';
+const CYAN_OVERLAY = '#062222';
 
 function applyCyanPreset() {
     const checked = document.getElementById('p-cyan-preset').checked;
@@ -1313,6 +1360,7 @@ function applyCyanPreset() {
     if (!checked) {
         // Turn off — restore previous color
         document.body.style.background = '';
+        document.body.classList.remove('cyan-preset');
         const sidebar = document.getElementById('sidebar-settings');
         if (sidebar) sidebar.style.background = '';
         root.style.removeProperty('--overlay-background-color');
@@ -1321,13 +1369,18 @@ function applyCyanPreset() {
         handleColorChange({target:{value: defaultColor}});
     } else {
         // Turn on
-        document.body.style.background = CYAN_BODY;
-        const sidebar = document.getElementById('sidebar-settings');
-        if (sidebar) sidebar.style.background = CYAN_BOX;
-        root.style.setProperty('--overlay-background-color', CYAN_OVERLAY);
+        applyCyanColors();
         colorInput.value = CYAN_GAME;
         handleColorChange({target:{value: CYAN_GAME}});
     }
+}
+
+function applyCyanColors() {
+    document.body.style.background = CYAN_BODY;
+    document.body.classList.add('cyan-preset');
+    const sidebar = document.getElementById('sidebar-settings');
+    if (sidebar) sidebar.style.background = CYAN_BOX;
+    document.documentElement.style.setProperty('--overlay-background-color', CYAN_OVERLAY);
 }
 
 
@@ -1354,7 +1407,10 @@ function handleTimerAnimChange(event) {
 
 function handleFontSizeChange(event) {
 
-    appState.fontSize = event.target.value;
+    const val = parseFloat(event.target.value);
+    appState.fontSize = val;
+    const label = val <= 0.8 ? 'Tiny' : val <= 0.9 ? 'Small' : val <= 1.05 ? 'Normal' : val <= 1.2 ? 'Large' : 'Huge';
+    document.getElementById('p-font-size-label').textContent = label;
 
     applyAppearanceSettings();
 
@@ -1362,11 +1418,126 @@ function handleFontSizeChange(event) {
 
 }
 
+function handleUiFontChange(event) {
+
+    const val = event.target.value;
+    const fileInput = document.getElementById('p-ui-font-file');
+    if (val === 'custom') {
+        fileInput.style.display = '';
+        fileInput.click();
+    } else {
+        fileInput.style.display = 'none';
+        appState.uiFont = val;
+        appState.uiFontCustom = '';
+    }
+
+    applyAppearanceSettings();
+
+    save();
+
+}
+
+function handleUiFontFileUpload(event) {
+
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result;
+        const fontName = 'CustomUI_' + file.name.replace(/\.[^.]+$/, '');
+        // Store font data
+        appState.uiFont = 'custom';
+        appState.uiFontCustom = fontName;
+        appState.uiFontFileData = base64;
+        appState.uiFontFileName = file.name;
+        // Inject @font-face
+        injectCustomFont(fontName, base64);
+        applyAppearanceSettings();
+        save();
+    };
+    reader.readAsDataURL(file);
+
+}
+
+function injectCustomFont(fontName, base64Data) {
+
+    // Remove existing font-face for this name if any
+    const existing = document.getElementById('fontface-' + fontName);
+    if (existing) existing.remove();
+
+    // Detect format from data URL mime type
+    let format = 'truetype';
+    if (base64Data.includes('data:font/opentype') || base64Data.includes('data:application/x-font-otf') || base64Data.includes('data:application/font-sfnt')) {
+        format = 'opentype';
+    } else if (base64Data.includes('data:font/woff2') || base64Data.includes('data:application/font-woff2')) {
+        format = 'woff2';
+    } else if (base64Data.includes('data:font/woff') || base64Data.includes('data:application/font-woff') || base64Data.includes('data:application/x-woff')) {
+        format = 'woff';
+    } else if (base64Data.includes('data:font/ttf') || base64Data.includes('data:application/x-font-ttf') || base64Data.includes('data:application/font-ttf')) {
+        format = 'truetype';
+    }
+
+    const style = document.createElement('style');
+    style.id = 'fontface-' + fontName;
+    style.textContent = `@font-face { font-family: "${fontName}"; src: url("${base64Data}") format("${format}"); }`;
+    document.head.appendChild(style);
+
+}
+
+function loadSavedCustomFonts() {
+
+    if (appState.uiFontFileData && appState.uiFontCustom) {
+        injectCustomFont(appState.uiFontCustom, appState.uiFontFileData);
+    }
+    if (appState.premiseFontFileData && appState.premiseFontCustom) {
+        injectCustomFont(appState.premiseFontCustom, appState.premiseFontFileData);
+    }
+
+}
+
+function handleSideTabStyleChange(event) {
+
+    appState.sideTabStyle = event.target.value;
+
+    applyAppearanceSettings();
+
+    save();
+
+}
+
+function applyAppearancePreset(preset) {
+
+    const presets = {
+
+        focus: { darkMode: true, bracketColor: '#3377ff', conclusionColor: '#ffffff', uiFont: 'inter', premiseFont: 'jetbrains-mono', fontSize: 1, uiDensity: 1, sideTabStyle: 'floating', timerHeight: 20, buttonStyle: 'contrast' },
+
+        arcade: { darkMode: true, bracketColor: '#7e47eb', conclusionColor: '#ffffff', uiFont: 'rajdhani', premiseFont: 'orbitron', fontSize: 1.15, uiDensity: 0.5, sideTabStyle: 'classic', timerHeight: 30, buttonStyle: 'solid' },
+
+        paper: { darkMode: false, bracketColor: '#3377ff', conclusionColor: '#000000', uiFont: 'space-grotesk', premiseFont: 'inter', fontSize: 1, uiDensity: 1.5, sideTabStyle: 'floating', timerHeight: 10, buttonStyle: 'contrast' },
+
+        minimal: { darkMode: true, bracketColor: '#18dc6a', conclusionColor: '#ffffff', uiFont: 'inter', premiseFont: 'inter', fontSize: 0.85, uiDensity: 0.5, sideTabStyle: 'minimal', timerHeight: 10, buttonStyle: 'contrast' }
+
+    };
+
+    const selected = presets[preset];
+
+    if (!selected) return;
+
+    Object.assign(appState, selected);
+
+    appState.cyanPreset = false;
+
+    refresh();
+
+}
 
 
 function handleDensityChange(event) {
 
-    appState.uiDensity = event.target.value;
+    const val = parseFloat(event.target.value);
+    appState.uiDensity = val;
+    const label = val <= 0.35 ? 'Super Compact' : val <= 0.65 ? 'Compact' : val <= 1.15 ? 'Normal' : 'Spacious';
+    document.getElementById('p-density-label').textContent = label;
 
     applyAppearanceSettings();
 
@@ -1390,7 +1561,10 @@ function handleBracketColorChange(event) {
 
 function handleTimerHeightChange(event) {
 
-    appState.timerHeight = event.target.value;
+    const val = parseInt(event.target.value);
+    appState.timerHeight = val;
+    const label = val <= 10 ? 'Thin' : val <= 24 ? 'Normal' : 'Thick';
+    document.getElementById('p-timer-height-label').textContent = label + ' (' + val + 'px)';
 
     applyAppearanceSettings();
 
@@ -1627,7 +1801,16 @@ function handleButtonStyleChange(event) {
 
 function handlePremiseFontChange(event) {
 
-    appState.premiseFont = event.target.value;
+    const val = event.target.value;
+    const fileInput = document.getElementById('p-premise-font-file');
+    if (val === 'custom') {
+        fileInput.style.display = '';
+        fileInput.click();
+    } else {
+        fileInput.style.display = 'none';
+        appState.premiseFont = val;
+        appState.premiseFontCustom = '';
+    }
 
     applyAppearanceSettings();
 
@@ -1635,11 +1818,34 @@ function handlePremiseFontChange(event) {
 
 }
 
+function handlePremiseFontFileUpload(event) {
+
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result;
+        const fontName = 'CustomPremise_' + file.name.replace(/\.[^.]+$/, '');
+        appState.premiseFont = 'custom';
+        appState.premiseFontCustom = fontName;
+        appState.premiseFontFileData = base64;
+        appState.premiseFontFileName = file.name;
+        injectCustomFont(fontName, base64);
+        applyAppearanceSettings();
+        save();
+    };
+    reader.readAsDataURL(file);
+
+}
+
 
 
 function handleStimulusSizeChange(event) {
 
-    appState.stimulusSize = event.target.value;
+    const val = parseFloat(event.target.value);
+    appState.stimulusSize = val;
+    const label = val <= 0.9 ? 'Small' : val <= 1.2 ? 'Normal' : val <= 1.6 ? 'Large' : 'Huge';
+    document.getElementById('p-71-label').textContent = label;
 
     applyAppearanceSettings();
 
@@ -1885,21 +2091,51 @@ function applyAppearanceSettings() {
 
     const settingsContent = document.querySelectorAll('.settings-section-content');
 
-    
+    const fontStacks = {
+
+        default: '\'Inter\', "Roboto", system-ui, sans-serif',
+
+        inter: '\'Inter\', "Roboto", system-ui, sans-serif',
+
+        'space-grotesk': '\'Space Grotesk\', "Roboto", system-ui, sans-serif',
+
+        rajdhani: '\'Rajdhani\', "Roboto", sans-serif',
+
+        'exo-2': '\'Exo 2\', "Roboto", system-ui, sans-serif',
+
+        orbitron: '\'Orbitron\', "Espionage", sans-serif',
+
+        'jetbrains-mono': '\'JetBrains Mono\', "Courier New", monospace'
+
+    };
+
+    const uiFontKey = appState.uiFont === 'custom' ? 'custom' : (appState.uiFont || 'default');
+    if (appState.uiFont === 'custom' && appState.uiFontCustom) {
+        root.style.setProperty('--ui-font', '"' + appState.uiFontCustom + '", sans-serif');
+    } else {
+        root.style.setProperty('--ui-font', fontStacks[appState.uiFont] || fontStacks.default);
+    }
+
+    document.body.classList.remove('ui-font-default', 'ui-font-inter', 'ui-font-space-grotesk', 'ui-font-rajdhani', 'ui-font-exo-2', 'ui-font-orbitron', 'ui-font-jetbrains-mono', 'ui-font-custom');
+
+    document.body.classList.add('ui-font-' + uiFontKey);
+
+    document.body.classList.remove('side-tabs-classic', 'side-tabs-floating', 'side-tabs-minimal');
+
+    document.body.classList.add('side-tabs-' + (appState.sideTabStyle || 'classic'));
+
 
     // Font size
-
-    const fontSizes = { smallest: '0.75rem', small: '0.85rem', normal: '1rem', large: '1.15rem', huge: '1.3rem' };
-
-    root.style.setProperty('--base-font-size', fontSizes[appState.fontSize] || '1rem');
+    const fontSizesMap = { smallest: '0.75rem', small: '0.85rem', normal: '1rem', large: '1.15rem', huge: '1.3rem' };
+    const fontSize = typeof appState.fontSize === 'number' ? appState.fontSize + 'rem' : (fontSizesMap[appState.fontSize] || '1rem');
+    root.style.setProperty('--base-font-size', fontSize);
 
     
 
     // UI Density - apply to multiple spacing elements
 
-    const densities = { 'super-compact': '0.25rem', compact: '0.5rem', normal: '1rem', spacious: '1.5rem' };
-
-    const density = densities[appState.uiDensity] || '1rem';
+    const densitiesMap = { 'super-compact': '0.25rem', compact: '0.5rem', normal: '1rem', spacious: '1.5rem' };
+    const density = typeof appState.uiDensity === 'number' ? appState.uiDensity + 'rem' : (densitiesMap[appState.uiDensity] || '1rem');
 
     root.style.setProperty('--ui-padding', density);
 
@@ -1925,7 +2161,7 @@ function applyAppearanceSettings() {
 
     root.style.setProperty('--premise-padding-y', `calc(${density} * 0.25)`);
 
-    root.style.setProperty('--premise-padding-x', (appState.uiDensity === 'compact' || appState.uiDensity === 'super-compact') ? '0' : `calc(${density} * 0.25)`);
+    root.style.setProperty('--premise-padding-x', (typeof appState.uiDensity === 'number' ? appState.uiDensity <= 0.5 : (appState.uiDensity === 'compact' || appState.uiDensity === 'super-compact')) ? '0' : `calc(${density} * 0.25)`);
 
     
 
@@ -2000,10 +2236,9 @@ function applyAppearanceSettings() {
     
 
     // Timer height
-
-    const timerHeights = { thin: '10px', normal: '20px', thick: '30px' };
-
-    if (timerBar) timerBar.style.height = timerHeights[appState.timerHeight] || '20px';
+    const timerHeightsMap = { thin: '10px', normal: '20px', thick: '30px' };
+    const timerH = typeof appState.timerHeight === 'number' ? appState.timerHeight + 'px' : (timerHeightsMap[appState.timerHeight] || '20px');
+    if (timerBar) timerBar.style.height = timerH;
 
     
 
@@ -2079,23 +2314,54 @@ function applyAppearanceSettings() {
 
 
 
-    // Premise font
+    // Question font
 
-    document.body.classList.remove('premise-mono');
+    document.body.classList.remove('premise-font-default', 'premise-font-inter', 'premise-font-space-grotesk', 'premise-font-rajdhani', 'premise-font-exo-2', 'premise-font-orbitron', 'premise-font-jetbrains-mono', 'premise-mono', 'premise-font-custom');
 
-    if (appState.premiseFont === 'mono') {
+    const premiseFont = appState.premiseFont || 'default';
+
+    const premiseFontStacks = {
+
+        default: 'inherit',
+
+        inter: '\'Inter\', "Roboto", system-ui, sans-serif',
+
+        'space-grotesk': '\'Space Grotesk\', "Roboto", system-ui, sans-serif',
+
+        rajdhani: '\'Rajdhani\', "Roboto", sans-serif',
+
+        'exo-2': '\'Exo 2\', "Roboto", system-ui, sans-serif',
+
+        orbitron: '\'Orbitron\', "Espionage", sans-serif',
+
+        'jetbrains-mono': '\'JetBrains Mono\', "Courier New", monospace',
+
+        mono: '\'Courier New\', Courier, monospace'
+
+    };
+
+    if (premiseFont === 'custom' && appState.premiseFontCustom) {
+        root.style.setProperty('--premise-font', '"' + appState.premiseFontCustom + '", sans-serif');
+    } else {
+        root.style.setProperty('--premise-font', premiseFontStacks[premiseFont] || premiseFontStacks.default);
+    }
+
+    if (premiseFont === 'mono') {
 
         document.body.classList.add('premise-mono');
+
+    } else {
+
+        document.body.classList.add('premise-font-' + premiseFont);
 
     }
 
 
 
     // Stimulus size (emoji, voronoi, topo)
-
-    const stimulusSizes = { small: '0.85em', normal: '1.125em', large: '1.5em', huge: '2em' };
-
-    root.style.setProperty('--stimulus-size', stimulusSizes[appState.stimulusSize] || '1.125em');
+    const stimulusSizesMap = { small: '0.85em', normal: '1.125em', large: '1.5em', huge: '2em' };
+    const stimSize = typeof appState.stimulusSize === 'number' ? appState.stimulusSize + 'em' : (stimulusSizesMap[appState.stimulusSize] || '1.125em');
+    root.style.setProperty('--stimulus-size', stimSize);
 
 }
 
@@ -2130,6 +2396,24 @@ function handleDarkModeChange(event) {
     }
 
     appState.darkMode = isDarkMode;
+
+    // Cyan preset is dark-mode only — disable it when switching to light mode
+    if (!isDarkMode && appState.cyanPreset) {
+        appState.cyanPreset = false;
+        document.getElementById('p-cyan-preset').checked = false;
+        document.body.style.background = '';
+        document.body.classList.remove('cyan-preset');
+        const sidebar = document.getElementById('sidebar-settings');
+        if (sidebar) sidebar.style.background = '';
+        document.documentElement.style.removeProperty('--overlay-background-color');
+        const colorInput = document.getElementById('color-input');
+        colorInput.value = '#EFEFEF';
+        handleColorChange({target:{value: '#EFEFEF'}});
+    }
+
+    // Show/hide cyan preset toggle based on mode
+    const cyanRow = document.getElementById('p-cyan-preset')?.closest('.ctrl__inner');
+    if (cyanRow) cyanRow.style.display = isDarkMode ? '' : 'none';
 
     refresh();
 
@@ -3674,9 +3958,60 @@ function deleteQuestion(i, isRight) {
 
 }
 
+function historyMatchesFilter(q) {
+    return historyFilter === "all" || q.correctness === historyFilter;
+}
+
+function updateHistoryFilterControls(questions = appState.questions) {
+    const counts = {
+        all: questions.length,
+        right: questions.filter(q => q.correctness === 'right').length,
+        wrong: questions.filter(q => q.correctness === 'wrong').length,
+        missed: questions.filter(q => q.correctness === 'missed').length,
+    };
+
+    historyFilterButtons.forEach(button => {
+        const filter = button.dataset.historyFilter || 'all';
+        const countEl = button.querySelector('.history-filter-count');
+        if (countEl) countEl.textContent = counts[filter] || 0;
+        button.classList.toggle('selected', filter === historyFilter);
+        button.setAttribute('aria-pressed', String(filter === historyFilter));
+    });
+}
+
+function updateHistoryFilterSummary(totalCount, visibleCount) {
+    if (!historyFilterSummary) return;
+
+    const label = {
+        all: 'all answers',
+        right: 'correct answers',
+        wrong: 'mistakes',
+        missed: 'missed answers',
+    }[historyFilter] || 'answers';
+
+    historyFilterSummary.textContent = historyFilter === 'all'
+        ? `Showing ${totalCount} ${label}`
+        : `Showing ${visibleCount} of ${totalCount} ${label}`;
+}
+
+function setHistoryFilter(filter) {
+    historyFilter = filter || 'all';
+    renderHQL();
+}
+
+historyFilterButtons.forEach(button => {
+    button.addEventListener('click', () => setHistoryFilter(button.dataset.historyFilter));
+});
+
 function renderHQL(didAddSingleQuestion=false) {
 
     const emptyEl = document.getElementById('history-empty');
+
+    if (didAddSingleQuestion && historyFilter !== 'all') {
+
+        didAddSingleQuestion = false;
+
+    }
 
     if (didAddSingleQuestion) {
 
@@ -3684,9 +4019,13 @@ function renderHQL(didAddSingleQuestion=false) {
 
         const recentQuestion = appState.questions[index];
 
-        const firstChild = historyList.firstElementChild;
+        if (historyMatchesFilter(recentQuestion)) {
 
-        historyList.insertBefore(createHQLI(recentQuestion, index), firstChild);
+            const firstChild = historyList.firstElementChild;
+
+            historyList.insertBefore(createHQLI(recentQuestion, index), firstChild);
+
+        }
 
         // Hide empty state placeholder
         if (emptyEl) emptyEl.style.display = 'none';
@@ -3696,17 +4035,17 @@ function renderHQL(didAddSingleQuestion=false) {
         historyList.innerHTML = "";
 
 
-        const len = appState.questions.length;
+        const entries = appState.questions
+            .map((q, index) => ({ q, index }))
+            .reverse()
+            .filter(({ q }) => historyMatchesFilter(q));
 
-        const reverseChronological = appState.questions.slice().reverse();
 
+        entries
 
+            .map(({ q, index }) => {
 
-        reverseChronological
-
-            .map((q, i) => {
-
-                const el = createHQLI(q, len - i - 1);
+                const el = createHQLI(q, index);
 
                 return el;
 
@@ -3714,12 +4053,22 @@ function renderHQL(didAddSingleQuestion=false) {
 
             .forEach(el => historyList.appendChild(el));
 
-        // Show/hide empty state based on whether there are questions
-        if (emptyEl) emptyEl.style.display = len > 0 ? 'none' : 'flex';
+        // Show/hide empty state based on whether there are questions or filter matches
+        if (emptyEl) {
+            const emptyTitle = emptyEl.querySelector('.history-empty-title');
+            if (emptyTitle) emptyTitle.textContent = appState.questions.length > 0 ? 'No matches' : 'No history yet';
+            emptyEl.style.display = entries.length > 0 ? 'none' : 'flex';
+        }
 
     }
 
 
+
+    updateHistoryFilterControls(appState.questions);
+
+    const visibleCount = appState.questions.filter(q => historyMatchesFilter(q)).length;
+
+    updateHistoryFilterSummary(appState.questions.length, visibleCount);
 
     updateAverage(appState.questions);
 

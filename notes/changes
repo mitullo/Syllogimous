@@ -1,0 +1,607 @@
+diff -ruN original/index.html modified/index.html
+--- original/index.html	2026-04-29 10:43:57.106372714 +0000
++++ modified/index.html	2026-04-29 10:46:06.002006596 +0000
+@@ -228,11 +228,17 @@
+ 
+ 									</div>
+ 
+-									<div class="profile-plus" id="profile-plus">+</div>
++									<div class="profile-actions">
+ 
+-									<div class="profile-share" id="profile-share"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Share</span></div>
++										<div class="profile-plus" id="profile-plus" role="button" tabindex="0" title="Duplicate current profile" aria-label="Duplicate current profile">+</div>
+ 
+-									<div class="profile-copied" id="profile-copied">URL copied to clipboard</div>
++										<div class="profile-export" id="profile-export" role="button" tabindex="0" title="Export profile" aria-label="Export profile"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Export</span></div>
++
++										<div class="profile-import" id="profile-import" role="button" tabindex="0" title="Import profile" aria-label="Import profile"><span class="text">Import</span></div>
++
++									</div>
++
++									<div class="profile-copied" id="profile-copied">Profile copied to clipboard</div>
+ 
+ 								</div>
+ 
+diff -ruN original/profile.js modified/profile.js
+--- original/profile.js	2026-04-29 10:43:57.107583938 +0000
++++ modified/profile.js	2026-04-29 10:46:06.002940822 +0000
+@@ -3,9 +3,13 @@
+ const profileList = document.getElementById('profile-list');
+ const profileDropdown = document.querySelector('.profile-dropdown');
+ const profilePlus = document.getElementById('profile-plus');
+-const profileShare = document.getElementById('profile-share');
++const profileExport = document.getElementById('profile-export');
++const profileImport = document.getElementById('profile-import');
+ const profileCopied = document.getElementById('profile-copied');
+ 
++const PROFILE_CAPSULE_PREFIX = 'SYL3:';
++const MAX_PROFILE_SHARE_URL_LENGTH = 1800;
++
+ class ProfileStore {
+     constructor() {
+         this.profiles = [];
+@@ -15,7 +19,7 @@
+ 
+     startup() {
+         this.loadProfiles();
+-        this.loadUrl();
++        this.loadIncomingProfile();
+     }
+ 
+     overrideExistingKeys(target, source) {
+@@ -181,106 +185,254 @@
+         return result;
+     }
+ 
+-    generateUrl() {
+-        const savedata = structuredClone(this.current().savedata);
+-        for (const setting of legacySettings) {
+-            if (savedata.hasOwnProperty(setting) && defaultSavedata[setting] === savedata[setting]) {
+-                delete savedata[setting];
+-            }
++    valuesEqual(a, b) {
++        return JSON.stringify(a) === JSON.stringify(b);
++    }
++
++    sanitizeInput(value, maxLength = 80) {
++        if (typeof value !== 'string') {
++            return '';
+         }
+-        for (const [setting, compressed] of Object.entries(compressedSettings)) {
+-            if (savedata.hasOwnProperty(setting)) {
+-                savedata[compressed] = savedata[setting];
+-                delete savedata[setting];
++        return (value.length < maxLength) ? value.replace(/<[^>]*>/g, '') : '';
++    }
++
++    buildPortableSavedata(source = this.current().savedata) {
++        const portable = {};
++
++        for (const [setting, value] of Object.entries(source)) {
++            if (!defaultSavedata.hasOwnProperty(setting)) {
++                continue;
+             }
+-        }
+-        for (const [setting, value] of Object.entries(savedata)) {
+-            if (typeof value === "boolean") {
+-                savedata[setting] = value ? 1 : 0;
++
++            if (this.valuesEqual(value, defaultSavedata[setting])) {
++                continue;
+             }
++
++            const key = compressedSettings[setting] || setting;
++            portable[key] = (typeof value === 'boolean') ? (value ? 1 : 0) : value;
++        }
++
++        return portable;
++    }
++
++    buildProfileCapsule() {
++        return {
++            app: 'syllogimous',
++            type: 'profile',
++            version: defaultSavedata.version || 3,
++            exportedAt: Date.now(),
++            id: this.generateShortId(10),
++            name: this.current().name || 'Imported',
++            savedata: this.buildPortableSavedata(),
++        };
++    }
++
++    encodeBase64Url(value) {
++        const bytes = new TextEncoder().encode(value);
++        let binary = '';
++        for (let i = 0; i < bytes.length; i += 0x8000) {
++            binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
++        }
++        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
++    }
++
++    decodeBase64Url(value) {
++        const base64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
++        const binary = atob(base64);
++        const bytes = new Uint8Array(binary.length);
++        for (let i = 0; i < binary.length; i++) {
++            bytes[i] = binary.charCodeAt(i);
+         }
+-        const savedataString = JSON.stringify(savedata);
+-        const encodedSaveData = encodeURIComponent(savedataString);
+-        const encodedId = encodeURIComponent(this.generateShortId(10));
+-        const encodedName = encodeURIComponent(this.current().name);
+-        const url = `${window.location.origin}${window.location.pathname}?id=${encodedId}&name=${encodedName}&savedata=${encodedSaveData}`;
+-        return url;
++        return new TextDecoder().decode(bytes);
+     }
+ 
+-    removeSearchParams() {
++    generateProfileCapsuleText() {
++        const capsule = this.buildProfileCapsule();
++        return PROFILE_CAPSULE_PREFIX + this.encodeBase64Url(JSON.stringify(capsule));
++    }
++
++    generateShareUrl(capsuleText = this.generateProfileCapsuleText()) {
++        return `${window.location.origin}${window.location.pathname}#profile=${encodeURIComponent(capsuleText)}`;
++    }
++
++    // Backwards-compatible name for any older code that still calls generateUrl().
++    generateUrl() {
++        return this.generateShareUrl();
++    }
++
++    removeImportParams() {
+         const newUrl = window.location.origin + window.location.pathname;
+-        window.history.replaceState({}, "", newUrl);
++        window.history.replaceState({}, '', newUrl);
+     }
+ 
+-    loadUrl() {
+-        const url = window.location.href;
+-        const urlObj = new URL(url);
+-        this.removeSearchParams();
+-        const encodedId = urlObj.searchParams.get("id");
+-        const encodedSavedata = urlObj.searchParams.get("savedata");
+-        const encodedName = urlObj.searchParams.get("name");
+-        if (!encodedId || !encodedSavedata || !encodedName) {
++    loadIncomingProfile() {
++        const urlObj = new URL(window.location.href);
++        const profile = this.parseProfileImport(window.location.href);
++        const hasProfilePayload = urlObj.hash.startsWith('#profile=') || urlObj.searchParams.has('savedata');
++
++        if (hasProfilePayload) {
++            this.removeImportParams();
++        }
++
++        if (!profile) {
+             return;
+         }
+ 
+-        function sanitizeInput(value) {
+-            return (value.length < 40) ? value.replace(/<[^>]*>/g, "") : '';
++        this.offerImportProfile(profile);
++    }
++
++    parseProfileImport(value) {
++        if (!value || typeof value !== 'string') {
++            return null;
+         }
+ 
+-        let id = sanitizeInput(decodeURIComponent(encodedId));
+-        if (!id) {
+-            return;
++        const trimmed = value.trim();
++
++        try {
++            const urlObj = new URL(trimmed);
++            if (urlObj.hash.startsWith('#profile=')) {
++                return this.decodeProfileCapsule(decodeURIComponent(urlObj.hash.slice('#profile='.length)));
++            }
++
++            if (urlObj.searchParams.has('savedata')) {
++                return this.decodeLegacyUrlProfile(urlObj.searchParams);
++            }
++        } catch (error) {
++            // Not a URL. Fall through and treat it as a capsule code.
+         }
+-        let name = sanitizeInput(decodeURIComponent(encodedName));
+-        if (!name) {
+-            name = 'Imported';
++
++        if (trimmed.startsWith('#profile=')) {
++            return this.decodeProfileCapsule(decodeURIComponent(trimmed.slice('#profile='.length)));
+         }
+ 
+-        for (const profile of this.profiles) {
+-            if (profile.id === id) {
+-                return;
++        return this.decodeProfileCapsule(trimmed);
++    }
++
++    decodeProfileCapsule(capsuleText) {
++        try {
++            const text = capsuleText.trim();
++            if (!text.startsWith(PROFILE_CAPSULE_PREFIX)) {
++                return null;
++            }
++
++            const decoded = this.decodeBase64Url(text.slice(PROFILE_CAPSULE_PREFIX.length));
++            const capsule = JSON.parse(decoded);
++
++            if (capsule.app !== 'syllogimous' || capsule.type !== 'profile' || !capsule.savedata) {
++                return null;
++            }
++
++            const id = this.sanitizeInput(capsule.id || this.generateShortId(10), 40) || this.generateShortId(10);
++            const name = this.sanitizeInput(capsule.name || 'Imported') || 'Imported';
++            const savedataObj = this.normalizeImportedSavedata(capsule.savedata);
++
++            return { id, name, savedata: savedataObj };
++        } catch (error) {
++            return null;
++        }
++    }
++
++    decodeLegacyUrlProfile(searchParams) {
++        try {
++            const encodedId = searchParams.get('id');
++            const encodedSavedata = searchParams.get('savedata');
++            const encodedName = searchParams.get('name');
++            if (!encodedId || !encodedSavedata || !encodedName) {
++                return null;
+             }
+ 
+-            if (profile.name === name) {
+-                name = this.updateNameNumber(encodedName);
++            const id = this.sanitizeInput(encodedId, 40);
++            if (!id) {
++                return null;
+             }
++
++            const name = this.sanitizeInput(encodedName) || 'Imported';
++            const savedataObj = this.normalizeImportedSavedata(JSON.parse(encodedSavedata));
++
++            return { id, name, savedata: savedataObj };
++        } catch (error) {
++            return null;
+         }
+-        const savedataString = decodeURIComponent(encodedSavedata);
+-        const savedataObj = JSON.parse(savedataString);
+-        if (!savedataObj) {
+-            return;
++    }
++
++    normalizeImportedSavedata(savedataObj) {
++        if (!savedataObj || typeof savedataObj !== 'object' || Array.isArray(savedataObj)) {
++            return null;
+         }
+ 
+-        this.uncompressSavedata(savedataObj);
++        const normalized = structuredClone(savedataObj);
++        this.uncompressSavedata(normalized);
+ 
+-        const unsafeKeys = Object.keys(savedataObj);
+-        for (const key in unsafeKeys) {
++        const unsafeKeys = Object.keys(normalized);
++        for (const key of unsafeKeys) {
+             if (!defaultSavedata.hasOwnProperty(key)) {
+-                delete savedataObj[key];
++                delete normalized[key];
+                 continue;
+             }
+ 
+-            if (typeof savedataObj[key] === "string") {
+-                savedataObj[key] = sanitizeInput(savedataObj[key]);
++            if (typeof normalized[key] === 'string') {
++                normalized[key] = this.sanitizeInput(normalized[key]);
+             }
+         }
+ 
+         for (const [key, defaultValue] of Object.entries(defaultSavedata)) {
+-            if (!savedataObj.hasOwnProperty(key)) {
+-                savedataObj[key] = defaultValue;
++            if (!normalized.hasOwnProperty(key)) {
++                normalized[key] = structuredClone(defaultValue);
+             }
+         }
+ 
++        this.settingsMigration.update(normalized);
++        return normalized;
++    }
++
++    addImportedProfile(profile) {
++        if (!profile || !profile.savedata) {
++            showProfileToast('Could not read profile');
++            return;
++        }
++
++        for (const existing of this.profiles) {
++            if (existing.id === profile.id) {
++                showProfileToast('Profile already imported');
++                return;
++            }
++        }
++
++        let name = profile.name;
++        const existingNames = new Set(this.profiles.map(p => p.name));
++        while (existingNames.has(name)) {
++            name = this.updateNameNumber(name);
++        }
++
+         const newProfile = {
+-            id,
++            id: profile.id || this.generateShortId(10),
+             name,
+-            savedata: savedataObj,
++            savedata: profile.savedata,
+         };
+ 
+         this.profiles.push(newProfile);
+         this.selectedProfile = this.profiles.length - 1;
+         this.handleProfileChange();
+         this.renderDropdown();
++        showProfileToast(`Imported ${newProfile.name}`);
++    }
++
++    offerImportProfile(profile) {
++        if (!profile || !profile.savedata) {
++            showProfileToast('Could not read profile');
++            return;
++        }
++
++        const changedSettings = Object.entries(profile.savedata).filter(([key, value]) => {
++            return defaultSavedata.hasOwnProperty(key) && !this.valuesEqual(value, defaultSavedata[key]);
++        }).length;
++
++        const message = `Import profile "${profile.name}"?\n\nChanged settings: ${changedSettings}`;
++        if (typeof customConfirm === 'function') {
++            customConfirm(message, () => this.addImportedProfile(profile), 'Import', 'Cancel');
++        } else if (window.confirm(message)) {
++            this.addImportedProfile(profile);
++        }
+     }
+ 
+     uncompressSavedata(savedataObj) {
+@@ -315,14 +467,89 @@
+     PROFILE_STORE.copySelectedProfile();
+ });
+ 
+-profileShare.addEventListener('click', e => {
+-    const url = PROFILE_STORE.generateUrl();
+-    navigator.clipboard.writeText(url);
++profileExport.addEventListener('click', async e => {
++    const capsuleText = PROFILE_STORE.generateProfileCapsuleText();
++    const url = PROFILE_STORE.generateShareUrl(capsuleText);
++    const canUseUrl = url.length <= MAX_PROFILE_SHARE_URL_LENGTH;
++    const textToCopy = canUseUrl ? url : capsuleText;
++
++    const copied = await copyToClipboard(textToCopy);
++    if (!canUseUrl) {
++        downloadProfileCapsule(capsuleText, PROFILE_STORE.current().name);
++    }
++
++    if (copied) {
++        showProfileToast(canUseUrl ? 'Profile link copied' : 'Profile code copied; file downloaded');
++    } else {
++        showProfileToast('Profile export created');
++    }
++});
++
++profileImport.addEventListener('click', e => {
++    const pasted = window.prompt('Paste a profile link or SYL3 profile code:');
++    if (!pasted) {
++        return;
++    }
++
++    const profile = PROFILE_STORE.parseProfileImport(pasted);
++    PROFILE_STORE.offerImportProfile(profile);
++});
++
++function triggerOnEnterOrSpace(element) {
++    element.addEventListener('keydown', event => {
++        if (event.key === 'Enter' || event.key === ' ') {
++            event.preventDefault();
++            element.click();
++        }
++    });
++}
++
++triggerOnEnterOrSpace(profilePlus);
++triggerOnEnterOrSpace(profileExport);
++triggerOnEnterOrSpace(profileImport);
++
++async function copyToClipboard(value) {
++    try {
++        if (navigator.clipboard && window.isSecureContext) {
++            await navigator.clipboard.writeText(value);
++            return true;
++        }
++
++        const textarea = document.createElement('textarea');
++        textarea.value = value;
++        textarea.setAttribute('readonly', '');
++        textarea.style.position = 'fixed';
++        textarea.style.opacity = '0';
++        document.body.appendChild(textarea);
++        textarea.select();
++        const copied = document.execCommand('copy');
++        document.body.removeChild(textarea);
++        return copied;
++    } catch (error) {
++        return false;
++    }
++}
++
++function showProfileToast(message) {
++    profileCopied.textContent = message;
+     profileCopied.classList.add('toast');
+     setTimeout(() => {
+         profileCopied.classList.remove('toast');
+-    }, 1000);
+-});
++    }, 1600);
++}
++
++function downloadProfileCapsule(capsuleText, profileName) {
++    const safeName = (profileName || 'profile').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'profile';
++    const blob = new Blob([capsuleText], { type: 'text/plain;charset=utf-8' });
++    const url = URL.createObjectURL(blob);
++    const link = document.createElement('a');
++    link.href = url;
++    link.download = `${safeName}.sylprofile`;
++    document.body.appendChild(link);
++    link.click();
++    document.body.removeChild(link);
++    URL.revokeObjectURL(url);
++}
+ 
+ function debounce(func, delay) {
+   let timeoutId;
+diff -ruN original/styles.css modified/styles.css
+--- original/styles.css	2026-04-29 10:43:57.107196232 +0000
++++ modified/styles.css	2026-04-29 10:46:06.009299790 +0000
+@@ -4283,7 +4283,9 @@
+ 
+     justify-content: space-between;
+ 
+-    height: 70px;
++    flex-wrap: wrap;
++
++    min-height: 70px;
+ 
+ }
+ 
+@@ -4297,7 +4299,9 @@
+ 
+     font-family: monospace;
+ 
+-    width: 250px;
++    flex: 1 1 220px;
++
++    min-width: 0;
+ 
+ }
+ 
+@@ -4349,9 +4353,33 @@
+ 
+ }
+ 
++.profile-actions {
+ 
++    display: flex;
++
++    flex: 1 1 210px;
+ 
+-.profile-arrow, .profile-plus, .profile-share {
++    gap: 2px;
++
++    min-width: 0;
++
++}
++
++.profile-plus {
++
++    min-width: 50px;
++
++}
++
++.profile-export, .profile-import {
++
++    min-width: 74px;
++
++}
++
++
++
++.profile-arrow, .profile-plus, .profile-export, .profile-import {
+ 
+     font-size: var(--step-2);
+ 
+@@ -4371,7 +4399,7 @@
+ 
+ 
+ 
+-.profile-plus, .profile-share {
++.profile-plus, .profile-export, .profile-import {
+ 
+     flex-grow: 1;
+ 
+@@ -4385,7 +4413,7 @@
+ 
+ 
+ 
+-.profile-share .icon {
++.profile-export .icon {
+ 
+     line-height: 0;
+ 
+@@ -4395,7 +4423,7 @@
+ 
+ 
+ 
+-.profile-share .text {
++.profile-export .text, .profile-import .text {
+ 
+     font-size: var(--step--1);
+ 
+@@ -5576,6 +5604,16 @@
+ 
+         width: 100%;
+ 
++        flex-basis: 100%;
++
++    }
++
++    .profile-actions {
++
++        width: 100%;
++
++        flex-basis: 100%;
++
+     }
+ 
+ 
+@@ -6452,6 +6490,12 @@
+ 
+ }
+ 
++#sidebar-settings .profile-actions {
++
++    gap: 0.35rem;
++
++}
++
+ 
+ 
+ #sidebar-settings .profile-input {
+@@ -6472,7 +6516,9 @@
+ 
+ #sidebar-settings .profile-plus,
+ 
+-#sidebar-settings .profile-share {
++#sidebar-settings .profile-export,
++
++#sidebar-settings .profile-import {
+ 
+     transition: all 0.2s ease;
+ 
+@@ -6486,7 +6532,9 @@
+ 
+ #sidebar-settings .profile-plus:hover,
+ 
+-#sidebar-settings .profile-share:hover {
++#sidebar-settings .profile-export:hover,
++
++#sidebar-settings .profile-import:hover {
+ 
+     background: var(--accent-hover);
+ 
+@@ -10780,7 +10828,8 @@
+ .settings-section.active .inline-input__outer,
+ .settings-section.active .profile-dropdown,
+ .settings-section.active .profile-plus,
+-.settings-section.active .profile-share {
++.settings-section.active .profile-export,
++.settings-section.active .profile-import {
+     border-radius: 12px;
+ }
+ 

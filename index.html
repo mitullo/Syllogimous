@@ -39,6 +39,9 @@
 		<link rel="stylesheet" href="css/codec.css">
 
 		<link rel="stylesheet" href="fonts/cool/coolicons.css">
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 		<link rel="stylesheet" href="css/styles.css">
 
@@ -113,7 +116,7 @@
 
 						<div class="settings-main-menu" id="settings-main-menu">
 
-							<button class="settings-menu-btn" data-section="profile-section" onclick="openSettingsSection('profile-section')">
+							<button class="settings-menu-btn" data-section="profile-section" title="Profile" aria-label="Profile" onclick="openSettingsSection('profile-section')">
 								<span class="btn-icon-wrap profile-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
 								<span class="btn-text-wrap">
 									<span class="btn-label">Profile</span>
@@ -122,7 +125,7 @@
 								<span class="btn-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
 							</button>
 
-							<button class="settings-menu-btn" data-section="difficulty-section" onclick="openSettingsSection('difficulty-section')">
+							<button class="settings-menu-btn" data-section="difficulty-section" title="Difficulty" aria-label="Difficulty" onclick="openSettingsSection('difficulty-section')">
 								<span class="btn-icon-wrap difficulty-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>
 								<span class="btn-text-wrap">
 									<span class="btn-label">Difficulty</span>
@@ -131,7 +134,7 @@
 								<span class="btn-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
 							</button>
 
-							<button class="settings-menu-btn" data-section="content-section" onclick="openSettingsSection('content-section')">
+							<button class="settings-menu-btn" data-section="content-section" title="Content" aria-label="Content" onclick="openSettingsSection('content-section')">
 								<span class="btn-icon-wrap content-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5H3"/><path d="M16 12H3"/><path d="M16 19H3"/><path d="M21 5h.01"/><path d="M21 12h.01"/><path d="M21 19h.01"/></svg></span>
 								<span class="btn-text-wrap">
 									<span class="btn-label">Content</span>
@@ -140,7 +143,7 @@
 								<span class="btn-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
 							</button>
 
-							<button class="settings-menu-btn" data-section="gamemode-section" onclick="openSettingsSection('gamemode-section')">
+							<button class="settings-menu-btn" data-section="gamemode-section" title="Game Modes" aria-label="Game Modes" onclick="openSettingsSection('gamemode-section')">
 								<span class="btn-icon-wrap gamemode-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></span>
 								<span class="btn-text-wrap">
 									<span class="btn-label">Game Modes</span>
@@ -149,7 +152,7 @@
 								<span class="btn-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
 							</button>
 
-							<button class="settings-menu-btn" data-section="advanced-section" onclick="openSettingsSection('advanced-section')">
+							<button class="settings-menu-btn" data-section="advanced-section" title="Advanced" aria-label="Advanced" onclick="openSettingsSection('advanced-section')">
 								<span class="btn-icon-wrap advanced-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg></span>
 								<span class="btn-text-wrap">
 									<span class="btn-label">Advanced</span>
@@ -158,7 +161,7 @@
 								<span class="btn-chevron"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
 							</button>
 
-							<button class="settings-menu-btn" data-section="appearance-section" onclick="openSettingsSection('appearance-section')">
+							<button class="settings-menu-btn" data-section="appearance-section" title="Appearance" aria-label="Appearance" onclick="openSettingsSection('appearance-section')">
 								<span class="btn-icon-wrap appearance-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>
 								<span class="btn-text-wrap">
 									<span class="btn-label">Appearance</span>
@@ -225,11 +228,17 @@
 
 									</div>
 
-									<div class="profile-plus" id="profile-plus">+</div>
+									<div class="profile-actions">
 
-									<div class="profile-share" id="profile-share"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Share</span></div>
+										<div class="profile-plus" id="profile-plus" role="button" tabindex="0" title="Duplicate current profile" aria-label="Duplicate current profile">+</div>
 
-									<div class="profile-copied" id="profile-copied">URL copied to clipboard</div>
+										<div class="profile-export" id="profile-export" role="button" tabindex="0" title="Export profile" aria-label="Export profile"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Export</span></div>
+
+										<div class="profile-import" id="profile-import" role="button" tabindex="0" title="Import profile" aria-label="Import profile"><span class="text">Import</span></div>
+
+									</div>
+
+									<div class="profile-copied" id="profile-copied">Profile copied to clipboard</div>
 
 								</div>
 
@@ -3017,6 +3026,92 @@
 
 									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
 
+										<span>Side Tab Style</span>
+
+										<select id="p-side-tab-style" class='select-item' onchange="handleSideTabStyleChange(event)">
+
+										    <option value="classic" selected>Classic</option>
+
+										    <option value="floating">Floating Pills</option>
+
+										    <option value="minimal">Minimal Lines</option>
+
+										</select>
+
+									</div>
+
+								</div>
+
+								<div class="mb-2">
+
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
+										<span>Interface Font</span>
+
+										<select id="p-ui-font" class='select-item' onchange="handleUiFontChange(event)">
+
+										    <option value="default" selected>Default</option>
+
+										    <option value="inter">Inter</option>
+
+										    <option value="space-grotesk">Space Grotesk</option>
+
+										    <option value="rajdhani">Rajdhani</option>
+
+										    <option value="exo-2">Exo 2</option>
+
+										    <option value="orbitron">Orbitron</option>
+
+										    <option value="jetbrains-mono">JetBrains Mono</option>
+
+										    <option value="custom">Custom Font...</option>
+
+										</select>
+
+										<input type="file" id="p-ui-font-file" class="custom-font-file" accept=".ttf,.otf,.woff,.woff2" style="display:none;" onchange="handleUiFontFileUpload(event)">
+
+									</div>
+
+								</div>
+
+								<div class="mb-2">
+
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
+										<span>Premise Font</span>
+
+										<select id="p-premise-font" class='select-item' onchange="handlePremiseFontChange(event)">
+
+										    <option value="default" selected>Default</option>
+
+										    <option value="inter">Inter</option>
+
+										    <option value="space-grotesk">Space Grotesk</option>
+
+										    <option value="rajdhani">Rajdhani</option>
+
+										    <option value="exo-2">Exo 2</option>
+
+										    <option value="orbitron">Orbitron</option>
+
+										    <option value="jetbrains-mono">JetBrains Mono</option>
+
+										    <option value="mono">System Monospace</option>
+
+										    <option value="custom">Custom Font...</option>
+
+										</select>
+
+										<input type="file" id="p-premise-font-file" class="custom-font-file" accept=".ttf,.otf,.woff,.woff2" style="display:none;" onchange="handlePremiseFontFileUpload(event)">
+
+									</div>
+
+								</div>
+
+								<div class="mb-2">
+
+									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+
 										<span>Timer Animation</span>
 
 										<select id="p-timer-anim" class='select-item' onchange="handleTimerAnimChange(event)">
@@ -3041,23 +3136,17 @@
 
 								<div class="mb-2">
 
-									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+									<div class="ctrl__inner" style="width: 100%; flex-direction: column; align-items: stretch; gap: 0.3rem;">
 
-										<span>Font Size</span>
+										<div style="display: flex; justify-content: space-between; align-items: center;">
 
-										<select id="p-font-size" class='select-item' onchange="handleFontSizeChange(event)">
+											<span>Font Size</span>
 
-										    <option value="smallest">Smallest</option>
+											<span class="slider-value" id="p-font-size-label">Normal</span>
 
-										    <option value="small">Small</option>
+										</div>
 
-										    <option value="normal" selected>Normal</option>
-
-										    <option value="large">Large</option>
-
-										    <option value="huge">Huge</option>
-
-										</select>
+										<input type="range" id="p-font-size" class="settings-range" min="0.75" max="1.3" step="0.05" value="1" oninput="handleFontSizeChange(event)">
 
 									</div>
 
@@ -3065,21 +3154,17 @@
 
 								<div class="mb-2">
 
-									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+									<div class="ctrl__inner" style="width: 100%; flex-direction: column; align-items: stretch; gap: 0.3rem;">
 
-										<span>UI Density</span>
+										<div style="display: flex; justify-content: space-between; align-items: center;">
 
-										<select id="p-density" class='select-item' onchange="handleDensityChange(event)">
+											<span>UI Density</span>
 
-										    <option value="super-compact">Super Compact</option>
+											<span class="slider-value" id="p-density-label">Normal</span>
 
-										    <option value="compact">Compact</option>
+										</div>
 
-										    <option value="normal" selected>Normal</option>
-
-										    <option value="spacious">Spacious</option>
-
-										</select>
+										<input type="range" id="p-density" class="settings-range" min="0.25" max="1.5" step="0.05" value="1" oninput="handleDensityChange(event)">
 
 									</div>
 
@@ -3161,19 +3246,17 @@
 
 								<div class="mb-2">
 
-									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+									<div class="ctrl__inner" style="width: 100%; flex-direction: column; align-items: stretch; gap: 0.3rem;">
 
-										<span>Timer Bar Height</span>
+										<div style="display: flex; justify-content: space-between; align-items: center;">
 
-										<select id="p-timer-height" class='select-item' onchange="handleTimerHeightChange(event)">
+											<span>Timer Bar Height</span>
 
-										    <option value="thin">Thin (10px)</option>
+											<span class="slider-value" id="p-timer-height-label">Normal</span>
 
-										    <option value="normal" selected>Normal (20px)</option>
+										</div>
 
-										    <option value="thick">Thick (30px)</option>
-
-										</select>
+										<input type="range" id="p-timer-height" class="settings-range" min="6" max="36" step="2" value="20" oninput="handleTimerHeightChange(event)">
 
 									</div>
 
@@ -3305,39 +3388,17 @@
 
 								<div class="mb-2">
 
-									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
+									<div class="ctrl__inner" style="width: 100%; flex-direction: column; align-items: stretch; gap: 0.3rem;">
 
-										<span>Premise Font</span>
+										<div style="display: flex; justify-content: space-between; align-items: center;">
 
-										<select id="p-premise-font" class='select-item' onchange="handlePremiseFontChange(event)">
+											<span>Stimulus Size</span>
 
-										    <option value="default" selected>Default</option>
+											<span class="slider-value" id="p-71-label">Normal</span>
 
-										    <option value="mono">Monospace</option>
+										</div>
 
-										</select>
-
-									</div>
-
-								</div>
-
-								<div class="mb-2">
-
-									<div class="ctrl__inner" style="width: 100%; justify-content: space-between;">
-
-										<span>Stimulus Size</span>
-
-										<select id="p-71" class='select-item' onchange="handleStimulusSizeChange(event)">
-
-										    <option value="small">Small</option>
-
-										    <option value="normal" selected>Normal</option>
-
-										    <option value="large">Large</option>
-
-										    <option value="huge">Huge</option>
-
-										</select>
+										<input type="range" id="p-71" class="settings-range" min="0.85" max="2" step="0.05" value="1.125" oninput="handleStimulusSizeChange(event)">
 
 									</div>
 
@@ -3351,7 +3412,7 @@
 
 										<select id="p-score-mode" class='select-item' onchange="handleScoreModeChange(event)">
 
-										    <option value="net">Net Score (В±)</option>
+										    <option value="net">Net Score (±)</option>
 
 										    <option value="correct" selected>Correct / Total</option>
 
@@ -3471,8 +3532,17 @@
 
 					</div>
 
+					<div class="history-filter-rail" role="toolbar" aria-label="Filter history answers">
+						<button type="button" class="history-filter-btn selected" data-history-filter="all" aria-pressed="true">All <span class="history-filter-count">0</span></button>
+						<button type="button" class="history-filter-btn" data-history-filter="wrong" aria-pressed="false">Mistakes <span class="history-filter-count">0</span></button>
+						<button type="button" class="history-filter-btn" data-history-filter="right" aria-pressed="false">Correct <span class="history-filter-count">0</span></button>
+						<button type="button" class="history-filter-btn" data-history-filter="missed" aria-pressed="false">Missed <span class="history-filter-count">0</span></button>
+					</div>
+
+					<div id="history-filter-summary" class="history-filter-summary">Showing all answers</div>
+
 					<div id="history-list" class="hql"></div>
-					<div id="history-empty" class="history-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;opacity:0.4;gap:0.5rem"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.409 5.824c-.702.792-1.15 1.496-1.415 2.166l2.153 2.156a.5.5 0 0 1 0 .707l-2.293 2.293a.5.5 0 0 0 0 .707L12 15"/><path d="M13.508 20.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5a5.5 5.5 0 0 1 9.591-3.677.6.6 0 0 0 .818.001A5.5 5.5 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5z"/></svg><span style="font-size:var(--step--1)">No history yet</span></div>
+					<div id="history-empty" class="history-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;opacity:0.4;gap:0.5rem"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.409 5.824c-.702.792-1.15 1.496-1.415 2.166l2.153 2.156a.5.5 0 0 1 0 .707l-2.293 2.293a.5.5 0 0 0 0 .707L12 15"/><path d="M13.508 20.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5a5.5 5.5 0 0 1 9.591-3.677.6.6 0 0 0 .818.001A5.5 5.5 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5z"/></svg><span class="history-empty-title" style="font-size:var(--step--1)">No history yet</span></div>
 
 					<div class="history-footer">
 
@@ -3498,11 +3568,11 @@
 
 				</div>
 
-				<div class="offcanvas-body ffmono">
+				<div class="offcanvas-body ffmono info-panel-body">
 
 					<div style="direction: ltr;">
 
-						<div class="mb-2">
+						<div class="mb-2 info-card">
 
 							<div class="explainer">
 
@@ -3911,7 +3981,7 @@
 
 				</div>
 
-				<div id="progress-tracker" class="progress-tracker"></div
+				<div id="progress-tracker" class="progress-tracker"></div>
 
 				</span>
 
@@ -3967,7 +4037,14 @@
 
 
 
-		<div id="graph-popup" class="graph-popup">
+		<div id="graph-popup" class="graph-popup" role="dialog" aria-modal="true" aria-label="Graph">
+
+			<div class="graph-summary" id="graph-summary" aria-live="polite">
+				<div class="graph-summary-card"><span>Days</span><strong id="graph-summary-days">—</strong></div>
+				<div class="graph-summary-card"><span>Attempts</span><strong id="graph-summary-total">—</strong></div>
+				<div class="graph-summary-card"><span>Accuracy</span><strong id="graph-summary-accuracy">—</strong></div>
+				<div class="graph-summary-card"><span>Total time</span><strong id="graph-summary-time">—</strong></div>
+			</div>
 
 			<div class="graph-controls">
 

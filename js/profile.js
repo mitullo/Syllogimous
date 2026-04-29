@@ -3,8 +3,12 @@ const profileArrow = document.getElementById('profile-arrow');
 const profileList = document.getElementById('profile-list');
 const profileDropdown = document.querySelector('.profile-dropdown');
 const profilePlus = document.getElementById('profile-plus');
-const profileShare = document.getElementById('profile-share');
+const profileExport = document.getElementById('profile-export');
+const profileImport = document.getElementById('profile-import');
 const profileCopied = document.getElementById('profile-copied');
+
+const PROFILE_CAPSULE_PREFIX = 'SYL3:';
+const MAX_PROFILE_SHARE_URL_LENGTH = 1800;
 
 class ProfileStore {
     constructor() {
@@ -15,7 +19,7 @@ class ProfileStore {
 
     startup() {
         this.loadProfiles();
-        this.loadUrl();
+        this.loadIncomingProfile();
     }
 
     overrideExistingKeys(target, source) {
@@ -181,106 +185,254 @@ class ProfileStore {
         return result;
     }
 
-    generateUrl() {
-        const savedata = structuredClone(this.current().savedata);
-        for (const setting of legacySettings) {
-            if (savedata.hasOwnProperty(setting) && defaultSavedata[setting] === savedata[setting]) {
-                delete savedata[setting];
-            }
-        }
-        for (const [setting, compressed] of Object.entries(compressedSettings)) {
-            if (savedata.hasOwnProperty(setting)) {
-                savedata[compressed] = savedata[setting];
-                delete savedata[setting];
-            }
-        }
-        for (const [setting, value] of Object.entries(savedata)) {
-            if (typeof value === "boolean") {
-                savedata[setting] = value ? 1 : 0;
-            }
-        }
-        const savedataString = JSON.stringify(savedata);
-        const encodedSaveData = encodeURIComponent(savedataString);
-        const encodedId = encodeURIComponent(this.generateShortId(10));
-        const encodedName = encodeURIComponent(this.current().name);
-        const url = `${window.location.origin}${window.location.pathname}?id=${encodedId}&name=${encodedName}&savedata=${encodedSaveData}`;
-        return url;
+    valuesEqual(a, b) {
+        return JSON.stringify(a) === JSON.stringify(b);
     }
 
-    removeSearchParams() {
-        const newUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, "", newUrl);
+    sanitizeInput(value, maxLength = 80) {
+        if (typeof value !== 'string') {
+            return '';
+        }
+        return (value.length < maxLength) ? value.replace(/<[^>]*>/g, '') : '';
     }
 
-    loadUrl() {
-        const url = window.location.href;
-        const urlObj = new URL(url);
-        this.removeSearchParams();
-        const encodedId = urlObj.searchParams.get("id");
-        const encodedSavedata = urlObj.searchParams.get("savedata");
-        const encodedName = urlObj.searchParams.get("name");
-        if (!encodedId || !encodedSavedata || !encodedName) {
-            return;
-        }
+    buildPortableSavedata(source = this.current().savedata) {
+        const portable = {};
 
-        function sanitizeInput(value) {
-            return (value.length < 40) ? value.replace(/<[^>]*>/g, "") : '';
-        }
-
-        let id = sanitizeInput(decodeURIComponent(encodedId));
-        if (!id) {
-            return;
-        }
-        let name = sanitizeInput(decodeURIComponent(encodedName));
-        if (!name) {
-            name = 'Imported';
-        }
-
-        for (const profile of this.profiles) {
-            if (profile.id === id) {
-                return;
-            }
-
-            if (profile.name === name) {
-                name = this.updateNameNumber(encodedName);
-            }
-        }
-        const savedataString = decodeURIComponent(encodedSavedata);
-        const savedataObj = JSON.parse(savedataString);
-        if (!savedataObj) {
-            return;
-        }
-
-        this.uncompressSavedata(savedataObj);
-
-        const unsafeKeys = Object.keys(savedataObj);
-        for (const key in unsafeKeys) {
-            if (!defaultSavedata.hasOwnProperty(key)) {
-                delete savedataObj[key];
+        for (const [setting, value] of Object.entries(source)) {
+            if (!defaultSavedata.hasOwnProperty(setting)) {
                 continue;
             }
 
-            if (typeof savedataObj[key] === "string") {
-                savedataObj[key] = sanitizeInput(savedataObj[key]);
+            if (this.valuesEqual(value, defaultSavedata[setting])) {
+                continue;
+            }
+
+            const key = compressedSettings[setting] || setting;
+            portable[key] = (typeof value === 'boolean') ? (value ? 1 : 0) : value;
+        }
+
+        return portable;
+    }
+
+    buildProfileCapsule() {
+        return {
+            app: 'syllogimous',
+            type: 'profile',
+            version: defaultSavedata.version || 3,
+            exportedAt: Date.now(),
+            id: this.generateShortId(10),
+            name: this.current().name || 'Imported',
+            savedata: this.buildPortableSavedata(),
+        };
+    }
+
+    encodeBase64Url(value) {
+        const bytes = new TextEncoder().encode(value);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    decodeBase64Url(value) {
+        const base64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new TextDecoder().decode(bytes);
+    }
+
+    generateProfileCapsuleText() {
+        const capsule = this.buildProfileCapsule();
+        return PROFILE_CAPSULE_PREFIX + this.encodeBase64Url(JSON.stringify(capsule));
+    }
+
+    generateShareUrl(capsuleText = this.generateProfileCapsuleText()) {
+        return `${window.location.origin}${window.location.pathname}#profile=${encodeURIComponent(capsuleText)}`;
+    }
+
+    // Backwards-compatible name for any older code that still calls generateUrl().
+    generateUrl() {
+        return this.generateShareUrl();
+    }
+
+    removeImportParams() {
+        const newUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+    }
+
+    loadIncomingProfile() {
+        const urlObj = new URL(window.location.href);
+        const profile = this.parseProfileImport(window.location.href);
+        const hasProfilePayload = urlObj.hash.startsWith('#profile=') || urlObj.searchParams.has('savedata');
+
+        if (hasProfilePayload) {
+            this.removeImportParams();
+        }
+
+        if (!profile) {
+            return;
+        }
+
+        this.offerImportProfile(profile);
+    }
+
+    parseProfileImport(value) {
+        if (!value || typeof value !== 'string') {
+            return null;
+        }
+
+        const trimmed = value.trim();
+
+        try {
+            const urlObj = new URL(trimmed);
+            if (urlObj.hash.startsWith('#profile=')) {
+                return this.decodeProfileCapsule(decodeURIComponent(urlObj.hash.slice('#profile='.length)));
+            }
+
+            if (urlObj.searchParams.has('savedata')) {
+                return this.decodeLegacyUrlProfile(urlObj.searchParams);
+            }
+        } catch (error) {
+            // Not a URL. Fall through and treat it as a capsule code.
+        }
+
+        if (trimmed.startsWith('#profile=')) {
+            return this.decodeProfileCapsule(decodeURIComponent(trimmed.slice('#profile='.length)));
+        }
+
+        return this.decodeProfileCapsule(trimmed);
+    }
+
+    decodeProfileCapsule(capsuleText) {
+        try {
+            const text = capsuleText.trim();
+            if (!text.startsWith(PROFILE_CAPSULE_PREFIX)) {
+                return null;
+            }
+
+            const decoded = this.decodeBase64Url(text.slice(PROFILE_CAPSULE_PREFIX.length));
+            const capsule = JSON.parse(decoded);
+
+            if (capsule.app !== 'syllogimous' || capsule.type !== 'profile' || !capsule.savedata) {
+                return null;
+            }
+
+            const id = this.sanitizeInput(capsule.id || this.generateShortId(10), 40) || this.generateShortId(10);
+            const name = this.sanitizeInput(capsule.name || 'Imported') || 'Imported';
+            const savedataObj = this.normalizeImportedSavedata(capsule.savedata);
+
+            return { id, name, savedata: savedataObj };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    decodeLegacyUrlProfile(searchParams) {
+        try {
+            const encodedId = searchParams.get('id');
+            const encodedSavedata = searchParams.get('savedata');
+            const encodedName = searchParams.get('name');
+            if (!encodedId || !encodedSavedata || !encodedName) {
+                return null;
+            }
+
+            const id = this.sanitizeInput(encodedId, 40);
+            if (!id) {
+                return null;
+            }
+
+            const name = this.sanitizeInput(encodedName) || 'Imported';
+            const savedataObj = this.normalizeImportedSavedata(JSON.parse(encodedSavedata));
+
+            return { id, name, savedata: savedataObj };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    normalizeImportedSavedata(savedataObj) {
+        if (!savedataObj || typeof savedataObj !== 'object' || Array.isArray(savedataObj)) {
+            return null;
+        }
+
+        const normalized = structuredClone(savedataObj);
+        this.uncompressSavedata(normalized);
+
+        const unsafeKeys = Object.keys(normalized);
+        for (const key of unsafeKeys) {
+            if (!defaultSavedata.hasOwnProperty(key)) {
+                delete normalized[key];
+                continue;
+            }
+
+            if (typeof normalized[key] === 'string') {
+                normalized[key] = this.sanitizeInput(normalized[key]);
             }
         }
 
         for (const [key, defaultValue] of Object.entries(defaultSavedata)) {
-            if (!savedataObj.hasOwnProperty(key)) {
-                savedataObj[key] = defaultValue;
+            if (!normalized.hasOwnProperty(key)) {
+                normalized[key] = structuredClone(defaultValue);
             }
         }
 
+        this.settingsMigration.update(normalized);
+        return normalized;
+    }
+
+    addImportedProfile(profile) {
+        if (!profile || !profile.savedata) {
+            showProfileToast('Could not read profile');
+            return;
+        }
+
+        for (const existing of this.profiles) {
+            if (existing.id === profile.id) {
+                showProfileToast('Profile already imported');
+                return;
+            }
+        }
+
+        let name = profile.name;
+        const existingNames = new Set(this.profiles.map(p => p.name));
+        while (existingNames.has(name)) {
+            name = this.updateNameNumber(name);
+        }
+
         const newProfile = {
-            id,
+            id: profile.id || this.generateShortId(10),
             name,
-            savedata: savedataObj,
+            savedata: profile.savedata,
         };
 
         this.profiles.push(newProfile);
         this.selectedProfile = this.profiles.length - 1;
         this.handleProfileChange();
         this.renderDropdown();
+        showProfileToast(`Imported ${newProfile.name}`);
+    }
+
+    offerImportProfile(profile) {
+        if (!profile || !profile.savedata) {
+            showProfileToast('Could not read profile');
+            return;
+        }
+
+        const changedSettings = Object.entries(profile.savedata).filter(([key, value]) => {
+            return defaultSavedata.hasOwnProperty(key) && !this.valuesEqual(value, defaultSavedata[key]);
+        }).length;
+
+        const message = `Import profile "${profile.name}"?\n\nChanged settings: ${changedSettings}`;
+        if (typeof customConfirm === 'function') {
+            customConfirm(message, () => this.addImportedProfile(profile), 'Import', 'Cancel');
+        } else if (window.confirm(message)) {
+            this.addImportedProfile(profile);
+        }
     }
 
     uncompressSavedata(savedataObj) {
@@ -315,14 +467,89 @@ profilePlus.addEventListener('click', e => {
     PROFILE_STORE.copySelectedProfile();
 });
 
-profileShare.addEventListener('click', e => {
-    const url = PROFILE_STORE.generateUrl();
-    navigator.clipboard.writeText(url);
+profileExport.addEventListener('click', async e => {
+    const capsuleText = PROFILE_STORE.generateProfileCapsuleText();
+    const url = PROFILE_STORE.generateShareUrl(capsuleText);
+    const canUseUrl = url.length <= MAX_PROFILE_SHARE_URL_LENGTH;
+    const textToCopy = canUseUrl ? url : capsuleText;
+
+    const copied = await copyToClipboard(textToCopy);
+    if (!canUseUrl) {
+        downloadProfileCapsule(capsuleText, PROFILE_STORE.current().name);
+    }
+
+    if (copied) {
+        showProfileToast(canUseUrl ? 'Profile link copied' : 'Profile code copied; file downloaded');
+    } else {
+        showProfileToast('Profile export created');
+    }
+});
+
+profileImport.addEventListener('click', e => {
+    const pasted = window.prompt('Paste a profile link or SYL3 profile code:');
+    if (!pasted) {
+        return;
+    }
+
+    const profile = PROFILE_STORE.parseProfileImport(pasted);
+    PROFILE_STORE.offerImportProfile(profile);
+});
+
+function triggerOnEnterOrSpace(element) {
+    element.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            element.click();
+        }
+    });
+}
+
+triggerOnEnterOrSpace(profilePlus);
+triggerOnEnterOrSpace(profileExport);
+triggerOnEnterOrSpace(profileImport);
+
+async function copyToClipboard(value) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(value);
+            return true;
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return copied;
+    } catch (error) {
+        return false;
+    }
+}
+
+function showProfileToast(message) {
+    profileCopied.textContent = message;
     profileCopied.classList.add('toast');
     setTimeout(() => {
         profileCopied.classList.remove('toast');
-    }, 1000);
-});
+    }, 1600);
+}
+
+function downloadProfileCapsule(capsuleText, profileName) {
+    const safeName = (profileName || 'profile').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'profile';
+    const blob = new Blob([capsuleText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${safeName}.sylprofile`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
 
 function debounce(func, delay) {
   let timeoutId;

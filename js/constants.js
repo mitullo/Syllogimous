@@ -44,11 +44,21 @@ let appState = {
 
     "navBar": false,
 
+    "sideTabStyle": "classic",
+
     "timerAnimation": "stepEaseOut",
 
-    "fontSize": "normal",
+    "fontSize": 1,
 
-    "uiDensity": "normal",
+    "uiFont": "inter",
+
+    "uiFontCustom": "",
+
+    "uiFontFileData": "",
+
+    "uiFontFileName": "",
+
+    "uiDensity": 1,
 
     "multipleConclusionsMode": false,
 
@@ -64,7 +74,7 @@ let appState = {
 
     "colorTimer": false,
 
-    "timerHeight": "normal",
+    "timerHeight": 20,
 
     "borderRadius": "rounded",
 
@@ -76,11 +86,19 @@ let appState = {
 
     "buttonStyle": "contrast",
 
+    "premiseFont": "default",
+
+    "premiseFontCustom": "",
+
+    "premiseFontFileData": "",
+
+    "premiseFontFileName": "",
+
     "scoreMode": "correct",
 
     "hideSideButtons": false,
 
-    "stimulusSize": "normal",
+    "stimulusSize": 1.125,
 
 };
 
