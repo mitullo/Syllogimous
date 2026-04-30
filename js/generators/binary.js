@@ -358,6 +358,8 @@ function createNestedBinaryGenerator(length) {
 
 class BinaryAnalogyQuestion {
     create(length, transforms = {}) {
+        // Binary analogy can work with two 2-premise analogy leaves (4 total premises).
+        // The sub-generators decide whether they need to internally retry or return null.
         length = Math.max(4, length);
 
         const btfm = savedata.binaryHardModeLevel || 0;
@@ -449,13 +451,16 @@ class BinaryAnalogyQuestion {
         const operandIndex = Math.floor(Math.random() * operands.length);
         const operand = operands[operandIndex];
 
-        while (flip !== isValid) {
+        let attempts = 0;
+        const maxAttempts = 120;
+        while (flip !== isValid && attempts < maxAttempts) {
+            attempts++;
             // Pick two random analogy generators
             const g1 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
             const g2 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
 
-            const subLength1 = Math.max(Math.floor(length / 2) + premiseOffset, 3);
-            const subLength2 = Math.max(Math.ceil(length / 2) + premiseOffset, 3);
+            const subLength1 = Math.max(Math.floor(length / 2) + premiseOffset, 2);
+            const subLength2 = Math.max(Math.ceil(length / 2) + premiseOffset, 2);
 
             // Create first analogy sub-question
             if (btfm > 0) applyOverride(firstHalf);
@@ -477,6 +482,8 @@ class BinaryAnalogyQuestion {
 
             isValid = evalBoolOperand(operand, choice.isValid, choice2.isValid);
         }
+
+        if (flip !== isValid || !choice || !choice2) return null;
 
         const countdown = getBinaryCountdown();
         const operations = [choice, choice2].flatMap(q => q.operations || []);

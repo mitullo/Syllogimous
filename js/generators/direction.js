@@ -34,11 +34,20 @@ function normalizeDirectionCoord(a) {
     return a.map(c => Math.max(-limit, Math.min(limit, c)));
 }
 
+function conclusionDimensionLimit(coordLength, index) {
+    // 4D uses the last axis as time; premise generation only supports -1/0/1 there.
+    // Do not let double-distance conclusion clamping create impossible time coords like 2.
+    if (coordLength === 4 && index === 3) return 1;
+    return directionLimit();
+}
+
 function normalizeConclusionCoord(a) {
     if (a.every(c => c === 0)) return null;
     if (savedata.enableDoubleDistanceConclusions) {
-        const limit = directionLimit();
-        return a.map(c => Math.max(-limit, Math.min(limit, c)));
+        return a.map((c, i) => {
+            const limit = conclusionDimensionLimit(a.length, i);
+            return Math.max(-limit, Math.min(limit, c));
+        });
     }
     return a.map(c => c === 0 ? 0 : c / Math.abs(c));
 }
@@ -111,6 +120,39 @@ function getConclusionCoords(wordCoordMap, startWord, endWord) {
     const diffCoord = diffCoords(start, end);
     const conclusionCoord = normalizeConclusionCoord(diffCoord);
     return [diffCoord, conclusionCoord];
+}
+
+function isRepresentableConclusionCoord(diffCoord, conclusionCoord) {
+    if (!isNonZeroConclusion(conclusionCoord)) return false;
+
+    // In the original +/-1 mode, directions are intentionally broad: any amount west
+    // normalizes to West. In double-distance conclusion mode, however, West² means an
+    // exact two-step relation. Reject larger deltas that merely got clamped to +/-2.
+    if (!savedata.enableDoubleDistanceConclusions) return true;
+
+    return conclusionCoord.every((coord, i) => diffCoord[i] === coord);
+}
+
+function getRepresentableConclusionCoords(wordCoordMap, startWord, endWord) {
+    const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+    if (!isRepresentableConclusionCoord(diffCoord, conclusionCoord)) {
+        return [diffCoord, null];
+    }
+    return [diffCoord, conclusionCoord];
+}
+
+function findRepresentableDirection(a, b) {
+    const diffCoord = diffCoords(a, b);
+    const directionCoord = normalizeDirectionCoord(diffCoord);
+    if (!isNonZeroConclusion(directionCoord)) return null;
+
+    // With double-distance directions, do not let a three-or-more-step gap masquerade
+    // as a two-step West²/East² style relation. Without double-distance, retain the
+    // legacy broad semantics where any amount west normalizes to West.
+    if (savedata.enableDoubleDistance && !directionCoord.every((coord, i) => diffCoord[i] === coord)) {
+        return null;
+    }
+    return directionCoord;
 }
 
 function isNonZeroConclusion(conclusionCoord) {
@@ -506,7 +548,7 @@ class DirectionQuestion {
                     for (let attempts = 0; attempts < 20 && (!startWord || !endWord); attempts++) {
                         const [a, b] = pickRandomItems(allWords, 2).picked;
                         if (wordCoordMap[a] && wordCoordMap[b]) {
-                            const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, a, b);
+                            const [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, a, b);
                             if (isNonZeroConclusion(conclusionCoord)) {
                                 startWord = a;
                                 endWord = b;
@@ -545,9 +587,8 @@ class DirectionQuestion {
                     for (let attempts = 0; attempts < 20 && !fallbackPair; attempts++) {
                         const [a, b] = pickRandomItems(allWords, 2).picked;
                         if (wordCoordMap[a] && wordCoordMap[b]) {
-                            const diff = diffCoords(wordCoordMap[a], wordCoordMap[b]);
-                            const norm = normalizeDirectionCoord(diff);
-                            if (isNonZeroConclusion(norm)) {
+                            const [, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, a, b);
+                            if (isNonZeroConclusion(conclusionCoord)) {
                                 fallbackPair = [a, b];
                             }
                         }
@@ -562,7 +603,7 @@ class DirectionQuestion {
             }
             
             // Get initial conclusion coords (before transforms) for validation
-            [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+            [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
             if (!isNonZeroConclusion(conclusionCoord)) {
                 continue; // No valid conclusion possible with this word map
             }
@@ -625,7 +666,7 @@ class DirectionQuestion {
                 }
                 continue;
             }
-            [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+            [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
             
             // Check if we have valid conclusion after transforms - if not, retry
             if (!isNonZeroConclusion(conclusionCoord)) {
@@ -683,7 +724,7 @@ class DirectionQuestion {
                     continue;
                 }
 
-                [dCoord, cCoord] = getConclusionCoords(wordCoordMap, sw, ew);
+                [dCoord, cCoord] = getRepresentableConclusionCoords(wordCoordMap, sw, ew);
                 if (!isNonZeroConclusion(cCoord)) {
                     generatedCount++; // Prevent infinite loop
                     continue;
@@ -841,6 +882,8 @@ class DirectionQuestion {
     }
 
     createAnalogy(length) {
+        length = Math.max(2, length);
+
         let isValid;
         let isValidSame;
         resetDirectionLimit();
@@ -854,14 +897,24 @@ class DirectionQuestion {
         let a, b, c, d;
         let continuousOps = [];
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
+        const useTinyAnalogy = length <= 2;
+        if (useTinyAnalogy) {
+            // Two-premise analogies cannot interleave transforms between enough ordinary premises.
+            // Keep all requested hard-mode transforms as regular operations instead.
+            numTransforms += numInterleaved;
+            numInterleaved = 0;
+        }
         const branchesAllowed = Math.random() > 0.2;
         const flip = coinFlip();
         const isV2 = this.generator.getName() === 'Anchor Space v2';
+        let retryCount = 0;
+        const maxRetries = 80;
         
         // Create unified transform state if any transforms are needed
         let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
         
-        while (flip !== isValidSame) {
+        while (flip !== isValidSame && retryCount < maxRetries) {
+            retryCount++;
             // Reset transformState at start of each iteration to clear stale data
             // But preserve the wordCoordMap as a reference (will be repopulated by createWordMapInterleaved)
             if (transformState) {
@@ -877,7 +930,10 @@ class DirectionQuestion {
             
             continuousOps = [];
             operations = [];
-            if (this.generator.shouldUseAnchor()) {
+            if (useTinyAnalogy) {
+                [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps] = this.createTinyAnalogyWordMap(flip);
+                anchorWords = null;
+            } else if (this.generator.shouldUseAnchor()) {
                 if (numInterleaved > 0) {
                     // Use interleaved version for anchor spaces when interleave mode is on
                     [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchorInterleaved(length, numInterleaved, transformState, branchesAllowed);
@@ -897,6 +953,7 @@ class DirectionQuestion {
                 anchorWords = null;
             }
             [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
+            if (!a || !b || !c || !d) continue;
             
             // Initialize transformState with final wordCoordMap and anchorWords
             if (transformState) {
@@ -915,7 +972,8 @@ class DirectionQuestion {
             
             if (numTransforms > 0) {
                 const [startWord, endWord] = pickRandomItems([a, b, c, d], 2).picked;
-                const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
+                const [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
+                if (!conclusionCoord) continue;
                 let _x;
                 // Pass transformState to SpaceHardMode for coordinated transforms
                 [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms, anchorWords || [], transformState)
@@ -931,11 +989,13 @@ class DirectionQuestion {
             if (continuousOps.length > 0) {
                 operations.push(...continuousOps);
             }
-            const dirAB = findDirection(wordCoordMap[a], wordCoordMap[b]);
-            const dirCD = findDirection(wordCoordMap[c], wordCoordMap[d]);
-            // Handle null directions (words at same position) - treat as not equal
+            const dirAB = findRepresentableDirection(wordCoordMap[a], wordCoordMap[b]);
+            const dirCD = findRepresentableDirection(wordCoordMap[c], wordCoordMap[d]);
+            // Handle null directions (words at same position or clamped double-distance) as not equal.
             isValidSame = dirAB !== null && dirCD !== null && arraysEqual(dirAB, dirCD);
         }
+        if (flip !== isValidSame) return null;
+
         let conclusion = analogyTo(a, b);
         if (coinFlip()) {
             conclusion += pickAnalogyStatementSame().html;
@@ -974,6 +1034,43 @@ class DirectionQuestion {
             ...(countdown && { countdown }),
             ...(pattern && { pattern }),
         }
+    }
+
+    createTinyAnalogyWordMap(preferSameDirection=false) {
+        const words = createStimuli(4);
+        const [a, b, c, d] = words;
+        const initialCoord = this.generator.initialCoord();
+        const coordLength = initialCoord.length;
+        const separation = directionLimit() * 4 + 4;
+        const secondBase = initialCoord.map((value, index) => index === 0 ? value + separation : value);
+
+        let wordCoordMap = {
+            [a]: initialCoord.slice(),
+            [c]: secondBase,
+        };
+        let neighbors = {
+            [a]: [],
+            [c]: [],
+        };
+
+        const dir1 = this.generator.pickDirection(a, neighbors, wordCoordMap);
+        const dirPool = getDirectionCoordsForLength(coordLength).filter(coord => !arraysEqual(coord, dir1));
+        const dir2 = preferSameDirection || dirPool.length === 0
+            ? dir1.slice()
+            : pickRandomItems(dirPool, 1).picked[0];
+
+        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1);
+        wordCoordMap[d] = addCoords(wordCoordMap[c], dir2);
+        neighbors[a].push(b);
+        neighbors[b] = [a];
+        neighbors[c].push(d);
+        neighbors[d] = [c];
+
+        const premises = [
+            this.generator.createDirectionStatement(a, b, dir1),
+            this.generator.createDirectionStatement(c, d, dir2),
+        ];
+        return [wordCoordMap, neighbors, premises, [dir1, dir2], []];
     }
 
     getInterferenceLevel() {

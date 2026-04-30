@@ -1,607 +1,314 @@
-diff -ruN original/index.html modified/index.html
---- original/index.html	2026-04-29 10:43:57.106372714 +0000
-+++ modified/index.html	2026-04-29 10:46:06.002006596 +0000
-@@ -228,11 +228,17 @@
+--- binary.js	2026-04-30 05:46:44.025268128 +0000
++++ patched/binary.js	2026-04-30 05:53:03.270921862 +0000
+@@ -358,6 +358,8 @@
  
- 									</div>
+ class BinaryAnalogyQuestion {
+     create(length, transforms = {}) {
++        // Binary analogy can work with two 2-premise analogy leaves (4 total premises).
++        // The sub-generators decide whether they need to internally retry or return null.
+         length = Math.max(4, length);
  
--									<div class="profile-plus" id="profile-plus">+</div>
-+									<div class="profile-actions">
+         const btfm = savedata.binaryHardModeLevel || 0;
+@@ -449,13 +451,16 @@
+         const operandIndex = Math.floor(Math.random() * operands.length);
+         const operand = operands[operandIndex];
  
--									<div class="profile-share" id="profile-share"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Share</span></div>
-+										<div class="profile-plus" id="profile-plus" role="button" tabindex="0" title="Duplicate current profile" aria-label="Duplicate current profile">+</div>
+-        while (flip !== isValid) {
++        let attempts = 0;
++        const maxAttempts = 120;
++        while (flip !== isValid && attempts < maxAttempts) {
++            attempts++;
+             // Pick two random analogy generators
+             const g1 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
+             const g2 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
  
--									<div class="profile-copied" id="profile-copied">URL copied to clipboard</div>
-+										<div class="profile-export" id="profile-export" role="button" tabindex="0" title="Export profile" aria-label="Export profile"><span class="icon"><i class="ci-Share_iOS_Export"></i></span><span class="text">Export</span></div>
+-            const subLength1 = Math.max(Math.floor(length / 2) + premiseOffset, 3);
+-            const subLength2 = Math.max(Math.ceil(length / 2) + premiseOffset, 3);
++            const subLength1 = Math.max(Math.floor(length / 2) + premiseOffset, 2);
++            const subLength2 = Math.max(Math.ceil(length / 2) + premiseOffset, 2);
+ 
+             // Create first analogy sub-question
+             if (btfm > 0) applyOverride(firstHalf);
+@@ -478,6 +483,8 @@
+             isValid = evalBoolOperand(operand, choice.isValid, choice2.isValid);
+         }
+ 
++        if (flip !== isValid || !choice || !choice2) return null;
 +
-+										<div class="profile-import" id="profile-import" role="button" tabindex="0" title="Import profile" aria-label="Import profile"><span class="text">Import</span></div>
+         const countdown = getBinaryCountdown();
+         const operations = [choice, choice2].flatMap(q => q.operations || []);
+         const transformCount = btfm || (operations.length ? Math.round(operations.length / 2) : 0);
+--- direction.js	2026-04-30 05:46:44.588633596 +0000
++++ patched/direction.js	2026-04-30 05:53:03.273987088 +0000
+@@ -34,11 +34,20 @@
+     return a.map(c => Math.max(-limit, Math.min(limit, c)));
+ }
+ 
++function conclusionDimensionLimit(coordLength, index) {
++    // 4D uses the last axis as time; premise generation only supports -1/0/1 there.
++    // Do not let double-distance conclusion clamping create impossible time coords like 2.
++    if (coordLength === 4 && index === 3) return 1;
++    return directionLimit();
++}
 +
-+									</div>
-+
-+									<div class="profile-copied" id="profile-copied">Profile copied to clipboard</div>
- 
- 								</div>
- 
-diff -ruN original/profile.js modified/profile.js
---- original/profile.js	2026-04-29 10:43:57.107583938 +0000
-+++ modified/profile.js	2026-04-29 10:46:06.002940822 +0000
-@@ -3,9 +3,13 @@
- const profileList = document.getElementById('profile-list');
- const profileDropdown = document.querySelector('.profile-dropdown');
- const profilePlus = document.getElementById('profile-plus');
--const profileShare = document.getElementById('profile-share');
-+const profileExport = document.getElementById('profile-export');
-+const profileImport = document.getElementById('profile-import');
- const profileCopied = document.getElementById('profile-copied');
- 
-+const PROFILE_CAPSULE_PREFIX = 'SYL3:';
-+const MAX_PROFILE_SHARE_URL_LENGTH = 1800;
-+
- class ProfileStore {
-     constructor() {
-         this.profiles = [];
-@@ -15,7 +19,7 @@
- 
-     startup() {
-         this.loadProfiles();
--        this.loadUrl();
-+        this.loadIncomingProfile();
+ function normalizeConclusionCoord(a) {
+     if (a.every(c => c === 0)) return null;
+     if (savedata.enableDoubleDistanceConclusions) {
+-        const limit = directionLimit();
+-        return a.map(c => Math.max(-limit, Math.min(limit, c)));
++        return a.map((c, i) => {
++            const limit = conclusionDimensionLimit(a.length, i);
++            return Math.max(-limit, Math.min(limit, c));
++        });
      }
+     return a.map(c => c === 0 ? 0 : c / Math.abs(c));
+ }
+@@ -113,6 +122,39 @@
+     return [diffCoord, conclusionCoord];
+ }
  
-     overrideExistingKeys(target, source) {
-@@ -181,106 +185,254 @@
-         return result;
-     }
- 
--    generateUrl() {
--        const savedata = structuredClone(this.current().savedata);
--        for (const setting of legacySettings) {
--            if (savedata.hasOwnProperty(setting) && defaultSavedata[setting] === savedata[setting]) {
--                delete savedata[setting];
--            }
-+    valuesEqual(a, b) {
-+        return JSON.stringify(a) === JSON.stringify(b);
++function isRepresentableConclusionCoord(diffCoord, conclusionCoord) {
++    if (!isNonZeroConclusion(conclusionCoord)) return false;
++
++    // In the original +/-1 mode, directions are intentionally broad: any amount west
++    // normalizes to West. In double-distance conclusion mode, however, West² means an
++    // exact two-step relation. Reject larger deltas that merely got clamped to +/-2.
++    if (!savedata.enableDoubleDistanceConclusions) return true;
++
++    return conclusionCoord.every((coord, i) => diffCoord[i] === coord);
++}
++
++function getRepresentableConclusionCoords(wordCoordMap, startWord, endWord) {
++    const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
++    if (!isRepresentableConclusionCoord(diffCoord, conclusionCoord)) {
++        return [diffCoord, null];
 +    }
++    return [diffCoord, conclusionCoord];
++}
 +
-+    sanitizeInput(value, maxLength = 80) {
-+        if (typeof value !== 'string') {
-+            return '';
-         }
--        for (const [setting, compressed] of Object.entries(compressedSettings)) {
--            if (savedata.hasOwnProperty(setting)) {
--                savedata[compressed] = savedata[setting];
--                delete savedata[setting];
-+        return (value.length < maxLength) ? value.replace(/<[^>]*>/g, '') : '';
++function findRepresentableDirection(a, b) {
++    const diffCoord = diffCoords(a, b);
++    const directionCoord = normalizeDirectionCoord(diffCoord);
++    if (!isNonZeroConclusion(directionCoord)) return null;
++
++    // With double-distance directions, do not let a three-or-more-step gap masquerade
++    // as a two-step West²/East² style relation. Without double-distance, retain the
++    // legacy broad semantics where any amount west normalizes to West.
++    if (savedata.enableDoubleDistance && !directionCoord.every((coord, i) => diffCoord[i] === coord)) {
++        return null;
 +    }
++    return directionCoord;
++}
 +
-+    buildPortableSavedata(source = this.current().savedata) {
-+        const portable = {};
-+
-+        for (const [setting, value] of Object.entries(source)) {
-+            if (!defaultSavedata.hasOwnProperty(setting)) {
-+                continue;
+ function isNonZeroConclusion(conclusionCoord) {
+     return conclusionCoord != null && Array.isArray(conclusionCoord) && conclusionCoord.some(c => c !== 0);
+ }
+@@ -506,7 +548,7 @@
+                     for (let attempts = 0; attempts < 20 && (!startWord || !endWord); attempts++) {
+                         const [a, b] = pickRandomItems(allWords, 2).picked;
+                         if (wordCoordMap[a] && wordCoordMap[b]) {
+-                            const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, a, b);
++                            const [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, a, b);
+                             if (isNonZeroConclusion(conclusionCoord)) {
+                                 startWord = a;
+                                 endWord = b;
+@@ -545,9 +587,8 @@
+                     for (let attempts = 0; attempts < 20 && !fallbackPair; attempts++) {
+                         const [a, b] = pickRandomItems(allWords, 2).picked;
+                         if (wordCoordMap[a] && wordCoordMap[b]) {
+-                            const diff = diffCoords(wordCoordMap[a], wordCoordMap[b]);
+-                            const norm = normalizeDirectionCoord(diff);
+-                            if (isNonZeroConclusion(norm)) {
++                            const [, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, a, b);
++                            if (isNonZeroConclusion(conclusionCoord)) {
+                                 fallbackPair = [a, b];
+                             }
+                         }
+@@ -562,7 +603,7 @@
              }
--        }
--        for (const [setting, value] of Object.entries(savedata)) {
--            if (typeof value === "boolean") {
--                savedata[setting] = value ? 1 : 0;
-+
-+            if (this.valuesEqual(value, defaultSavedata[setting])) {
-+                continue;
+             
+             // Get initial conclusion coords (before transforms) for validation
+-            [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
++            [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
+             if (!isNonZeroConclusion(conclusionCoord)) {
+                 continue; // No valid conclusion possible with this word map
              }
-+
-+            const key = compressedSettings[setting] || setting;
-+            portable[key] = (typeof value === 'boolean') ? (value ? 1 : 0) : value;
-+        }
-+
-+        return portable;
-+    }
-+
-+    buildProfileCapsule() {
-+        return {
-+            app: 'syllogimous',
-+            type: 'profile',
-+            version: defaultSavedata.version || 3,
-+            exportedAt: Date.now(),
-+            id: this.generateShortId(10),
-+            name: this.current().name || 'Imported',
-+            savedata: this.buildPortableSavedata(),
-+        };
-+    }
-+
-+    encodeBase64Url(value) {
-+        const bytes = new TextEncoder().encode(value);
-+        let binary = '';
-+        for (let i = 0; i < bytes.length; i += 0x8000) {
-+            binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-+        }
-+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-+    }
-+
-+    decodeBase64Url(value) {
-+        const base64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
-+        const binary = atob(base64);
-+        const bytes = new Uint8Array(binary.length);
-+        for (let i = 0; i < binary.length; i++) {
-+            bytes[i] = binary.charCodeAt(i);
-         }
--        const savedataString = JSON.stringify(savedata);
--        const encodedSaveData = encodeURIComponent(savedataString);
--        const encodedId = encodeURIComponent(this.generateShortId(10));
--        const encodedName = encodeURIComponent(this.current().name);
--        const url = `${window.location.origin}${window.location.pathname}?id=${encodedId}&name=${encodedName}&savedata=${encodedSaveData}`;
--        return url;
-+        return new TextDecoder().decode(bytes);
-     }
- 
--    removeSearchParams() {
-+    generateProfileCapsuleText() {
-+        const capsule = this.buildProfileCapsule();
-+        return PROFILE_CAPSULE_PREFIX + this.encodeBase64Url(JSON.stringify(capsule));
-+    }
-+
-+    generateShareUrl(capsuleText = this.generateProfileCapsuleText()) {
-+        return `${window.location.origin}${window.location.pathname}#profile=${encodeURIComponent(capsuleText)}`;
-+    }
-+
-+    // Backwards-compatible name for any older code that still calls generateUrl().
-+    generateUrl() {
-+        return this.generateShareUrl();
-+    }
-+
-+    removeImportParams() {
-         const newUrl = window.location.origin + window.location.pathname;
--        window.history.replaceState({}, "", newUrl);
-+        window.history.replaceState({}, '', newUrl);
-     }
- 
--    loadUrl() {
--        const url = window.location.href;
--        const urlObj = new URL(url);
--        this.removeSearchParams();
--        const encodedId = urlObj.searchParams.get("id");
--        const encodedSavedata = urlObj.searchParams.get("savedata");
--        const encodedName = urlObj.searchParams.get("name");
--        if (!encodedId || !encodedSavedata || !encodedName) {
-+    loadIncomingProfile() {
-+        const urlObj = new URL(window.location.href);
-+        const profile = this.parseProfileImport(window.location.href);
-+        const hasProfilePayload = urlObj.hash.startsWith('#profile=') || urlObj.searchParams.has('savedata');
-+
-+        if (hasProfilePayload) {
-+            this.removeImportParams();
-+        }
-+
-+        if (!profile) {
-             return;
-         }
- 
--        function sanitizeInput(value) {
--            return (value.length < 40) ? value.replace(/<[^>]*>/g, "") : '';
-+        this.offerImportProfile(profile);
-+    }
-+
-+    parseProfileImport(value) {
-+        if (!value || typeof value !== 'string') {
-+            return null;
-         }
- 
--        let id = sanitizeInput(decodeURIComponent(encodedId));
--        if (!id) {
--            return;
-+        const trimmed = value.trim();
-+
-+        try {
-+            const urlObj = new URL(trimmed);
-+            if (urlObj.hash.startsWith('#profile=')) {
-+                return this.decodeProfileCapsule(decodeURIComponent(urlObj.hash.slice('#profile='.length)));
-+            }
-+
-+            if (urlObj.searchParams.has('savedata')) {
-+                return this.decodeLegacyUrlProfile(urlObj.searchParams);
-+            }
-+        } catch (error) {
-+            // Not a URL. Fall through and treat it as a capsule code.
-         }
--        let name = sanitizeInput(decodeURIComponent(encodedName));
--        if (!name) {
--            name = 'Imported';
-+
-+        if (trimmed.startsWith('#profile=')) {
-+            return this.decodeProfileCapsule(decodeURIComponent(trimmed.slice('#profile='.length)));
-         }
- 
--        for (const profile of this.profiles) {
--            if (profile.id === id) {
--                return;
-+        return this.decodeProfileCapsule(trimmed);
-+    }
-+
-+    decodeProfileCapsule(capsuleText) {
-+        try {
-+            const text = capsuleText.trim();
-+            if (!text.startsWith(PROFILE_CAPSULE_PREFIX)) {
-+                return null;
-+            }
-+
-+            const decoded = this.decodeBase64Url(text.slice(PROFILE_CAPSULE_PREFIX.length));
-+            const capsule = JSON.parse(decoded);
-+
-+            if (capsule.app !== 'syllogimous' || capsule.type !== 'profile' || !capsule.savedata) {
-+                return null;
-+            }
-+
-+            const id = this.sanitizeInput(capsule.id || this.generateShortId(10), 40) || this.generateShortId(10);
-+            const name = this.sanitizeInput(capsule.name || 'Imported') || 'Imported';
-+            const savedataObj = this.normalizeImportedSavedata(capsule.savedata);
-+
-+            return { id, name, savedata: savedataObj };
-+        } catch (error) {
-+            return null;
-+        }
-+    }
-+
-+    decodeLegacyUrlProfile(searchParams) {
-+        try {
-+            const encodedId = searchParams.get('id');
-+            const encodedSavedata = searchParams.get('savedata');
-+            const encodedName = searchParams.get('name');
-+            if (!encodedId || !encodedSavedata || !encodedName) {
-+                return null;
-             }
- 
--            if (profile.name === name) {
--                name = this.updateNameNumber(encodedName);
-+            const id = this.sanitizeInput(encodedId, 40);
-+            if (!id) {
-+                return null;
-             }
-+
-+            const name = this.sanitizeInput(encodedName) || 'Imported';
-+            const savedataObj = this.normalizeImportedSavedata(JSON.parse(encodedSavedata));
-+
-+            return { id, name, savedata: savedataObj };
-+        } catch (error) {
-+            return null;
-         }
--        const savedataString = decodeURIComponent(encodedSavedata);
--        const savedataObj = JSON.parse(savedataString);
--        if (!savedataObj) {
--            return;
-+    }
-+
-+    normalizeImportedSavedata(savedataObj) {
-+        if (!savedataObj || typeof savedataObj !== 'object' || Array.isArray(savedataObj)) {
-+            return null;
-         }
- 
--        this.uncompressSavedata(savedataObj);
-+        const normalized = structuredClone(savedataObj);
-+        this.uncompressSavedata(normalized);
- 
--        const unsafeKeys = Object.keys(savedataObj);
--        for (const key in unsafeKeys) {
-+        const unsafeKeys = Object.keys(normalized);
-+        for (const key of unsafeKeys) {
-             if (!defaultSavedata.hasOwnProperty(key)) {
--                delete savedataObj[key];
-+                delete normalized[key];
+@@ -625,7 +666,7 @@
+                 }
                  continue;
              }
+-            [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
++            [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
+             
+             // Check if we have valid conclusion after transforms - if not, retry
+             if (!isNonZeroConclusion(conclusionCoord)) {
+@@ -683,7 +724,7 @@
+                     continue;
+                 }
  
--            if (typeof savedataObj[key] === "string") {
--                savedataObj[key] = sanitizeInput(savedataObj[key]);
-+            if (typeof normalized[key] === 'string') {
-+                normalized[key] = this.sanitizeInput(normalized[key]);
-             }
-         }
- 
-         for (const [key, defaultValue] of Object.entries(defaultSavedata)) {
--            if (!savedataObj.hasOwnProperty(key)) {
--                savedataObj[key] = defaultValue;
-+            if (!normalized.hasOwnProperty(key)) {
-+                normalized[key] = structuredClone(defaultValue);
-             }
-         }
- 
-+        this.settingsMigration.update(normalized);
-+        return normalized;
-+    }
-+
-+    addImportedProfile(profile) {
-+        if (!profile || !profile.savedata) {
-+            showProfileToast('Could not read profile');
-+            return;
-+        }
-+
-+        for (const existing of this.profiles) {
-+            if (existing.id === profile.id) {
-+                showProfileToast('Profile already imported');
-+                return;
-+            }
-+        }
-+
-+        let name = profile.name;
-+        const existingNames = new Set(this.profiles.map(p => p.name));
-+        while (existingNames.has(name)) {
-+            name = this.updateNameNumber(name);
-+        }
-+
-         const newProfile = {
--            id,
-+            id: profile.id || this.generateShortId(10),
-             name,
--            savedata: savedataObj,
-+            savedata: profile.savedata,
-         };
- 
-         this.profiles.push(newProfile);
-         this.selectedProfile = this.profiles.length - 1;
-         this.handleProfileChange();
-         this.renderDropdown();
-+        showProfileToast(`Imported ${newProfile.name}`);
-+    }
-+
-+    offerImportProfile(profile) {
-+        if (!profile || !profile.savedata) {
-+            showProfileToast('Could not read profile');
-+            return;
-+        }
-+
-+        const changedSettings = Object.entries(profile.savedata).filter(([key, value]) => {
-+            return defaultSavedata.hasOwnProperty(key) && !this.valuesEqual(value, defaultSavedata[key]);
-+        }).length;
-+
-+        const message = `Import profile "${profile.name}"?\n\nChanged settings: ${changedSettings}`;
-+        if (typeof customConfirm === 'function') {
-+            customConfirm(message, () => this.addImportedProfile(profile), 'Import', 'Cancel');
-+        } else if (window.confirm(message)) {
-+            this.addImportedProfile(profile);
-+        }
+-                [dCoord, cCoord] = getConclusionCoords(wordCoordMap, sw, ew);
++                [dCoord, cCoord] = getRepresentableConclusionCoords(wordCoordMap, sw, ew);
+                 if (!isNonZeroConclusion(cCoord)) {
+                     generatedCount++; // Prevent infinite loop
+                     continue;
+@@ -841,6 +882,8 @@
      }
  
-     uncompressSavedata(savedataObj) {
-@@ -315,14 +467,89 @@
-     PROFILE_STORE.copySelectedProfile();
- });
- 
--profileShare.addEventListener('click', e => {
--    const url = PROFILE_STORE.generateUrl();
--    navigator.clipboard.writeText(url);
-+profileExport.addEventListener('click', async e => {
-+    const capsuleText = PROFILE_STORE.generateProfileCapsuleText();
-+    const url = PROFILE_STORE.generateShareUrl(capsuleText);
-+    const canUseUrl = url.length <= MAX_PROFILE_SHARE_URL_LENGTH;
-+    const textToCopy = canUseUrl ? url : capsuleText;
+     createAnalogy(length) {
++        length = Math.max(2, length);
 +
-+    const copied = await copyToClipboard(textToCopy);
-+    if (!canUseUrl) {
-+        downloadProfileCapsule(capsuleText, PROFILE_STORE.current().name);
-+    }
-+
-+    if (copied) {
-+        showProfileToast(canUseUrl ? 'Profile link copied' : 'Profile code copied; file downloaded');
-+    } else {
-+        showProfileToast('Profile export created');
-+    }
-+});
-+
-+profileImport.addEventListener('click', e => {
-+    const pasted = window.prompt('Paste a profile link or SYL3 profile code:');
-+    if (!pasted) {
-+        return;
-+    }
-+
-+    const profile = PROFILE_STORE.parseProfileImport(pasted);
-+    PROFILE_STORE.offerImportProfile(profile);
-+});
-+
-+function triggerOnEnterOrSpace(element) {
-+    element.addEventListener('keydown', event => {
-+        if (event.key === 'Enter' || event.key === ' ') {
-+            event.preventDefault();
-+            element.click();
+         let isValid;
+         let isValidSame;
+         resetDirectionLimit();
+@@ -854,14 +897,24 @@
+         let a, b, c, d;
+         let continuousOps = [];
+         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
++        const useTinyAnalogy = length <= 2;
++        if (useTinyAnalogy) {
++            // Two-premise analogies cannot interleave transforms between enough ordinary premises.
++            // Keep all requested hard-mode transforms as regular operations instead.
++            numTransforms += numInterleaved;
++            numInterleaved = 0;
 +        }
-+    });
-+}
+         const branchesAllowed = Math.random() > 0.2;
+         const flip = coinFlip();
+         const isV2 = this.generator.getName() === 'Anchor Space v2';
++        let retryCount = 0;
++        const maxRetries = 80;
+         
+         // Create unified transform state if any transforms are needed
+         let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
+         
+-        while (flip !== isValidSame) {
++        while (flip !== isValidSame && retryCount < maxRetries) {
++            retryCount++;
+             // Reset transformState at start of each iteration to clear stale data
+             // But preserve the wordCoordMap as a reference (will be repopulated by createWordMapInterleaved)
+             if (transformState) {
+@@ -877,7 +930,10 @@
+             
+             continuousOps = [];
+             operations = [];
+-            if (this.generator.shouldUseAnchor()) {
++            if (useTinyAnalogy) {
++                [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps] = this.createTinyAnalogyWordMap(flip);
++                anchorWords = null;
++            } else if (this.generator.shouldUseAnchor()) {
+                 if (numInterleaved > 0) {
+                     // Use interleaved version for anchor spaces when interleave mode is on
+                     [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchorInterleaved(length, numInterleaved, transformState, branchesAllowed);
+@@ -897,6 +953,7 @@
+                 anchorWords = null;
+             }
+             [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
++            if (!a || !b || !c || !d) continue;
+             
+             // Initialize transformState with final wordCoordMap and anchorWords
+             if (transformState) {
+@@ -915,7 +972,8 @@
+             
+             if (numTransforms > 0) {
+                 const [startWord, endWord] = pickRandomItems([a, b, c, d], 2).picked;
+-                const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
++                const [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
++                if (!conclusionCoord) continue;
+                 let _x;
+                 // Pass transformState to SpaceHardMode for coordinated transforms
+                 [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms, anchorWords || [], transformState)
+@@ -931,11 +989,13 @@
+             if (continuousOps.length > 0) {
+                 operations.push(...continuousOps);
+             }
+-            const dirAB = findDirection(wordCoordMap[a], wordCoordMap[b]);
+-            const dirCD = findDirection(wordCoordMap[c], wordCoordMap[d]);
+-            // Handle null directions (words at same position) - treat as not equal
++            const dirAB = findRepresentableDirection(wordCoordMap[a], wordCoordMap[b]);
++            const dirCD = findRepresentableDirection(wordCoordMap[c], wordCoordMap[d]);
++            // Handle null directions (words at same position or clamped double-distance) as not equal.
+             isValidSame = dirAB !== null && dirCD !== null && arraysEqual(dirAB, dirCD);
+         }
++        if (flip !== isValidSame) return null;
 +
-+triggerOnEnterOrSpace(profilePlus);
-+triggerOnEnterOrSpace(profileExport);
-+triggerOnEnterOrSpace(profileImport);
-+
-+async function copyToClipboard(value) {
-+    try {
-+        if (navigator.clipboard && window.isSecureContext) {
-+            await navigator.clipboard.writeText(value);
-+            return true;
-+        }
-+
-+        const textarea = document.createElement('textarea');
-+        textarea.value = value;
-+        textarea.setAttribute('readonly', '');
-+        textarea.style.position = 'fixed';
-+        textarea.style.opacity = '0';
-+        document.body.appendChild(textarea);
-+        textarea.select();
-+        const copied = document.execCommand('copy');
-+        document.body.removeChild(textarea);
-+        return copied;
-+    } catch (error) {
-+        return false;
-+    }
-+}
-+
-+function showProfileToast(message) {
-+    profileCopied.textContent = message;
-     profileCopied.classList.add('toast');
-     setTimeout(() => {
-         profileCopied.classList.remove('toast');
--    }, 1000);
--});
-+    }, 1600);
-+}
-+
-+function downloadProfileCapsule(capsuleText, profileName) {
-+    const safeName = (profileName || 'profile').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'profile';
-+    const blob = new Blob([capsuleText], { type: 'text/plain;charset=utf-8' });
-+    const url = URL.createObjectURL(blob);
-+    const link = document.createElement('a');
-+    link.href = url;
-+    link.download = `${safeName}.sylprofile`;
-+    document.body.appendChild(link);
-+    link.click();
-+    document.body.removeChild(link);
-+    URL.revokeObjectURL(url);
-+}
- 
- function debounce(func, delay) {
-   let timeoutId;
-diff -ruN original/styles.css modified/styles.css
---- original/styles.css	2026-04-29 10:43:57.107196232 +0000
-+++ modified/styles.css	2026-04-29 10:46:06.009299790 +0000
-@@ -4283,7 +4283,9 @@
- 
-     justify-content: space-between;
- 
--    height: 70px;
-+    flex-wrap: wrap;
-+
-+    min-height: 70px;
- 
- }
- 
-@@ -4297,7 +4299,9 @@
- 
-     font-family: monospace;
- 
--    width: 250px;
-+    flex: 1 1 220px;
-+
-+    min-width: 0;
- 
- }
- 
-@@ -4349,9 +4353,33 @@
- 
- }
- 
-+.profile-actions {
- 
-+    display: flex;
-+
-+    flex: 1 1 210px;
- 
--.profile-arrow, .profile-plus, .profile-share {
-+    gap: 2px;
-+
-+    min-width: 0;
-+
-+}
-+
-+.profile-plus {
-+
-+    min-width: 50px;
-+
-+}
-+
-+.profile-export, .profile-import {
-+
-+    min-width: 74px;
-+
-+}
-+
-+
-+
-+.profile-arrow, .profile-plus, .profile-export, .profile-import {
- 
-     font-size: var(--step-2);
- 
-@@ -4371,7 +4399,7 @@
- 
- 
- 
--.profile-plus, .profile-share {
-+.profile-plus, .profile-export, .profile-import {
- 
-     flex-grow: 1;
- 
-@@ -4385,7 +4413,7 @@
- 
- 
- 
--.profile-share .icon {
-+.profile-export .icon {
- 
-     line-height: 0;
- 
-@@ -4395,7 +4423,7 @@
- 
- 
- 
--.profile-share .text {
-+.profile-export .text, .profile-import .text {
- 
-     font-size: var(--step--1);
- 
-@@ -5576,6 +5604,16 @@
- 
-         width: 100%;
- 
-+        flex-basis: 100%;
-+
-+    }
-+
-+    .profile-actions {
-+
-+        width: 100%;
-+
-+        flex-basis: 100%;
-+
+         let conclusion = analogyTo(a, b);
+         if (coinFlip()) {
+             conclusion += pickAnalogyStatementSame().html;
+@@ -976,6 +1036,43 @@
+         }
      }
  
- 
-@@ -6452,6 +6490,12 @@
- 
- }
- 
-+#sidebar-settings .profile-actions {
++    createTinyAnalogyWordMap(preferSameDirection=false) {
++        const words = createStimuli(4);
++        const [a, b, c, d] = words;
++        const initialCoord = this.generator.initialCoord();
++        const coordLength = initialCoord.length;
++        const separation = directionLimit() * 4 + 4;
++        const secondBase = initialCoord.map((value, index) => index === 0 ? value + separation : value);
 +
-+    gap: 0.35rem;
++        let wordCoordMap = {
++            [a]: initialCoord.slice(),
++            [c]: secondBase,
++        };
++        let neighbors = {
++            [a]: [],
++            [c]: [],
++        };
 +
-+}
++        const dir1 = this.generator.pickDirection(a, neighbors, wordCoordMap);
++        const dirPool = getDirectionCoordsForLength(coordLength).filter(coord => !arraysEqual(coord, dir1));
++        const dir2 = preferSameDirection || dirPool.length === 0
++            ? dir1.slice()
++            : pickRandomItems(dirPool, 1).picked[0];
 +
- 
- 
- #sidebar-settings .profile-input {
-@@ -6472,7 +6516,9 @@
- 
- #sidebar-settings .profile-plus,
- 
--#sidebar-settings .profile-share {
-+#sidebar-settings .profile-export,
++        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1);
++        wordCoordMap[d] = addCoords(wordCoordMap[c], dir2);
++        neighbors[a].push(b);
++        neighbors[b] = [a];
++        neighbors[c].push(d);
++        neighbors[d] = [c];
 +
-+#sidebar-settings .profile-import {
- 
-     transition: all 0.2s ease;
- 
-@@ -6486,7 +6532,9 @@
- 
- #sidebar-settings .profile-plus:hover,
- 
--#sidebar-settings .profile-share:hover {
-+#sidebar-settings .profile-export:hover,
++        const premises = [
++            this.generator.createDirectionStatement(a, b, dir1),
++            this.generator.createDirectionStatement(c, d, dir2),
++        ];
++        return [wordCoordMap, neighbors, premises, [dir1, dir2], []];
++    }
 +
-+#sidebar-settings .profile-import:hover {
+     getInterferenceLevel() {
+         const name = this.generator.getName();
+         if (name.includes('Three D') || name.includes('3D')) {
+--- mixed-mode.js	2026-04-30 05:46:44.612741247 +0000
++++ patched/mixed-mode.js	2026-04-30 05:53:36.109810846 +0000
+@@ -469,13 +469,14 @@
+                                 continue;
+                             }
+                             
+-                            // Find the actual vector from endNode to startNode
++                            // Find the actual vector from endNode to startNode. In double-distance
++                            // conclusion mode, skip vectors that would only become West²/East² by clamping.
+                             const vec = diffCoords(coordMap[endNode], coordMap[startNode]);
+-                            const actualCoord = this.normalizeCoord(vec);
++                            const actualCoord = normalizeConclusionCoord(vec);
+                             
+-                            // If both nodes are at the same position, we can't create a direction conclusion
+-                            if (actualCoord.every(d => d === 0)) {
+-                                // Can't generate a valid mixed conclusion - skip and fall through to simple distinction
++                            // If both nodes are at the same position, or the vector cannot be stated exactly,
++                            // we can't create a reliable direction conclusion.
++                            if (!isRepresentableConclusionCoord(vec, actualCoord)) {
+                                 continue;
+                             }
+                             
+@@ -568,9 +569,9 @@
+             const validCoords = words.filter(w => coordMap[w]);
+             if (validCoords.length >= 2) {
+                 const [a, b] = pickRandomItems(validCoords, 2).picked;
+-                const rawDir = findDirection(coordMap[a], coordMap[b]);
+-                if (!rawDir) return [null, false, []];
+-                const actualCoord = this.normalizeCoord(rawDir);
++                const vec = diffCoords(coordMap[a], coordMap[b]);
++                const actualCoord = normalizeConclusionCoord(vec);
++                if (!isRepresentableConclusionCoord(vec, actualCoord)) return [null, false, []];
  
-     background: var(--accent-hover);
- 
-@@ -10780,7 +10828,8 @@
- .settings-section.active .inline-input__outer,
- .settings-section.active .profile-dropdown,
- .settings-section.active .profile-plus,
--.settings-section.active .profile-share {
-+.settings-section.active .profile-export,
-+.settings-section.active .profile-import {
-     border-radius: 12px;
- }
- 
+                 const isMultiDim = actualCoord.length >= 5;
+                 const multiDimDim = actualCoord.length + 1; // 5 coords → dim=6, 6 coords → dim=7

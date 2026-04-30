@@ -469,13 +469,14 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
                                 continue;
                             }
                             
-                            // Find the actual vector from endNode to startNode
+                            // Find the actual vector from endNode to startNode. In double-distance
+                            // conclusion mode, skip vectors that would only become West²/East² by clamping.
                             const vec = diffCoords(coordMap[endNode], coordMap[startNode]);
-                            const actualCoord = this.normalizeCoord(vec);
+                            const actualCoord = normalizeConclusionCoord(vec);
                             
-                            // If both nodes are at the same position, we can't create a direction conclusion
-                            if (actualCoord.every(d => d === 0)) {
-                                // Can't generate a valid mixed conclusion - skip and fall through to simple distinction
+                            // If both nodes are at the same position, or the vector cannot be stated exactly,
+                            // we can't create a reliable direction conclusion.
+                            if (!isRepresentableConclusionCoord(vec, actualCoord)) {
                                 continue;
                             }
                             
@@ -568,9 +569,9 @@ createMixedConclusion(words, premises, coordMap, sameSets, bucketMap, neighbors,
             const validCoords = words.filter(w => coordMap[w]);
             if (validCoords.length >= 2) {
                 const [a, b] = pickRandomItems(validCoords, 2).picked;
-                const rawDir = findDirection(coordMap[a], coordMap[b]);
-                if (!rawDir) return [null, false, []];
-                const actualCoord = this.normalizeCoord(rawDir);
+                const vec = diffCoords(coordMap[a], coordMap[b]);
+                const actualCoord = normalizeConclusionCoord(vec);
+                if (!isRepresentableConclusionCoord(vec, actualCoord)) return [null, false, []];
 
                 const isMultiDim = actualCoord.length >= 5;
                 const multiDimDim = actualCoord.length + 1; // 5 coords → dim=6, 6 coords → dim=7
