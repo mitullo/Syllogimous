@@ -447,6 +447,19 @@ class BinaryAnalogyQuestion {
         analogyGenerators = analogyGenerators.filter(g => typeof g.question.createAnalogy === 'function');
         if (analogyGenerators.length === 0) return null;
 
+        // For 4-premise binary analogy, each side must be a 2-premise analogy leaf.
+        // Only Direction/Anchor-style analogy generators currently expose that compact path.
+        // Without this filter, a non-compact leaf falls back to 3 premises, so the whole
+        // binary analogy silently becomes 6 premises again.
+        if (length <= 4) {
+            const compactAnalogyGenerators = analogyGenerators.filter(
+                g => typeof g.question.createCompactAnalogy === 'function'
+            );
+            if (compactAnalogyGenerators.length > 0) {
+                analogyGenerators = compactAnalogyGenerators;
+            }
+        }
+
         const premiseOffset = getPremisesFor('offsetAnalogyPremises', 0);
 
         let choice, choice2;
