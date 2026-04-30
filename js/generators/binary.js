@@ -460,7 +460,10 @@ class BinaryAnalogyQuestion {
             }
         }
 
-        const premiseOffset = getPremisesFor('offsetAnalogyPremises', 0);
+        // When the total length is 4 or fewer, each leaf is at most 2 premises.
+        // The analogy-premise offset is meant for enriching larger analogies and would
+        // inflate compact leaves back to 3 premises (6 total), defeating the purpose.
+        const premiseOffset = length <= 4 ? 0 : getPremisesFor('offsetAnalogyPremises', 0);
 
         let choice, choice2;
         let premises;
