@@ -897,13 +897,6 @@ class DirectionQuestion {
         let a, b, c, d;
         let continuousOps = [];
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
-        const useTinyAnalogy = length <= 2;
-        if (useTinyAnalogy) {
-            // Two-premise analogies cannot interleave transforms between enough ordinary premises.
-            // Keep all requested hard-mode transforms as regular operations instead.
-            numTransforms += numInterleaved;
-            numInterleaved = 0;
-        }
         const branchesAllowed = Math.random() > 0.2;
         const flip = coinFlip();
         const isV2 = this.generator.getName() === 'Anchor Space v2';
@@ -930,10 +923,7 @@ class DirectionQuestion {
             
             continuousOps = [];
             operations = [];
-            if (useTinyAnalogy) {
-                [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps] = this.createTinyAnalogyWordMap(flip);
-                anchorWords = null;
-            } else if (this.generator.shouldUseAnchor()) {
+            if (this.generator.shouldUseAnchor()) {
                 if (numInterleaved > 0) {
                     // Use interleaved version for anchor spaces when interleave mode is on
                     [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchorInterleaved(length, numInterleaved, transformState, branchesAllowed);
@@ -1036,41 +1026,69 @@ class DirectionQuestion {
         }
     }
 
-    createTinyAnalogyWordMap(preferSameDirection=false) {
+    createCompactAnalogy(length = 2) {
+        // Binary analogy can ask for very small leaves. A normal direction analogy
+        // builds one connected map, so 2 premises only gives 3 words and cannot
+        // support A:B :: C:D. This compact path creates two independent relation
+        // premises instead, giving a true 2-premise analogy leaf.
+        resetDirectionLimit();
+
         const words = createStimuli(4);
         const [a, b, c, d] = words;
         const initialCoord = this.generator.initialCoord();
-        const coordLength = initialCoord.length;
-        const separation = directionLimit() * 4 + 4;
-        const secondBase = initialCoord.map((value, index) => index === 0 ? value + separation : value);
-
-        let wordCoordMap = {
+        const zero = initialCoord.map(() => 0);
+        const wordCoordMap = {
             [a]: initialCoord.slice(),
-            [c]: secondBase,
+            [c]: initialCoord.map((_, i) => (i === 0 ? 10 : 0)),
         };
-        let neighbors = {
-            [a]: [],
-            [c]: [],
-        };
+        const neighbors = { [a]: [], [b]: [], [c]: [], [d]: [] };
 
         const dir1 = this.generator.pickDirection(a, neighbors, wordCoordMap);
-        const dirPool = getDirectionCoordsForLength(coordLength).filter(coord => !arraysEqual(coord, dir1));
-        const dir2 = preferSameDirection || dirPool.length === 0
-            ? dir1.slice()
-            : pickRandomItems(dirPool, 1).picked[0];
+        const wantSame = coinFlip();
+        let dir2 = dir1;
+        let guard = 0;
+        while (!wantSame && arraysEqual(dir2, dir1) && guard < 25) {
+            dir2 = this.generator.pickDirection(c, neighbors, wordCoordMap);
+            guard++;
+        }
+        if (!wantSame && arraysEqual(dir2, dir1)) {
+            dir2 = inverse(dir1) || dir1;
+        }
 
-        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1);
-        wordCoordMap[d] = addCoords(wordCoordMap[c], dir2);
-        neighbors[a].push(b);
-        neighbors[b] = [a];
-        neighbors[c].push(d);
-        neighbors[d] = [c];
+        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1 || zero);
+        wordCoordMap[d] = addCoords(wordCoordMap[c], dir2 || zero);
 
-        const premises = [
+        const premiseObjs = [
             this.generator.createDirectionStatement(a, b, dir1),
             this.generator.createDirectionStatement(c, d, dir2),
         ];
-        return [wordCoordMap, neighbors, premises, [dir1, dir2], []];
+        const premises = premiseObjs.map((p, i) => createPremiseHTML(p, true, i));
+
+        const isValidSame = dir1 !== null && dir2 !== null && arraysEqual(dir1, dir2);
+        let conclusion = analogyTo(a, b);
+        let isValid;
+        if (coinFlip()) {
+            conclusion += pickAnalogyStatementSame().html;
+            isValid = isValidSame;
+        } else {
+            conclusion += pickAnalogyStatementDifferent().html;
+            isValid = !isValidSame;
+        }
+        conclusion += analogyTo(c, d);
+
+        return {
+            category: 'Analogy: ' + this.generator.getName(),
+            type: normalizeString(this.generator.getName()),
+            modifiers: ['compact'],
+            startedAt: new Date().getTime(),
+            wordCoordMap,
+            bucket: Object.keys(wordCoordMap),
+            isValid,
+            premises,
+            operations: [],
+            conclusion,
+            ...(this.generator.getCountdown() && { countdown: this.generator.getCountdown() }),
+        };
     }
 
     getInterferenceLevel() {

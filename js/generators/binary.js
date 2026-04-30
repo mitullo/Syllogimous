@@ -357,10 +357,16 @@ function createNestedBinaryGenerator(length) {
 }
 
 class BinaryAnalogyQuestion {
+    createAnalogyLeaf(generator, length) {
+        const question = generator.question;
+        if (length <= 2 && typeof question.createCompactAnalogy === 'function') {
+            return question.createCompactAnalogy(length);
+        }
+        return question.createAnalogy(Math.max(length, 3));
+    }
+
     create(length, transforms = {}) {
-        // Binary analogy can work with two 2-premise analogy leaves (4 total premises).
-        // The sub-generators decide whether they need to internally retry or return null.
-        length = Math.max(4, length);
+        length = Math.max(2, length);
 
         const btfm = savedata.binaryHardModeLevel || 0;
         const firstHalf = Math.ceil(btfm / 2);
@@ -406,12 +412,12 @@ class BinaryAnalogyQuestion {
         ];
 
         const operandTemplates = [
-            '$a <div class="is-connector">and</div> $b',
-            '<div class="is-connector"></div> $a <div class="is-connector">nand</div> $b <div class="is-connector">are true</div>',
-            '$a <div class="is-connector">or</div> $b',
-            '<div class="is-connector">Neither</div> $a <div class="is-connector">nor</div> $b',
-            '<div class="is-connector">Either</div> $a <div class="is-connector">or</div> $b',
-            '<div class="is-connector">Both</div> $a <div class="is-connector">and</div> $b <div class="is-connector">are the same</div>'
+            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">AND</div> $b</div>',
+            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">NAND</div> $b</div>',
+            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">OR</div> $b</div>',
+            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">NOR</div> $b</div>',
+            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">XOR</div> $b</div>',
+            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">XNOR</div> $b</div>'
         ];
 
         // Build analogy generator pool (same as AnalogyQuestion)
@@ -464,17 +470,21 @@ class BinaryAnalogyQuestion {
 
             // Create first analogy sub-question
             if (btfm > 0) applyOverride(firstHalf);
-            choice = g1.question.createAnalogy(subLength1);
+            choice = this.createAnalogyLeaf(g1, subLength1);
             if (btfm > 0) restoreOverride();
 
             // Create second analogy sub-question
             if (btfm > 0) applyOverride(secondHalf);
-            choice2 = g2.question.createAnalogy(subLength2);
+            choice2 = this.createAnalogyLeaf(g2, subLength2);
             if (btfm > 0) restoreOverride();
 
             if (!choice || !choice2) continue;
 
-            premises = scramble([...choice.premises, ...choice2.premises], getScrambleFactor('overrideBinaryScramble'));
+            const scrambleFactor = getScrambleFactor('overrideBinaryScramble');
+            premises = [
+                ...scramble([...choice.premises], scrambleFactor),
+                ...scramble([...choice2.premises], scrambleFactor),
+            ];
 
             conclusion = operandTemplates[operandIndex]
                 .replace("$a", '<div class="binary-sub-conclusion">' + choice.conclusion + '</div>')
@@ -496,6 +506,7 @@ class BinaryAnalogyQuestion {
             startedAt: new Date().getTime(),
             subresults: [choice, choice2],
             subOperations: [choice.operations || [], choice2.operations || []],
+            tags: ['analogy'],
             isValid,
             premises,
             operations,

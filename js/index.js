@@ -1432,7 +1432,7 @@ function displayInit() {
 
 
 
-    const isBinary = question.type === 'binary';
+    const isBinary = question.type === 'binary' || question.type === 'binary-analogy';
 
 
 

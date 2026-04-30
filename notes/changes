@@ -1,24 +1,43 @@
---- binary.js	2026-04-30 05:46:44.025268128 +0000
-+++ patched/binary.js	2026-04-30 05:53:03.270921862 +0000
-@@ -358,6 +358,8 @@
+--- binary.js	2026-04-30 06:15:01.394691418 +0000
++++ patchwork/binary.js	2026-04-30 06:23:48.259429661 +0000
+@@ -357,8 +357,16 @@
+ }
  
  class BinaryAnalogyQuestion {
++    createAnalogyLeaf(generator, length) {
++        const question = generator.question;
++        if (length <= 2 && typeof question.createCompactAnalogy === 'function') {
++            return question.createCompactAnalogy(length);
++        }
++        return question.createAnalogy(Math.max(length, 3));
++    }
++
      create(length, transforms = {}) {
-+        // Binary analogy can work with two 2-premise analogy leaves (4 total premises).
-+        // The sub-generators decide whether they need to internally retry or return null.
-         length = Math.max(4, length);
+-        length = Math.max(4, length);
++        length = Math.max(2, length);
  
          const btfm = savedata.binaryHardModeLevel || 0;
-@@ -449,13 +451,16 @@
-         const operandIndex = Math.floor(Math.random() * operands.length);
-         const operand = operands[operandIndex];
+         const firstHalf = Math.ceil(btfm / 2);
+@@ -404,12 +412,12 @@
+         ];
  
--        while (flip !== isValid) {
-+        let attempts = 0;
-+        const maxAttempts = 120;
-+        while (flip !== isValid && attempts < maxAttempts) {
-+            attempts++;
-             // Pick two random analogy generators
+         const operandTemplates = [
+-            '$a <div class="is-connector">and</div> $b',
+-            '<div class="is-connector"></div> $a <div class="is-connector">nand</div> $b <div class="is-connector">are true</div>',
+-            '$a <div class="is-connector">or</div> $b',
+-            '<div class="is-connector">Neither</div> $a <div class="is-connector">nor</div> $b',
+-            '<div class="is-connector">Either</div> $a <div class="is-connector">or</div> $b',
+-            '<div class="is-connector">Both</div> $a <div class="is-connector">and</div> $b <div class="is-connector">are the same</div>'
++            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">AND</div> $b</div>',
++            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">NAND</div> $b</div>',
++            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">OR</div> $b</div>',
++            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">NOR</div> $b</div>',
++            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">XOR</div> $b</div>',
++            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">XNOR</div> $b</div>'
+         ];
+ 
+         // Build analogy generator pool (same as AnalogyQuestion)
+@@ -454,22 +462,26 @@
              const g1 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
              const g2 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
  
@@ -29,286 +48,340 @@
  
              // Create first analogy sub-question
              if (btfm > 0) applyOverride(firstHalf);
-@@ -478,6 +483,8 @@
-             isValid = evalBoolOperand(operand, choice.isValid, choice2.isValid);
-         }
+-            choice = g1.question.createAnalogy(subLength1);
++            choice = this.createAnalogyLeaf(g1, subLength1);
+             if (btfm > 0) restoreOverride();
  
-+        if (flip !== isValid || !choice || !choice2) return null;
-+
-         const countdown = getBinaryCountdown();
-         const operations = [choice, choice2].flatMap(q => q.operations || []);
-         const transformCount = btfm || (operations.length ? Math.round(operations.length / 2) : 0);
---- direction.js	2026-04-30 05:46:44.588633596 +0000
-+++ patched/direction.js	2026-04-30 05:53:03.273987088 +0000
-@@ -34,11 +34,20 @@
-     return a.map(c => Math.max(-limit, Math.min(limit, c)));
- }
+             // Create second analogy sub-question
+             if (btfm > 0) applyOverride(secondHalf);
+-            choice2 = g2.question.createAnalogy(subLength2);
++            choice2 = this.createAnalogyLeaf(g2, subLength2);
+             if (btfm > 0) restoreOverride();
  
-+function conclusionDimensionLimit(coordLength, index) {
-+    // 4D uses the last axis as time; premise generation only supports -1/0/1 there.
-+    // Do not let double-distance conclusion clamping create impossible time coords like 2.
-+    if (coordLength === 4 && index === 3) return 1;
-+    return directionLimit();
-+}
-+
- function normalizeConclusionCoord(a) {
-     if (a.every(c => c === 0)) return null;
-     if (savedata.enableDoubleDistanceConclusions) {
--        const limit = directionLimit();
--        return a.map(c => Math.max(-limit, Math.min(limit, c)));
-+        return a.map((c, i) => {
-+            const limit = conclusionDimensionLimit(a.length, i);
-+            return Math.max(-limit, Math.min(limit, c));
-+        });
-     }
-     return a.map(c => c === 0 ? 0 : c / Math.abs(c));
- }
-@@ -113,6 +122,39 @@
-     return [diffCoord, conclusionCoord];
- }
+             if (!choice || !choice2) continue;
  
-+function isRepresentableConclusionCoord(diffCoord, conclusionCoord) {
-+    if (!isNonZeroConclusion(conclusionCoord)) return false;
-+
-+    // In the original +/-1 mode, directions are intentionally broad: any amount west
-+    // normalizes to West. In double-distance conclusion mode, however, West² means an
-+    // exact two-step relation. Reject larger deltas that merely got clamped to +/-2.
-+    if (!savedata.enableDoubleDistanceConclusions) return true;
-+
-+    return conclusionCoord.every((coord, i) => diffCoord[i] === coord);
-+}
-+
-+function getRepresentableConclusionCoords(wordCoordMap, startWord, endWord) {
-+    const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
-+    if (!isRepresentableConclusionCoord(diffCoord, conclusionCoord)) {
-+        return [diffCoord, null];
-+    }
-+    return [diffCoord, conclusionCoord];
-+}
-+
-+function findRepresentableDirection(a, b) {
-+    const diffCoord = diffCoords(a, b);
-+    const directionCoord = normalizeDirectionCoord(diffCoord);
-+    if (!isNonZeroConclusion(directionCoord)) return null;
-+
-+    // With double-distance directions, do not let a three-or-more-step gap masquerade
-+    // as a two-step West²/East² style relation. Without double-distance, retain the
-+    // legacy broad semantics where any amount west normalizes to West.
-+    if (savedata.enableDoubleDistance && !directionCoord.every((coord, i) => diffCoord[i] === coord)) {
-+        return null;
-+    }
-+    return directionCoord;
-+}
-+
- function isNonZeroConclusion(conclusionCoord) {
-     return conclusionCoord != null && Array.isArray(conclusionCoord) && conclusionCoord.some(c => c !== 0);
- }
-@@ -506,7 +548,7 @@
-                     for (let attempts = 0; attempts < 20 && (!startWord || !endWord); attempts++) {
-                         const [a, b] = pickRandomItems(allWords, 2).picked;
-                         if (wordCoordMap[a] && wordCoordMap[b]) {
--                            const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, a, b);
-+                            const [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, a, b);
-                             if (isNonZeroConclusion(conclusionCoord)) {
-                                 startWord = a;
-                                 endWord = b;
-@@ -545,9 +587,8 @@
-                     for (let attempts = 0; attempts < 20 && !fallbackPair; attempts++) {
-                         const [a, b] = pickRandomItems(allWords, 2).picked;
-                         if (wordCoordMap[a] && wordCoordMap[b]) {
--                            const diff = diffCoords(wordCoordMap[a], wordCoordMap[b]);
--                            const norm = normalizeDirectionCoord(diff);
--                            if (isNonZeroConclusion(norm)) {
-+                            const [, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, a, b);
-+                            if (isNonZeroConclusion(conclusionCoord)) {
-                                 fallbackPair = [a, b];
-                             }
-                         }
-@@ -562,7 +603,7 @@
-             }
-             
-             // Get initial conclusion coords (before transforms) for validation
--            [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
-+            [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
-             if (!isNonZeroConclusion(conclusionCoord)) {
-                 continue; // No valid conclusion possible with this word map
-             }
-@@ -625,7 +666,7 @@
-                 }
-                 continue;
-             }
--            [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
-+            [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
-             
-             // Check if we have valid conclusion after transforms - if not, retry
-             if (!isNonZeroConclusion(conclusionCoord)) {
-@@ -683,7 +724,7 @@
-                     continue;
-                 }
+-            premises = scramble([...choice.premises, ...choice2.premises], getScrambleFactor('overrideBinaryScramble'));
++            const scrambleFactor = getScrambleFactor('overrideBinaryScramble');
++            premises = [
++                ...scramble([...choice.premises], scrambleFactor),
++                ...scramble([...choice2.premises], scrambleFactor),
++            ];
  
--                [dCoord, cCoord] = getConclusionCoords(wordCoordMap, sw, ew);
-+                [dCoord, cCoord] = getRepresentableConclusionCoords(wordCoordMap, sw, ew);
-                 if (!isNonZeroConclusion(cCoord)) {
-                     generatedCount++; // Prevent infinite loop
-                     continue;
-@@ -841,6 +882,8 @@
-     }
- 
-     createAnalogy(length) {
-+        length = Math.max(2, length);
-+
-         let isValid;
-         let isValidSame;
-         resetDirectionLimit();
-@@ -854,14 +897,24 @@
-         let a, b, c, d;
-         let continuousOps = [];
-         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
-+        const useTinyAnalogy = length <= 2;
-+        if (useTinyAnalogy) {
-+            // Two-premise analogies cannot interleave transforms between enough ordinary premises.
-+            // Keep all requested hard-mode transforms as regular operations instead.
-+            numTransforms += numInterleaved;
-+            numInterleaved = 0;
-+        }
-         const branchesAllowed = Math.random() > 0.2;
-         const flip = coinFlip();
-         const isV2 = this.generator.getName() === 'Anchor Space v2';
-+        let retryCount = 0;
-+        const maxRetries = 80;
-         
-         // Create unified transform state if any transforms are needed
-         let transformState = (numInterleaved > 0 || numTransforms > 0) ? new TransformState({}, []) : null;
-         
--        while (flip !== isValidSame) {
-+        while (flip !== isValidSame && retryCount < maxRetries) {
-+            retryCount++;
-             // Reset transformState at start of each iteration to clear stale data
-             // But preserve the wordCoordMap as a reference (will be repopulated by createWordMapInterleaved)
-             if (transformState) {
-@@ -877,7 +930,10 @@
-             
-             continuousOps = [];
-             operations = [];
--            if (this.generator.shouldUseAnchor()) {
-+            if (useTinyAnalogy) {
-+                [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps] = this.createTinyAnalogyWordMap(flip);
-+                anchorWords = null;
-+            } else if (this.generator.shouldUseAnchor()) {
-                 if (numInterleaved > 0) {
-                     // Use interleaved version for anchor spaces when interleave mode is on
-                     [wordCoordMap, neighbors, premises, usedDirCoords, anchorWords] = this.createWordMapAnchorInterleaved(length, numInterleaved, transformState, branchesAllowed);
-@@ -897,6 +953,7 @@
-                 anchorWords = null;
-             }
-             [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
-+            if (!a || !b || !c || !d) continue;
-             
-             // Initialize transformState with final wordCoordMap and anchorWords
-             if (transformState) {
-@@ -915,7 +972,8 @@
-             
-             if (numTransforms > 0) {
-                 const [startWord, endWord] = pickRandomItems([a, b, c, d], 2).picked;
--                const [diffCoord, conclusionCoord] = getConclusionCoords(wordCoordMap, startWord, endWord);
-+                const [diffCoord, conclusionCoord] = getRepresentableConclusionCoords(wordCoordMap, startWord, endWord);
-+                if (!conclusionCoord) continue;
-                 let _x;
-                 // Pass transformState to SpaceHardMode for coordinated transforms
-                 [wordCoordMap, operations, _x] = new SpaceHardMode(numTransforms, anchorWords || [], transformState)
-@@ -931,11 +989,13 @@
-             if (continuousOps.length > 0) {
-                 operations.push(...continuousOps);
-             }
--            const dirAB = findDirection(wordCoordMap[a], wordCoordMap[b]);
--            const dirCD = findDirection(wordCoordMap[c], wordCoordMap[d]);
--            // Handle null directions (words at same position) - treat as not equal
-+            const dirAB = findRepresentableDirection(wordCoordMap[a], wordCoordMap[b]);
-+            const dirCD = findRepresentableDirection(wordCoordMap[c], wordCoordMap[d]);
-+            // Handle null directions (words at same position or clamped double-distance) as not equal.
-             isValidSame = dirAB !== null && dirCD !== null && arraysEqual(dirAB, dirCD);
-         }
-+        if (flip !== isValidSame) return null;
-+
-         let conclusion = analogyTo(a, b);
-         if (coinFlip()) {
-             conclusion += pickAnalogyStatementSame().html;
-@@ -976,6 +1036,43 @@
+             conclusion = operandTemplates[operandIndex]
+                 .replace("$a", '<div class="binary-sub-conclusion">' + choice.conclusion + '</div>')
+@@ -489,6 +501,7 @@
+             startedAt: new Date().getTime(),
+             subresults: [choice, choice2],
+             subOperations: [choice.operations || [], choice2.operations || []],
++            tags: ['analogy'],
+             isValid,
+             premises,
+             operations,
+--- direction.js	2026-04-30 06:15:01.499088460 +0000
++++ patchwork/direction.js	2026-04-30 06:23:48.262647969 +0000
+@@ -840,6 +840,71 @@
          }
      }
  
-+    createTinyAnalogyWordMap(preferSameDirection=false) {
++    createCompactAnalogy(length = 2) {
++        // Binary analogy can ask for very small leaves. A normal direction analogy
++        // builds one connected map, so 2 premises only gives 3 words and cannot
++        // support A:B :: C:D. This compact path creates two independent relation
++        // premises instead, giving a true 2-premise analogy leaf.
++        resetDirectionLimit();
++
 +        const words = createStimuli(4);
 +        const [a, b, c, d] = words;
 +        const initialCoord = this.generator.initialCoord();
-+        const coordLength = initialCoord.length;
-+        const separation = directionLimit() * 4 + 4;
-+        const secondBase = initialCoord.map((value, index) => index === 0 ? value + separation : value);
-+
-+        let wordCoordMap = {
++        const zero = initialCoord.map(() => 0);
++        const wordCoordMap = {
 +            [a]: initialCoord.slice(),
-+            [c]: secondBase,
++            [c]: initialCoord.map((_, i) => (i === 0 ? 10 : 0)),
 +        };
-+        let neighbors = {
-+            [a]: [],
-+            [c]: [],
-+        };
++        const neighbors = { [a]: [], [b]: [], [c]: [], [d]: [] };
 +
 +        const dir1 = this.generator.pickDirection(a, neighbors, wordCoordMap);
-+        const dirPool = getDirectionCoordsForLength(coordLength).filter(coord => !arraysEqual(coord, dir1));
-+        const dir2 = preferSameDirection || dirPool.length === 0
-+            ? dir1.slice()
-+            : pickRandomItems(dirPool, 1).picked[0];
++        const wantSame = coinFlip();
++        let dir2 = dir1;
++        let guard = 0;
++        while (!wantSame && arraysEqual(dir2, dir1) && guard < 25) {
++            dir2 = this.generator.pickDirection(c, neighbors, wordCoordMap);
++            guard++;
++        }
++        if (!wantSame && arraysEqual(dir2, dir1)) {
++            dir2 = inverse(dir1) || dir1;
++        }
 +
-+        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1);
-+        wordCoordMap[d] = addCoords(wordCoordMap[c], dir2);
-+        neighbors[a].push(b);
-+        neighbors[b] = [a];
-+        neighbors[c].push(d);
-+        neighbors[d] = [c];
++        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1 || zero);
++        wordCoordMap[d] = addCoords(wordCoordMap[c], dir2 || zero);
 +
-+        const premises = [
++        const premiseObjs = [
 +            this.generator.createDirectionStatement(a, b, dir1),
 +            this.generator.createDirectionStatement(c, d, dir2),
 +        ];
-+        return [wordCoordMap, neighbors, premises, [dir1, dir2], []];
++        const premises = premiseObjs.map((p, i) => createPremiseHTML(p, true, i));
++
++        const isValidSame = dir1 !== null && dir2 !== null && arraysEqual(dir1, dir2);
++        let conclusion = analogyTo(a, b);
++        let isValid;
++        if (coinFlip()) {
++            conclusion += pickAnalogyStatementSame().html;
++            isValid = isValidSame;
++        } else {
++            conclusion += pickAnalogyStatementDifferent().html;
++            isValid = !isValidSame;
++        }
++        conclusion += analogyTo(c, d);
++
++        return {
++            category: 'Analogy: ' + this.generator.getName(),
++            type: normalizeString(this.generator.getName()),
++            modifiers: ['compact'],
++            startedAt: new Date().getTime(),
++            wordCoordMap,
++            bucket: Object.keys(wordCoordMap),
++            isValid,
++            premises,
++            operations: [],
++            conclusion,
++            ...(this.generator.getCountdown() && { countdown: this.generator.getCountdown() }),
++        };
 +    }
 +
-     getInterferenceLevel() {
-         const name = this.generator.getName();
-         if (name.includes('Three D') || name.includes('3D')) {
---- mixed-mode.js	2026-04-30 05:46:44.612741247 +0000
-+++ patched/mixed-mode.js	2026-04-30 05:53:36.109810846 +0000
-@@ -469,13 +469,14 @@
-                                 continue;
-                             }
-                             
--                            // Find the actual vector from endNode to startNode
-+                            // Find the actual vector from endNode to startNode. In double-distance
-+                            // conclusion mode, skip vectors that would only become West²/East² by clamping.
-                             const vec = diffCoords(coordMap[endNode], coordMap[startNode]);
--                            const actualCoord = this.normalizeCoord(vec);
-+                            const actualCoord = normalizeConclusionCoord(vec);
-                             
--                            // If both nodes are at the same position, we can't create a direction conclusion
--                            if (actualCoord.every(d => d === 0)) {
--                                // Can't generate a valid mixed conclusion - skip and fall through to simple distinction
-+                            // If both nodes are at the same position, or the vector cannot be stated exactly,
-+                            // we can't create a reliable direction conclusion.
-+                            if (!isRepresentableConclusionCoord(vec, actualCoord)) {
-                                 continue;
-                             }
-                             
-@@ -568,9 +569,9 @@
-             const validCoords = words.filter(w => coordMap[w]);
-             if (validCoords.length >= 2) {
-                 const [a, b] = pickRandomItems(validCoords, 2).picked;
--                const rawDir = findDirection(coordMap[a], coordMap[b]);
--                if (!rawDir) return [null, false, []];
--                const actualCoord = this.normalizeCoord(rawDir);
-+                const vec = diffCoords(coordMap[a], coordMap[b]);
-+                const actualCoord = normalizeConclusionCoord(vec);
-+                if (!isRepresentableConclusionCoord(vec, actualCoord)) return [null, false, []];
+     createAnalogy(length) {
+         let isValid;
+         let isValidSame;
+--- index.js	2026-04-30 06:15:01.928039781 +0000
++++ patchwork/index.js	2026-04-30 06:23:48.264187297 +0000
+@@ -1432,7 +1432,7 @@
  
-                 const isMultiDim = actualCoord.length >= 5;
-                 const multiDimDim = actualCoord.length + 1; // 5 coords → dim=6, 6 coords → dim=7
+ 
+ 
+-    const isBinary = question.type === 'binary';
++    const isBinary = question.type === 'binary' || question.type === 'binary-analogy';
+ 
+ 
+ 
+--- styles.css	2026-04-30 06:15:01.378371963 +0000
++++ patchwork/styles.css	2026-04-30 06:23:48.272890989 +0000
+@@ -5134,74 +5134,86 @@
+ 
+ 
+ 
+-.binary-sub-conclusion {
++.binary-analogy-conclusion {
+ 
++    display: flex;
+ 
++    flex-wrap: wrap;
+ 
+-    display: inline-block;
++    align-items: center;
+ 
++    justify-content: center;
+ 
++    gap: 0.45rem 0.75rem;
+ 
+-    padding: 0.25rem 0.75rem;
++    max-width: min(100%, 34rem);
+ 
++    margin: 0 auto;
+ 
++    white-space: normal;
+ 
+-    border: 1px solid rgba(255, 255, 255, 0.3);
++}
+ 
++.binary-operator {
+ 
++    flex: 0 0 auto;
+ 
+-    border-radius: 4px;
++    letter-spacing: 0.08em;
+ 
++}
+ 
++.binary-sub-conclusion {
+ 
+-    background: rgba(255, 255, 255, 0.05);
++    display: block;
+ 
++    flex: 1 1 13rem;
+ 
++    min-width: min(100%, 12rem);
+ 
+-    margin: 0.15rem 0;
++    padding: 0.25rem 0.75rem;
+ 
++    border: 1px solid rgba(255, 255, 255, 0.3);
+ 
++    border-radius: 4px;
+ 
+-    vertical-align: middle;
++    background: rgba(255, 255, 255, 0.05);
+ 
++    margin: 0.15rem 0;
+ 
++    vertical-align: middle;
+ 
+     max-width: 100%;
+ 
+-
+-
+     box-sizing: border-box;
+ 
++    overflow-wrap: anywhere;
+ 
+-
+-    overflow-wrap: break-word;
+-
+-
++    white-space: normal;
+ 
+ }
+ 
+-
+-
+ @media (max-width: 600px) {
+ 
++    .binary-analogy-conclusion {
+ 
++        flex-direction: column;
+ 
+-    .binary-sub-conclusion {
+-
++        align-items: stretch;
+ 
++        gap: 0.35rem;
+ 
+-        display: block;
+-
++    }
+ 
++    .binary-sub-conclusion {
+ 
+-        margin: 0.3rem 0;
++        flex-basis: auto;
+ 
++        min-width: 0;
+ 
++        margin: 0.1rem 0;
+ 
+     }
+ 
+-
+-
+ }
+ 
+ 
+@@ -22460,6 +22472,110 @@
+ 
+     }
+ 
++    #sidebar-history .offcanvas-body {
++
++        padding: 0.55rem 0.65rem 0.65rem;
++
++    }
++
++    #sidebar-history .history-stats {
++
++        grid-template-columns: repeat(2, minmax(0, 1fr));
++
++        gap: 0.35rem;
++
++        margin-bottom: 0.35rem;
++
++        padding-bottom: 0.35rem;
++
++    }
++
++    #sidebar-history .history-stats .stat-row {
++
++        min-height: 46px;
++
++        padding: 0.42rem 0.55rem;
++
++        border-radius: 11px;
++
++    }
++
++    #sidebar-history .stat-label {
++
++        font-size: 0.64rem;
++
++        letter-spacing: 0.08em;
++
++    }
++
++    #sidebar-history .stat-row span:not(.stat-label) {
++
++        font-size: 0.95rem;
++
++    }
++
++    #sidebar-history .history-filter-rail {
++
++        grid-template-columns: repeat(4, max-content);
++
++        gap: 0.25rem;
++
++        margin: 0 0 0.3rem;
++
++        padding: 0.25rem;
++
++        overflow-x: auto;
++
++        overscroll-behavior-x: contain;
++
++    }
++
++    #sidebar-history .history-filter-btn {
++
++        min-height: 32px;
++
++        padding: 0.25rem 0.5rem;
++
++        border-radius: 9px;
++
++        font-size: 0.64rem;
++
++        white-space: nowrap;
++
++    }
++
++    #sidebar-history .history-filter-summary {
++
++        margin-bottom: 0.35rem;
++
++        font-size: 0.64rem;
++
++    }
++
++    #sidebar-history #history-list {
++
++        min-height: 12rem;
++
++    }
++
++    #sidebar-history .hqli .inner {
++
++        padding: 0.6rem 0.7rem;
++
++    }
++
++    #sidebar-history .history-footer {
++
++        padding-top: 0.35rem;
++
++    }
++
++    #sidebar-history .clear-history-btn {
++
++        min-height: 40px;
++
++    }
++
+ }
+ 
+ 
