@@ -355,13 +355,16 @@ class Direction4D {
         }
         const direction = dirStringFromCoord(dirCoord);
         const reverseDirection = dirStringFromCoord(inverse(dirCoord));
-        const timeName = timeMapping[dirCoord[3]];
-        const reverseTimeName = reverseTimeNames[timeName];
+        // Use temporalLayers (same as 5D/6D) for consistent time vocabulary:
+        // "was before" / "is simultaneous with" / "will be after"
+        const temporal = temporalLayers[dirCoord[3] + 1];
+        const spatialRelation = `is ${direction} of`;
+        const reverseSpatialRelation = `is ${reverseDirection} of`;
         return {
             start: b,
             end: a,
-            relation: `${timeName} ${direction} of`,
-            reverse: `${reverseTimeName} ${reverseDirection} of`,
+            relation: `${spatialRelation}, ${temporal.name}`,
+            reverse: `${reverseSpatialRelation}, ${temporal.reverse}`,
             relationMinimal: dirStringMinimal(dirCoord),
             reverseMinimal: dirStringMinimal(inverse(dirCoord)),
         }
@@ -789,7 +792,7 @@ class DirectionQuestion {
         conclusion = primaryConclusion.conclusion;
 
         if (numInterleaved === 0) {
-            premises = scramble(premises);
+            premises = scramble(premises, getScrambleFactor('overrideAnalogyScramble'));
         }
         // Filter out any undefined/null premises (can happen with transform stacking)
         premises = premises.filter(p => p != null).map((p, i) => createPremiseHTML(p, true, i, pattern));
@@ -1027,40 +1030,44 @@ class DirectionQuestion {
     }
 
     createCompactAnalogy(length = 2) {
-        // Binary analogy can ask for very small leaves. A normal direction analogy
-        // builds one connected map, so 2 premises only gives 3 words and cannot
-        // support A:B :: C:D. This compact path creates two independent relation
-        // premises instead, giving a true 2-premise analogy leaf.
+        // Binary analogy needs 2-premise leaves to keep the whole question at 4p.
+        // Keep that minimum, but make the compact leaf a connected chain instead
+        // of two unrelated edges. The analogy becomes A:B :: B:C, so the two
+        // premises share a pivot and cannot be treated as isolated packages.
         resetDirectionLimit();
 
-        const words = createStimuli(4);
-        const [a, b, c, d] = words;
+        const words = createStimuli(3);
+        const [a, b, c] = words;
         const initialCoord = this.generator.initialCoord();
         const zero = initialCoord.map(() => 0);
         const wordCoordMap = {
             [a]: initialCoord.slice(),
-            [c]: initialCoord.map((_, i) => (i === 0 ? 10 : 0)),
         };
-        const neighbors = { [a]: [], [b]: [], [c]: [], [d]: [] };
+        const neighbors = { [a]: [], [b]: [], [c]: [] };
 
         const dir1 = this.generator.pickDirection(a, neighbors, wordCoordMap);
+        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1 || zero);
+        neighbors[a].push(b);
+        neighbors[b].push(a);
+
         const wantSame = coinFlip();
         let dir2 = dir1;
         let guard = 0;
         while (!wantSame && arraysEqual(dir2, dir1) && guard < 25) {
-            dir2 = this.generator.pickDirection(c, neighbors, wordCoordMap);
+            dir2 = this.generator.pickDirection(b, neighbors, wordCoordMap);
             guard++;
         }
         if (!wantSame && arraysEqual(dir2, dir1)) {
             dir2 = inverse(dir1) || dir1;
         }
 
-        wordCoordMap[b] = addCoords(wordCoordMap[a], dir1 || zero);
-        wordCoordMap[d] = addCoords(wordCoordMap[c], dir2 || zero);
+        wordCoordMap[c] = addCoords(wordCoordMap[b], dir2 || zero);
+        neighbors[b].push(c);
+        neighbors[c].push(b);
 
         const premiseObjs = [
             this.generator.createDirectionStatement(a, b, dir1),
-            this.generator.createDirectionStatement(c, d, dir2),
+            this.generator.createDirectionStatement(b, c, dir2),
         ];
         const premises = premiseObjs.map((p, i) => createPremiseHTML(p, true, i));
 
@@ -1074,12 +1081,12 @@ class DirectionQuestion {
             conclusion += pickAnalogyStatementDifferent().html;
             isValid = !isValidSame;
         }
-        conclusion += analogyTo(c, d);
+        conclusion += analogyTo(b, c);
 
         return {
             category: 'Analogy: ' + this.generator.getName(),
             type: normalizeString(this.generator.getName()),
-            modifiers: ['compact'],
+            modifiers: ['compact', 'connected'],
             startedAt: new Date().getTime(),
             wordCoordMap,
             bucket: Object.keys(wordCoordMap),
@@ -1357,7 +1364,7 @@ class DirectionQuestion {
             premiseChunks.pop();
         }
 
-        premiseChunks = scramblePremiseChunks(premiseChunks, savedata.scrambleFactor);
+        premiseChunks = scramblePremiseChunks(premiseChunks, getScrambleFactor('overrideAnalogyScramble'));
 
         let merged = interleaveArrays(premiseChunks, operations);
         let premises = merged.flatMap(p => {

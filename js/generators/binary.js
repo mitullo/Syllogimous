@@ -366,7 +366,9 @@ class BinaryAnalogyQuestion {
     }
 
     create(length, transforms = {}) {
-        length = Math.max(2, length);
+        // Binary analogy should still be able to bottom out at 4 premises:
+        // two 2-premise analogy leaves combined by one binary operator.
+        length = Math.max(4, length);
 
         const btfm = savedata.binaryHardModeLevel || 0;
         const firstHalf = Math.ceil(btfm / 2);
@@ -460,10 +462,11 @@ class BinaryAnalogyQuestion {
             }
         }
 
-        // When the total length is 4 or fewer, each leaf is at most 2 premises.
-        // The analogy-premise offset is meant for enriching larger analogies and would
-        // inflate compact leaves back to 3 premises (6 total), defeating the purpose.
-        const premiseOffset = length <= 4 ? 0 : getPremisesFor('offsetAnalogyPremises', 0);
+        // The analogy-premise offset is meant for regular analogies. In binary analogy
+        // it gets applied to each sub-length independently, doubling its effect and
+        // inflating the total. The user already controls premise count via
+        // overrideBinaryPremises, so skip the offset here.
+        const premiseOffset = 0;
 
         let choice, choice2;
         let premises;
@@ -497,10 +500,10 @@ class BinaryAnalogyQuestion {
             if (!choice || !choice2) continue;
 
             const scrambleFactor = getScrambleFactor('overrideBinaryScramble');
-            premises = [
-                ...scramble([...choice.premises], scrambleFactor),
-                ...scramble([...choice2.premises], scrambleFactor),
-            ];
+            // Do not preserve the two leaf packages in premise order. Keeping each
+            // two-premise analogy leaf adjacent makes binary analogy solvable by
+            // locally comparing the two visible arrows/relations.
+            premises = scramble([...choice.premises, ...choice2.premises], scrambleFactor);
 
             conclusion = operandTemplates[operandIndex]
                 .replace("$a", '<div class="binary-sub-conclusion">' + choice.conclusion + '</div>')
