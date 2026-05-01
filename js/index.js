@@ -7370,6 +7370,8 @@ function storeQuestionAndSave() {
 
     appState.questions.push(question);
 
+    checkJumpscare();
+
 
 
     if (timerToggle.checked) {
