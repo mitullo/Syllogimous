@@ -6508,7 +6508,7 @@ function generateQuestion() {
 
 
 
-            generators.push(createBinaryAnalogyGenerator(quota));
+            generators.push((savedata.maxNestedBinaryDepth ?? 1) > 1 ? createNestedBinaryAnalogyGenerator(quota) : createBinaryAnalogyGenerator(quota));
 
 
 

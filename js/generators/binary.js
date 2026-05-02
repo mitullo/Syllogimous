@@ -359,9 +359,6 @@ function createNestedBinaryGenerator(length) {
 class BinaryAnalogyQuestion {
     createAnalogyLeaf(generator, length) {
         const question = generator.question;
-        if (length <= 2 && typeof question.createCompactAnalogy === 'function') {
-            return question.createCompactAnalogy(length);
-        }
         return question.createAnalogy(Math.max(length, 3));
     }
 
@@ -449,18 +446,6 @@ class BinaryAnalogyQuestion {
         analogyGenerators = analogyGenerators.filter(g => typeof g.question.createAnalogy === 'function');
         if (analogyGenerators.length === 0) return null;
 
-        // For 4-premise binary analogy, each side must be a 2-premise analogy leaf.
-        // Only Direction/Anchor-style analogy generators currently expose that compact path.
-        // Without this filter, a non-compact leaf falls back to 3 premises, so the whole
-        // binary analogy silently becomes 6 premises again.
-        if (length <= 4) {
-            const compactAnalogyGenerators = analogyGenerators.filter(
-                g => typeof g.question.createCompactAnalogy === 'function'
-            );
-            if (compactAnalogyGenerators.length > 0) {
-                analogyGenerators = compactAnalogyGenerators;
-            }
-        }
 
         // The analogy-premise offset is meant for regular analogies. In binary analogy
         // it gets applied to each sub-length independently, doubling its effect and
@@ -535,9 +520,184 @@ class BinaryAnalogyQuestion {
     }
 }
 
+class NestedBinaryAnalogyQuestion {
+    createAnalogyLeaf(generator, length) {
+        const question = generator.question;
+        return question.createAnalogy(Math.max(length, 3));
+    }
+
+    create(length, transforms = {}) {
+        const numOperands = +savedata.maxNestedBinaryDepth;
+        if (numOperands <= 1) return null;
+
+        const btfm = savedata.binaryHardModeLevel || 0;
+        const firstHalf = Math.ceil(btfm / 2);
+        const secondHalf = Math.floor(btfm / 2);
+        const hardModeKeys = [
+            'space2DHardModeLevel', 'space3DHardModeLevel', 'space4DHardModeLevel',
+            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel'
+        ];
+        const originalValues = {};
+        for (const key of hardModeKeys) {
+            originalValues[key] = savedata[key];
+        }
+        function applyOverride(level) {
+            for (const key of hardModeKeys) {
+                savedata[key] = originalValues[key];
+                if (savedata[key] < level) {
+                    savedata[key] = level;
+                }
+            }
+        }
+        function restoreOverride() {
+            for (const key of hardModeKeys) {
+                savedata[key] = originalValues[key];
+            }
+        }
+
+        const humanOperands = [
+            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">AND</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
+            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">NAND</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
+            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">OR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
+            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">NOR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
+            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">XOR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
+            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">XNOR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>'
+        ];
+
+        const evalOperands = [
+            "(a)&&(b)",
+            "!((a)&&(b))",
+            "(a)||(b)",
+            "!((a)||(b))",
+            "!((a)&&(b))&&((a)||(b))",
+            "!(!((a)&&(b))&&((a)||(b)))"
+        ];
+
+        // Build analogy generator pool (same as BinaryAnalogyQuestion)
+        let analogyGenerators = [];
+        if (savedata.enableDistinction)
+            analogyGenerators.push(createDistinctionGenerator(length));
+        if (savedata.enableLinear)
+            analogyGenerators.push(...createLinearGenerators(length));
+        if (savedata.enableDirection)
+            analogyGenerators.push(createDirectionGenerator(length));
+        if (savedata.enableDirection3D)
+            analogyGenerators.push(createDirection3DGenerator(length));
+        if (savedata.enableDirection4D)
+            analogyGenerators.push(createDirection4DGenerator(length));
+        if (savedata.enableAnchorSpace)
+            analogyGenerators.push(createAnchorSpaceGenerator(length));
+        if (savedata.enableAnchorSpaceV2)
+            analogyGenerators.push(createAnchorSpaceV2Generator(length));
+        if (savedata.enableMultiDim5D)
+            analogyGenerators.push(createMultiDim5DGenerator(length));
+        if (savedata.enableMultiDim6D)
+            analogyGenerators.push(createMultiDim6DGenerator(length));
+
+        analogyGenerators = analogyGenerators.filter(g => typeof g.question.createAnalogy === 'function');
+        if (analogyGenerators.length === 0) return null;
+
+        length = Math.max(4, length);
+
+        // Always create exactly 2 analogy leaves (same premise count regardless of operator depth)
+        const subLength1 = Math.max(Math.floor(length / 2), 3);
+        const subLength2 = Math.max(Math.ceil(length / 2), 3);
+
+        let choice, choice2;
+        let premises;
+        const flip = coinFlip();
+        let isValid;
+        let attempts = 0;
+        const maxAttempts = 120;
+
+        while (flip !== isValid && attempts < maxAttempts) {
+            attempts++;
+            const g1 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
+            const g2 = analogyGenerators[Math.floor(Math.random() * analogyGenerators.length)];
+
+            if (btfm > 0) applyOverride(firstHalf);
+            choice = this.createAnalogyLeaf(g1, subLength1);
+            if (btfm > 0) restoreOverride();
+
+            if (btfm > 0) applyOverride(secondHalf);
+            choice2 = this.createAnalogyLeaf(g2, subLength2);
+            if (btfm > 0) restoreOverride();
+
+            if (!choice || !choice2) continue;
+
+            const scrambleFactor = getScrambleFactor('overrideBinaryScramble');
+            premises = scramble([...choice.premises, ...choice2.premises], scrambleFactor);
+
+            // Build nested expression tree referencing only the 2 leaves (indices 0 and 1)
+            const questions = [choice, choice2];
+            let leafIndex = 0;
+            function generator(remaining, depth) {
+                remaining--;
+                const left = Math.floor(Math.random() * remaining);
+                const right = remaining - left;
+                const rndIndex = Math.floor(Math.random() * humanOperands.length);
+                const humanOperand = humanOperands[rndIndex];
+                const evalOperand = evalOperands[rndIndex];
+                const val = (left > 0)
+                    ? generator(left, depth+1)
+                    : { leaf: (leafIndex++) % 2 };
+                const val2 = (right > 0)
+                    ? generator(right, depth+1)
+                    : { leaf: (leafIndex++) % 2 };
+                const letter = String.fromCharCode(97 + depth);
+                return {
+                    human: humanOperand
+                        .replaceAll('DEPTH', 'depth-' + letter)
+                        .replaceAll('INDENT', 'indent-' + letter)
+                        .replace('à', val.leaf !== undefined ? val.leaf : val.human)
+                        .replace('ò', val2.leaf !== undefined ? val2.leaf : val2.human),
+                    eval: evalOperand
+                        .replaceAll('a', val.leaf !== undefined ? val.leaf : val.eval)
+                        .replaceAll('b', val2.leaf !== undefined ? val2.leaf : val2.eval),
+                };
+            }
+
+            const generated = generator(numOperands, 0);
+            isValid = evalNestedBool(generated.eval, questions);
+
+            if (flip === isValid) {
+                // Build the conclusion from the nested expression
+                const nestedConclusion = generated.human.replaceAll(/(\d+)/g, m => {
+                    const idx = +m;
+                    return '<div class="binary-sub-conclusion">' + questions[idx].conclusion + '</div>';
+                });
+                return {
+                    category: "Binary Analogy: " + choice.category + " ∘ " + choice2.category,
+                    type: "binary-analogy",
+                    modifiers: btfm > 0 ? ['op' + numOperands, 'tfm' + btfm] : ['op' + numOperands],
+                    startedAt: new Date().getTime(),
+                    subresults: questions,
+                    subOperations: questions.map(q => q.operations || []),
+                    tags: ['analogy'],
+                    isValid,
+                    premises,
+                    operations: questions.flatMap(q => q.operations || []),
+                    conclusion: nestedConclusion,
+                    ...(getBinaryCountdown() && { countdown: getBinaryCountdown() }),
+                };
+            }
+        }
+
+        return null;
+    }
+}
+
 function createBinaryAnalogyGenerator(length) {
     return {
         question: new BinaryAnalogyQuestion(),
+        premiseCount: getPremisesFor('overrideBinaryPremises', length),
+        weight: 100,
+    };
+}
+
+function createNestedBinaryAnalogyGenerator(length) {
+    return {
+        question: new NestedBinaryAnalogyQuestion(),
         premiseCount: getPremisesFor('overrideBinaryPremises', length),
         weight: 100,
     };
