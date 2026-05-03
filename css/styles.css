@@ -23144,12 +23144,23 @@ body:not(.premise-font-default):not(.premise-mono) .formatted-conclusion {
 
 
 
+    .section-nav-bar .settings-section.active {
+        padding: 0.75rem 0.85rem 1rem;
+        width: 100%;
+        max-width: none;
+        flex: 1 1 auto;
+    }
+
+    .section-nav-bar .offcanvas-body {
+        width: 100% !important;
+        max-width: none !important;
+        padding: 0 !important;
+    }
+
     .section-nav-bar .offcanvas-body > div {
-
         flex-direction: column;
-
         gap: 0;
-
+        width: 100%;
     }
 
 
@@ -23234,9 +23245,15 @@ body:not(.premise-font-default):not(.premise-mono) .formatted-conclusion {
 
     .section-nav-bar .settings-section.active {
 
+
+
         padding: 0.75rem 0.85rem 1rem;
 
+
+
     }
+
+
 
 }
 
