@@ -545,11 +545,9 @@ class LinearQuestion {
         let conclusion = analogyTo(a, b);
         let isValid;
         if (coinFlip()) {
-            conclusion += pickAnalogyStatementSame().html;
-            isValid = isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementSame(), isValidSame);
         } else {
-            conclusion += pickAnalogyStatementDifferent().html;
-            isValid = !isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementDifferent(), !isValidSame);
         }
         conclusion += analogyTo(c, d);
 
@@ -559,6 +557,7 @@ class LinearQuestion {
             type: normalizeString('linear'),
             startedAt: new Date().getTime(),
             bucket: this.bucket || Object.keys(this.bucketMap || {}),
+            ...(this.bucketMap && { bucketMap: this.bucketMap }),
             ...(this.buckets && { buckets: this.buckets, modifiers: ['180'] }),
             premises: this.premises,
             ...(savedata.widePremises && { plen: length }),

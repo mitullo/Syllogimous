@@ -42,32 +42,86 @@ function shouldInvertAnalogy() {
     return Math.random() * 100 < freq;
 }
 
+function pickAnalogyStatementOptions(normalHtml, invertedHtml) {
+    if (!savedata.enableNegation) {
+        return { html: normalHtml, isInverted: false };
+    }
+    const freq = savedata.negationFrequency || 50;
+    if (Math.random() * 100 < freq && coinFlip()) {
+        return { html: invertedHtml, isInverted: true };
+    }
+    return { html: normalHtml, isInverted: false };
+}
+
+function applyAnalogyStatementChoice(conclusion, statement, isValid) {
+    return [conclusion + statement.html, statement.isInverted ? !isValid : isValid];
+}
+
+function getAnalogyIsValidSame(question, a, b, c, d) {
+    if (question.wordCoordMap && question.wordCoordMap[a] && question.wordCoordMap[b] && question.wordCoordMap[c] && question.wordCoordMap[d]) {
+        const useExactDirection = question.type === 'space-five-d' || question.type === 'space-six-d';
+        const ab = useExactDirection
+            ? findDirection(question.wordCoordMap[a], question.wordCoordMap[b])
+            : findRepresentableDirection(question.wordCoordMap[a], question.wordCoordMap[b]);
+        const cd = useExactDirection
+            ? findDirection(question.wordCoordMap[c], question.wordCoordMap[d])
+            : findRepresentableDirection(question.wordCoordMap[c], question.wordCoordMap[d]);
+        return ab !== null && cd !== null && arraysEqual(ab, cd);
+    }
+
+    if (question.type === 'distinction' && question.buckets && question.buckets.length >= 2) {
+        const indexOfA = Number(question.buckets[0].indexOf(a) !== -1);
+        const indexOfB = Number(question.buckets[0].indexOf(b) !== -1);
+        const indexOfC = Number(question.buckets[0].indexOf(c) !== -1);
+        const indexOfD = Number(question.buckets[0].indexOf(d) !== -1);
+        return indexOfA === indexOfB && indexOfC === indexOfD
+            || indexOfA !== indexOfB && indexOfC !== indexOfD;
+    }
+
+    if (question.bucketMap) {
+        const [indexOfA, indexOfB] = [question.bucketMap[a], question.bucketMap[b]];
+        const [indexOfC, indexOfD] = [question.bucketMap[c], question.bucketMap[d]];
+        if ([indexOfA, indexOfB, indexOfC, indexOfD].some(v => v === undefined)) return false;
+        return (indexOfA > indexOfB && indexOfC > indexOfD) ||
+            (indexOfA < indexOfB && indexOfC < indexOfD) ||
+            (indexOfA === indexOfB && indexOfC === indexOfD);
+    }
+
+    const sourceBucket = question.fullBucket || question.bucket || [];
+    const [indexOfA, indexOfB] = [sourceBucket.indexOf(a), sourceBucket.indexOf(b)];
+    const [indexOfC, indexOfD] = [sourceBucket.indexOf(c), sourceBucket.indexOf(d)];
+    if (indexOfA < 0 || indexOfB < 0 || indexOfC < 0 || indexOfD < 0) return false;
+    return (indexOfA > indexOfB && indexOfC > indexOfD) ||
+        (indexOfA < indexOfB && indexOfC < indexOfD) ||
+        (indexOfA === indexOfB && indexOfC === indexOfD);
+}
+
 function pickAnalogyStatementSameTwoOptions() {
-    return pickNegatable([
+    return pickAnalogyStatementOptions(
         '<div class="analogy-statement">is the same as</div>',
         '<div class="analogy-statement" style="color: red;">is different from</div>'
-    ]);
+    );
 }
 
 function pickAnalogyStatementDifferentTwoOptions() {
-    return pickNegatable([
+    return pickAnalogyStatementOptions(
         '<div class="analogy-statement">is different from</div>',
         '<div class="analogy-statement" style="color: red;">is the same as</div>'
-    ]);
+    );
 }
 
 function pickAnalogyStatementSame() {
-    return pickNegatable([
+    return pickAnalogyStatementOptions(
         '<div class="analogy-statement">has the same relation as</div>',
         '<div class="analogy-statement" style="color: red">has a different relation from</div>',
-    ]);
+    );
 }
 
 function pickAnalogyStatementDifferent() {
-    return pickNegatable([
+    return pickAnalogyStatementOptions(
         '<div class="analogy-statement">has a different relation from</div>',
         '<div class="analogy-statement" style="color: red">has the same relation as</div>',
-    ]);
+    );
 }
 
 function analogyTo(a, b) {
@@ -100,19 +154,27 @@ class AnalogyQuestion {
         if (savedata.enableMultiDim6D)
             generators.push(createMultiDim6DGenerator(length));
 
+        if (generators.length === 0) return null;
+
         const totalWeight = generators.reduce((sum, item) => sum + item.weight, 0);
-        const randomValue = Math.random() * totalWeight;
-        let cumulativeWeight = 0;
         let g;
-        for (let generator of generators) {
-            cumulativeWeight += generator.weight;
-            if (randomValue < cumulativeWeight) {
-                g = generator;
-                break;
+        let question;
+
+        for (let attempt = 0; attempt < Math.max(8, generators.length * 2); attempt++) {
+            const randomValue = Math.random() * totalWeight;
+            let cumulativeWeight = 0;
+            for (let generator of generators) {
+                cumulativeWeight += generator.weight;
+                if (randomValue < cumulativeWeight) {
+                    g = generator;
+                    question = g.question.createAnalogy(Math.max(g.premiseCount + premiseOffset, 3));
+                    break;
+                }
             }
+            if (question) break;
         }
 
-        let question = g.question.createAnalogy(Math.max(g.premiseCount + premiseOffset, 3));
+        if (!question) return null;
 
         // Invert conclusion pair if option is enabled (frequency-based)
         if (shouldInvertAnalogy() && question.conclusion) {
@@ -180,14 +242,7 @@ class AnalogyQuestion {
                 }
 
                 const [a, b, c, d] = finalPicked;
-                const sourceBucket = question.fullBucket;
-
-                const [indexOfA, indexOfB] = [sourceBucket.indexOf(a), sourceBucket.indexOf(b)];
-                const [indexOfC, indexOfD] = [sourceBucket.indexOf(c), sourceBucket.indexOf(d)];
-                let isValidSame =
-                    (indexOfA > indexOfB && indexOfC > indexOfD) ||
-                    (indexOfA < indexOfB && indexOfC < indexOfD) ||
-                    (indexOfA === indexOfB && indexOfC === indexOfD);
+                let isValidSame = getAnalogyIsValidSame(question, a, b, c, d);
 
                 // Invert: randomly pick a pair, flip isValidSame
                 const doInvert = shouldInvertAnalogy();
@@ -199,11 +254,9 @@ class AnalogyQuestion {
                 let conclusionIsValid;
 
                 if (coinFlip()) {
-                    conclusion += pickAnalogyStatementSame().html;
-                    conclusionIsValid = isValidSame;
+                    [conclusion, conclusionIsValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementSame(), isValidSame);
                 } else {
-                    conclusion += pickAnalogyStatementDifferent().html;
-                    conclusionIsValid = !isValidSame;
+                    [conclusion, conclusionIsValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementDifferent(), !isValidSame);
                 }
 
                 if (invertFirst) {

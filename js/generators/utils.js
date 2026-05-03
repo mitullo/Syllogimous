@@ -4,7 +4,7 @@ function pickRandomItems(array, n) {
     }
     const copy = [...array];
     const picked = [];
-    while (n > 0) {
+    while (n > 0 && copy.length > 0) {
         const rnd = Math.floor(Math.random()*copy.length);
         picked.push(copy.splice(rnd, 1)[0]);
         n--;
@@ -173,6 +173,7 @@ function pairwise(arr, callback) {
 }
 
 function repeatArrayUntil(arr, n) {
+    if (arr.length === 0) return [];
     const result = [];
     while (result.length < n) {
         result.push(...arr); // Spread the array and append it to the result
@@ -183,7 +184,12 @@ function repeatArrayUntil(arr, n) {
 function getLocalStorageObj(key) {
     const entry = localStorage.getItem(key);
     if (entry) {
-        return JSON.parse(entry);
+        try {
+            return JSON.parse(entry);
+        } catch (error) {
+            localStorage.removeItem(key);
+            return null;
+        }
     } else {
         return null;
     }

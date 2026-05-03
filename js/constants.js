@@ -372,6 +372,8 @@ let savedata = {
 
     "enableDoubleDistanceConclusions": false,
 
+    "symbolicBinaryGates": false,
+
 };
 
 
@@ -819,6 +821,7 @@ const keySettingMap = {
     "p-double-distance": "enableDoubleDistance",
     "p-double-distance-freq": "doubleDistanceFrequency",
     "p-double-distance-conclusions": "enableDoubleDistanceConclusions",
+    "p-symbolic-binary-gates": "symbolicBinaryGates",
     "p-binary-transform": "binaryHardModeLevel",
 };
 

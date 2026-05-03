@@ -327,6 +327,7 @@ const graphSummaryTotal = document.getElementById('graph-summary-total');
 const graphSummaryAccuracy = document.getElementById('graph-summary-accuracy');
 const graphSummaryTime = document.getElementById('graph-summary-time');
 
+
 const graphTime = document.getElementById('graph-popup-time');
 const graphCount = document.getElementById('graph-popup-count');
 const graphScore = document.getElementById('graph-popup-score');

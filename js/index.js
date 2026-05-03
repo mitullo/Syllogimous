@@ -562,6 +562,8 @@ let historyFilter = "all";
 
 
 
+
+
 let carouselIndex = 0;
 
 
@@ -2567,33 +2569,18 @@ function populateAppearanceSettings() {
 
 
     // Stimulus size slider - migrate legacy string values to numeric
-
     const stimMap = { small: 0.85, normal: 1.125, large: 1.5, huge: 2 };
-
     const ssVal = typeof appState.stimulusSize === 'number' ? appState.stimulusSize : (stimMap[appState.stimulusSize] || 1.125);
-
     appState.stimulusSize = ssVal;
-
     document.getElementById('p-71').value = ssVal;
-
     const ssLabel = ssVal <= 0.9 ? 'Small' : ssVal <= 1.2 ? 'Normal' : ssVal <= 1.6 ? 'Large' : 'Huge';
-
     document.getElementById('p-71-label').textContent = ssLabel;
 
-
+    
 
     applyAppearanceSettings();
-
-
-
     applyFlatSettings();
-
-
-
     applySwapButtons();
-
-
-
     applyNavBar();
 
 
@@ -3688,9 +3675,15 @@ function handleStimulusSizeChange(event) {
 
     const val = parseFloat(event.target.value);
 
+
+
     appState.stimulusSize = val;
 
+
+
     const label = val <= 0.9 ? 'Small' : val <= 1.2 ? 'Normal' : val <= 1.6 ? 'Large' : 'Huge';
+
+
 
     document.getElementById('p-71-label').textContent = label;
 
@@ -4725,6 +4718,8 @@ function applyAppearanceSettings() {
     const stimSize = typeof appState.stimulusSize === 'number' ? appState.stimulusSize + 'em' : (stimulusSizesMap[appState.stimulusSize] || '1.125em');
 
     root.style.setProperty('--stimulus-size', stimSize);
+
+    
 
 
 
@@ -6596,53 +6591,28 @@ function generateQuestion() {
 
 
 
-    const randomValue = Math.random() * totalWeight;
-
-
-
     let cumulativeWeight = 0;
 
+    for (let attempt = 0; attempt < Math.max(8, generators.length * 2); attempt++) {
+        const randomValue = Math.random() * totalWeight;
+        cumulativeWeight = 0;
 
-
-    let q;
-
-
-
-    for (let generator of generators) {
-
-
-
-        cumulativeWeight += generator.weight;
-
-
-
-        if (randomValue < cumulativeWeight) {
-
-
-
-            q = generator.question.create(generator.premiseCount);
-
-
-
-            break;
-
-
-
+        for (let generator of generators) {
+            cumulativeWeight += generator.weight;
+            if (randomValue < cumulativeWeight) {
+                const q = generator.question.create(generator.premiseCount);
+                if (q) return q;
+                break;
+            }
         }
-
-
-
     }
 
+    for (let generator of generators) {
+        const q = generator.question.create(generator.premiseCount);
+        if (q) return q;
+    }
 
-
-
-
-
-
-    return q;
-
-
+    return null;
 
 }
 
@@ -7921,7 +7891,6 @@ function deleteQuestion(i, isRight) {
 function historyMatchesFilter(q) {
 
     return historyFilter === "all" || q.correctness === historyFilter;
-
 }
 
 
@@ -7987,6 +7956,9 @@ function updateHistoryFilterSummary(totalCount, visibleCount) {
         : `Showing ${visibleCount} of ${totalCount} ${label}`;
 
 }
+
+
+
 
 
 

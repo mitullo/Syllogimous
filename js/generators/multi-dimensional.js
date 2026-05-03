@@ -597,11 +597,9 @@ function createMultiDim5DGenerator(length) {
                 let conclusion = analogyTo(a, b);
                 let isValid;
                 if (coinFlip()) {
-                    conclusion += pickAnalogyStatementSame().html;
-                    isValid = isValidSame;
+                    [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementSame(), isValidSame);
                 } else {
-                    conclusion += pickAnalogyStatementDifferent().html;
-                    isValid = !isValidSame;
+                    [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementDifferent(), !isValidSame);
                 }
                 conclusion += analogyTo(c, d);
 
@@ -1055,11 +1053,9 @@ function createMultiDim6DGenerator(length) {
                 let conclusion = analogyTo(a, b);
                 let isValid;
                 if (coinFlip()) {
-                    conclusion += pickAnalogyStatementSame().html;
-                    isValid = isValidSame;
+                    [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementSame(), isValidSame);
                 } else {
-                    conclusion += pickAnalogyStatementDifferent().html;
-                    isValid = !isValidSame;
+                    [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementDifferent(), !isValidSame);
                 }
                 conclusion += analogyTo(c, d);
 

@@ -11792,16 +11792,10 @@ button:not(:disabled):hover::after {
 
 
 
-
-
-
-
 /* Confirmation Buttons Enhancement */
-
-
-
+    
 .confirmation-buttons button {
-
+    
 
 
     min-width: 96px;
@@ -11832,31 +11826,7 @@ button:not(:disabled):hover::after {
 
 
 
-.confirmation-buttons button:first-child {
 
-
-
-    background: linear-gradient(135deg, #2d4a45, #3d5a55);
-
-
-
-}
-
-
-
-
-
-
-
-.confirmation-buttons button:last-child {
-
-
-
-    background: linear-gradient(135deg, #4a2d35, #5a3d45);
-
-
-
-}
 
 
 
@@ -23177,4 +23147,12 @@ body:not(.premise-font-default):not(.premise-mono) .formatted-conclusion {
     }
 
 }
+
+
+
+
+
+
+
+
 

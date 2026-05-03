@@ -194,11 +194,9 @@ class DistinctionQuestion {
         let conclusion = analogyTo(a, b);
         let isValid;
         if (coinFlip()) {
-            conclusion += pickAnalogyStatementSameTwoOptions().html;
-            isValid = isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementSameTwoOptions(), isValidSame);
         } else {
-            conclusion += pickAnalogyStatementDifferentTwoOptions().html;
-            isValid = !isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementDifferentTwoOptions(), !isValidSame);
         }
         conclusion += analogyTo(c, d);
         const countdown = this.getCountdown();

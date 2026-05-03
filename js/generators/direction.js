@@ -991,11 +991,9 @@ class DirectionQuestion {
 
         let conclusion = analogyTo(a, b);
         if (coinFlip()) {
-            conclusion += pickAnalogyStatementSame().html;
-            isValid = isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementSame(), isValidSame);
         } else {
-            conclusion += pickAnalogyStatementDifferent().html;
-            isValid = !isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementDifferent(), !isValidSame);
         }
         conclusion += analogyTo(c, d);
 
@@ -1075,11 +1073,9 @@ class DirectionQuestion {
         let conclusion = analogyTo(a, b);
         let isValid;
         if (coinFlip()) {
-            conclusion += pickAnalogyStatementSame().html;
-            isValid = isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementSame(), isValidSame);
         } else {
-            conclusion += pickAnalogyStatementDifferent().html;
-            isValid = !isValidSame;
+            [conclusion, isValid] = applyAnalogyStatementChoice(conclusion, pickAnalogyStatementDifferent(), !isValidSame);
         }
         conclusion += analogyTo(b, c);
 
@@ -2144,7 +2140,16 @@ class AnchorSpaceV2 {
         if (savedata.anchorSpaceFixedPositions) {
             const saved = localStorage.getItem(this.patternKey);
             if (saved) {
-                const pattern = JSON.parse(saved);
+                let pattern;
+                try {
+                    pattern = JSON.parse(saved);
+                } catch (error) {
+                    localStorage.removeItem(this.patternKey);
+                    pattern = null;
+                }
+                if (!pattern || typeof pattern !== 'object') {
+                    localStorage.removeItem(this.patternKey);
+                } else {
                 // Update coordinates in case wordCoordMap changed
                 const updatedPattern = {};
                 for (const shapeId in pattern) {
@@ -2156,6 +2161,7 @@ class AnchorSpaceV2 {
                     }
                 }
                 return updatedPattern;
+                }
             }
         }
 

@@ -13,6 +13,12 @@ function evalBoolOperand(operand, a, b) {
     }
 }
 
+function formatBinaryGate(label, negated = false) {
+    const symbols = { AND: '&and;', OR: '&or;', XOR: '&oplus;' };
+    const gate = savedata.symbolicBinaryGates ? (symbols[label] || label) : label;
+    return negated ? `<span class="is-negated">&not;</span>${gate}` : gate;
+}
+
 // Safe nested boolean evaluation - replaces eval() for nested binary expressions
 function evalNestedBool(expr, questions) {
     // Replace digit references with their boolean isValid values, then evaluate safely
@@ -117,7 +123,8 @@ class BinaryQuestion {
         const secondHalf = Math.floor(btfm / 2);
         const hardModeKeys = [
             'space2DHardModeLevel', 'space3DHardModeLevel', 'space4DHardModeLevel',
-            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel'
+            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel',
+            'anchorSpaceV2HardModeLevel'
         ];
         // Save original values once before any overrides
         const originalValues = {};
@@ -176,7 +183,10 @@ class BinaryQuestion {
         let isValid;
         const operandIndex = Math.floor(Math.random()*operands.length);
         const operand = operands[operandIndex];
-        while (flip !== isValid) {
+        let attempts = 0;
+        const maxAttempts = 120;
+        while (flip !== isValid && attempts < maxAttempts) {
+            attempts++;
             const generator = pool[Math.floor(Math.random() * pool.length)];
             const generator2 = pool[Math.floor(Math.random() * pool.length)];
 
@@ -189,6 +199,8 @@ class BinaryQuestion {
             if (btfm > 0) applyOverride(secondHalf);
             choice2 = generator2.question.create(Math.ceil(length/2), transforms);
             if (btfm > 0) restoreOverride();
+
+            if (!choice || !choice2) continue;
     
             premises = scramble([...choice.premises, ...choice2.premises], getScrambleFactor('overrideBinaryScramble'));
     
@@ -198,6 +210,8 @@ class BinaryQuestion {
 
             isValid = evalBoolOperand(operand, choice.isValid, choice2.isValid);
         }
+
+        if (flip !== isValid || !choice || !choice2) return null;
 
         const countdown = getBinaryCountdown();
 
@@ -222,13 +236,16 @@ class BinaryQuestion {
 
 class NestedBinaryQuestion {
     create(length, transforms = {}) {
+        const numOperands = +savedata.maxNestedBinaryDepth;
+        if (numOperands <= 1) return null;
 
         // When binaryHardModeLevel > 0, temporarily override sub-generators' hard mode levels
         // Distribute level across sub-questions so total transforms ≈ btfm
         const btfm = savedata.binaryHardModeLevel || 0;
         const hardModeKeys = [
             'space2DHardModeLevel', 'space3DHardModeLevel', 'space4DHardModeLevel',
-            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel'
+            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel',
+            'anchorSpaceV2HardModeLevel'
         ];
         const originalValues = {};
         for (const key of hardModeKeys) {
@@ -282,7 +299,8 @@ class NestedBinaryQuestion {
                 return q;
             });
 
-        let numOperands = +savedata.maxNestedBinaryDepth;
+        if (questions.some(q => !q)) return null;
+
         let leafIndex = 0;
         function generator(remaining, depth) {
             remaining--;
@@ -372,7 +390,8 @@ class BinaryAnalogyQuestion {
         const secondHalf = Math.floor(btfm / 2);
         const hardModeKeys = [
             'space2DHardModeLevel', 'space3DHardModeLevel', 'space4DHardModeLevel',
-            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel'
+            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel',
+            'anchorSpaceV2HardModeLevel'
         ];
         const originalValues = {};
         for (const key of hardModeKeys) {
@@ -411,12 +430,12 @@ class BinaryAnalogyQuestion {
         ];
 
         const operandTemplates = [
-            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">AND</div> $b</div>',
-            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">NAND</div> $b</div>',
-            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">OR</div> $b</div>',
-            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">NOR</div> $b</div>',
-            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">XOR</div> $b</div>',
-            '<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">XNOR</div> $b</div>'
+            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('AND')}</div> $b</div>`,
+            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('AND', true)}</div> $b</div>`,
+            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('OR')}</div> $b</div>`,
+            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('OR', true)}</div> $b</div>`,
+            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('XOR')}</div> $b</div>`,
+            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('XOR', true)}</div> $b</div>`
         ];
 
         // Build analogy generator pool (same as AnalogyQuestion)
@@ -535,7 +554,8 @@ class NestedBinaryAnalogyQuestion {
         const secondHalf = Math.floor(btfm / 2);
         const hardModeKeys = [
             'space2DHardModeLevel', 'space3DHardModeLevel', 'space4DHardModeLevel',
-            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel'
+            'space5DHardModeLevel', 'space6DHardModeLevel', 'anchorSpaceHardModeLevel',
+            'anchorSpaceV2HardModeLevel'
         ];
         const originalValues = {};
         for (const key of hardModeKeys) {
@@ -556,12 +576,12 @@ class NestedBinaryAnalogyQuestion {
         }
 
         const humanOperands = [
-            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">AND</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
-            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">NAND</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
-            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">OR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
-            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">NOR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
-            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">XOR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>',
-            '<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">XNOR</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>'
+            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('AND')}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
+            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('AND', true)}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
+            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('OR')}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
+            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('OR', true)}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
+            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('XOR')}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
+            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('XOR', true)}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`
         ];
 
         const evalOperands = [
