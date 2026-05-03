@@ -4503,7 +4503,7 @@ function applyAppearanceSettings() {
 
 
 
-    document.body.classList.remove('premise-minimal', 'premise-boxed', 'premise-card', 'premise-underline');
+    document.body.classList.remove('premise-minimal', 'premise-boxed', 'premise-card', 'premise-underline', 'premise-quote', 'premise-highlight', 'premise-pill');
 
 
 
@@ -4519,7 +4519,7 @@ function applyAppearanceSettings() {
 
 
 
-    document.body.classList.remove('conclusion-minimal', 'conclusion-boxed', 'conclusion-card', 'conclusion-underline');
+    document.body.classList.remove('conclusion-minimal', 'conclusion-boxed', 'conclusion-card', 'conclusion-underline', 'conclusion-quote', 'conclusion-highlight', 'conclusion-pill');
 
 
 
@@ -4546,25 +4546,9 @@ function applyAppearanceSettings() {
     root.style.setProperty('--conclusion-color', conclusionColor);
 
 
-
-
-
-
-
-    // Button style - only Contrast and Solid now
-
-
-
-    document.body.classList.remove('btn-solid', 'btn-contrast');
-
-
-
+    // Button style
+    document.body.classList.remove('btn-solid', 'btn-contrast', 'btn-outline', 'btn-minimal');
     document.body.classList.add('btn-' + appState.buttonStyle);
-
-
-
-    
-
 
 
     // Color words option
