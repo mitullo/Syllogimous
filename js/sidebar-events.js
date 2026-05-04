@@ -101,22 +101,66 @@ function goBackToSettingsMenu() {
     if (backBtn) backBtn.classList.remove('visible');
 }
 
-// When opening settings, ensure we start at the main menu
+// Saved state for settings sidebar (section + scroll position)
+let _savedSettingsSection = null;
+let _savedSettingsScroll = 0;
+
+function saveSettingsState() {
+    const activeSection = document.querySelector('.settings-section.active');
+    _savedSettingsSection = activeSection ? activeSection.id : null;
+    const scrollContainer = activeSection || document.querySelector('.section-nav-bar .offcanvas-body');
+    _savedSettingsScroll = scrollContainer ? scrollContainer.scrollTop : 0;
+}
+
+function restoreSettingsState() {
+    if (_savedSettingsSection) {
+        openSettingsSection(_savedSettingsSection);
+        // Restore scroll after a short delay so the section is rendered
+        requestAnimationFrame(() => {
+            const section = document.getElementById(_savedSettingsSection);
+            if (section) section.scrollTop = _savedSettingsScroll;
+        });
+    }
+}
+
+// When opening settings, restore previous section if available
 document.addEventListener('DOMContentLoaded', () => {
     const settingsLabel = document.querySelector('label.open[for="offcanvas-settings"]');
     if (settingsLabel) {
         settingsLabel.addEventListener('click', () => {
-            // Reset to main menu view
-            document.querySelectorAll('.settings-section').forEach(section => {
-                section.classList.remove('active');
-            });
-            const mainMenu = document.querySelector('.settings-main-menu');
-            if (mainMenu) mainMenu.classList.remove('hidden');
-            const backBtn = document.getElementById('settings-back-btn');
-            if (backBtn) backBtn.classList.remove('visible');
-            document.querySelectorAll('.settings-menu-btn').forEach(btn => {
-                btn.removeAttribute('data-active');
-            });
+            // Save state if currently open (toggling closed)
+            const checkbox = document.getElementById('offcanvas-settings');
+            if (checkbox && checkbox.checked) {
+                saveSettingsState();
+                return; // Let the checkbox toggle close it
+            }
+            // Opening — restore if we have saved state
+            if (_savedSettingsSection) {
+                // Need a tiny delay so the offcanvas transition starts first
+                requestAnimationFrame(() => restoreSettingsState());
+            }
+        });
+    }
+
+    // Also save state when the close (✕) button is clicked
+    const closeLabel = document.querySelector('label.offcanvas-close[for="offcanvas-settings"]');
+    if (closeLabel) {
+        closeLabel.addEventListener('click', () => {
+            saveSettingsState();
+        });
+    }
+
+    // Catch checkbox change (covers all close/open methods)
+    const settingsCheckbox = document.getElementById('offcanvas-settings');
+    if (settingsCheckbox) {
+        settingsCheckbox.addEventListener('change', () => {
+            if (!settingsCheckbox.checked) {
+                // Closing
+                saveSettingsState();
+            } else if (_savedSettingsSection) {
+                // Opening with saved state
+                requestAnimationFrame(() => restoreSettingsState());
+            }
         });
     }
 });
@@ -136,6 +180,7 @@ document.addEventListener('click', (event) => {
 
     if (sylSettingsCheckbox && sylSettingsSidebar &&
         !sylSettingsSidebar.contains(event.target) && event.target !== sylSettingsCheckbox) {
+        if (sylSettingsCheckbox.checked) saveSettingsState();
         sylSettingsCheckbox.checked = false;
     }
     if (sylHistoryCheckbox && sylHistorySidebar &&

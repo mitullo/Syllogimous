@@ -5036,37 +5036,23 @@ function handleNavBarChange(event) {
 
 
 function applyNavBar() {
-
-
-
     const sidebar = document.getElementById('sidebar-settings');
-
-
-
     if (!sidebar) return;
 
-
-
     if (appState.navBar) {
-
-
-
         sidebar.classList.add('section-nav-bar');
-
-
-
     } else {
-
-
-
         sidebar.classList.remove('section-nav-bar');
-
-
-
+        
+        // Reset UI state when turning off nav bar
+        document.querySelectorAll('.settings-section').forEach(section => {
+            section.classList.remove('active');
+        });
+        const mainMenu = document.querySelector('.settings-main-menu');
+        if (mainMenu) mainMenu.classList.remove('hidden');
+        const backBtn = document.getElementById('settings-back-btn');
+        if (backBtn) backBtn.classList.remove('visible');
     }
-
-
-
 }
 
 

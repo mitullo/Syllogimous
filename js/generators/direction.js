@@ -899,6 +899,7 @@ class DirectionQuestion {
         let pattern = null;
         let a, b, c, d;
         let continuousOps = [];
+        let wordsInPremises = new Set();
         let [numInterleaved, numTransforms] = this.getNumTransformsSplit(length);
         const branchesAllowed = Math.random() > 0.2;
         const flip = coinFlip();
@@ -945,8 +946,41 @@ class DirectionQuestion {
                 [wordCoordMap, neighbors, premises, usedDirCoords, continuousOps] = this.createWordMap(length, branchesAllowed);
                 anchorWords = null;
             }
+            // Extract all words that actually appear in premises
+            wordsInPremises = new Set();
+            for (const premise of premises) {
+                const premiseList = Array.isArray(premise) ? premise : [premise];
+                for (const p of premiseList) {
+                    if (!p) continue;
+                    if (p.startSet) {
+                        for (const w of p.startSet) wordsInPremises.add(w);
+                    } else if (p.start) {
+                        wordsInPremises.add(p.start);
+                    }
+                    if (p.endSet) {
+                        for (const w of p.endSet) wordsInPremises.add(w);
+                    } else if (p.end) {
+                        wordsInPremises.add(p.end);
+                    }
+                }
+            }
             [a, b, c, d] = pickRandomItems(Object.keys(wordCoordMap), 4).picked;
             if (!a || !b || !c || !d) continue;
+
+            // Ensure each conclusion pair has at least one non-anchor word (avoid trivial anchor-only conclusions)
+            if (this.generator.shouldUseAnchor() && anchorWords) {
+                const nonAnchorWords = Array.from(wordsInPremises).filter(w => !anchorWords.includes(w));
+                if (nonAnchorWords.length > 0) {
+                    // Fix pair (a, b) if both are anchors
+                    if (anchorWords.includes(a) && anchorWords.includes(b)) {
+                        a = nonAnchorWords[Math.floor(Math.random() * nonAnchorWords.length)];
+                    }
+                    // Fix pair (c, d) if both are anchors
+                    if (anchorWords.includes(c) && anchorWords.includes(d)) {
+                        c = nonAnchorWords[Math.floor(Math.random() * nonAnchorWords.length)];
+                    }
+                }
+            }
             
             // Initialize transformState with final wordCoordMap and anchorWords
             if (transformState) {
@@ -1010,12 +1044,52 @@ class DirectionQuestion {
         if (continuousOps.length > 0) {
             modifiers.push(`continuous`);
         }
+        // For V2, filter wordCoordMap to only include words that appear in premises
+        // For classic Anchor Space, keep all anchor words for the explanation grid
+        const finalWordCoordMap = isV2 ? {} : wordCoordMap;
+        if (isV2) {
+            for (const word of wordsInPremises) {
+                if (wordCoordMap[word]) {
+                    finalWordCoordMap[word] = wordCoordMap[word];
+                }
+            }
+            // Also include anchor words used as reference points in transforms
+            const allTransformStrings = [...operations];
+            for (const premise of premises) {
+                if (typeof premise === 'string' && 
+                    (premise.includes('🪞') || premise.includes('↔️') || premise.includes(':=') || 
+                     premise.includes('mirrored') || premise.includes('scaled') || 
+                     premise.includes('rotated') || premise.includes('set to'))) {
+                    allTransformStrings.push(premise);
+                }
+            }
+            for (const op of allTransformStrings) {
+                if (!op) continue;
+                const spanMatches = op.match(/<span class="subject">([^<]+)<\/span>/g);
+                if (spanMatches && spanMatches.length >= 2) {
+                    const lastMatch = spanMatches[spanMatches.length - 1];
+                    const refWord = lastMatch.replace(/<[^>]+>/g, '');
+                    if (wordCoordMap[refWord] && !finalWordCoordMap[refWord]) {
+                        finalWordCoordMap[refWord] = wordCoordMap[refWord];
+                    }
+                } else {
+                    const knownWords = Object.keys(wordCoordMap);
+                    for (const word of knownWords) {
+                        if (finalWordCoordMap[word]) continue;
+                        const wordRegex = new RegExp(`\\b${word}\\b`);
+                        if (wordRegex.test(op) && wordCoordMap[word]) {
+                            finalWordCoordMap[word] = wordCoordMap[word];
+                        }
+                    }
+                }
+            }
+        }
         return {
             category: 'Analogy: ' + this.generator.getName(),
             type: normalizeString(this.generator.getName()),
             modifiers,
             startedAt: new Date().getTime(),
-            wordCoordMap,
+            wordCoordMap: finalWordCoordMap,
             bucket: Object.keys(wordCoordMap),
             isValid,
             premises,

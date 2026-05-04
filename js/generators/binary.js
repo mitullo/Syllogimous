@@ -16,7 +16,7 @@ function evalBoolOperand(operand, a, b) {
 function formatBinaryGate(label, negated = false) {
     const symbols = { AND: '&and;', OR: '&or;', XOR: '&oplus;' };
     const gate = savedata.symbolicBinaryGates ? (symbols[label] || label) : label;
-    return negated ? `<span class="is-negated">&not;</span>${gate}` : gate;
+    return negated ? `<span class="is-connector">&not;</span>${gate}` : gate;
 }
 
 // Safe nested boolean evaluation - replaces eval() for nested binary expressions
