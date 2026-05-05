@@ -407,12 +407,12 @@ function createExplanation(question) {
         }
     }
 
-    if (question.bucket) {
-        return createExplanationBucket(question);
-    }
-
     if (question.buckets) {
         return createExplanationBuckets(question);
+    }
+
+    if (question.bucket) {
+        return createExplanationBucket(question);
     }
 
     if (question.subresults) {

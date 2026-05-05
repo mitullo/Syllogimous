@@ -210,7 +210,7 @@ class ProgressStore {
             const span = document.createElement('span');
             span.classList.add('trailing-dot');
             span.style.width = `${width.toFixed(2)}%`;
-            span.classList.add(isSuccess ? 'success' : 'fail');
+            if (!appState.hideFeedback) span.classList.add(isSuccess ? 'success' : 'fail');
             progressTracker.appendChild(span);
         });
     }

@@ -14,9 +14,32 @@ function evalBoolOperand(operand, a, b) {
 }
 
 function formatBinaryGate(label, negated = false) {
-    const symbols = { AND: '&and;', OR: '&or;', XOR: '&oplus;' };
-    const gate = savedata.symbolicBinaryGates ? (symbols[label] || label) : label;
-    return negated ? `<span class="is-connector">&not;</span>${gate}` : gate;
+    const normalizedLabel = negated ? ({ AND: 'NAND', OR: 'NOR', XOR: 'XNOR' }[label] || label) : label;
+    const symbols = {
+        AND: '&and;',
+        NAND: '<span class="is-connector">&not;</span>&and;',
+        OR: '&or;',
+        NOR: '<span class="is-connector">&not;</span>&or;',
+        XOR: '&oplus;',
+        XNOR: '<span class="is-connector">&not;</span>&oplus;',
+    };
+    if (savedata.symbolicBinaryGates) {
+        return symbols[normalizedLabel] || normalizedLabel;
+    }
+    return negated ? `<span class="is-connector">&not;</span>${label}` : label;
+}
+
+function collectBinaryAnalogyStimuli(question) {
+    const values = [];
+    if (question.wordCoordMap) values.push(...Object.keys(question.wordCoordMap));
+    if (question.bucket) values.push(...question.bucket);
+    if (question.buckets) values.push(...question.buckets.flat());
+    return values.filter(v => typeof v === 'string' && !v.startsWith('[svg]') && !v.startsWith('shape_'));
+}
+
+function hasBinaryAnalogyStimulusOverlap(question, question2) {
+    const seen = new Set(collectBinaryAnalogyStimuli(question));
+    return collectBinaryAnalogyStimuli(question2).some(v => seen.has(v));
 }
 
 // Safe nested boolean evaluation - replaces eval() for nested binary expressions
@@ -501,7 +524,7 @@ class BinaryAnalogyQuestion {
             choice2 = this.createAnalogyLeaf(g2, subLength2);
             if (btfm > 0) restoreOverride();
 
-            if (!choice || !choice2) continue;
+            if (!choice || !choice2 || hasBinaryAnalogyStimulusOverlap(choice, choice2)) continue;
 
             const scrambleFactor = getScrambleFactor('overrideBinaryScramble');
             // Do not preserve the two leaf packages in premise order. Keeping each
@@ -643,7 +666,7 @@ class NestedBinaryAnalogyQuestion {
             choice2 = this.createAnalogyLeaf(g2, subLength2);
             if (btfm > 0) restoreOverride();
 
-            if (!choice || !choice2) continue;
+            if (!choice || !choice2 || hasBinaryAnalogyStimulusOverlap(choice, choice2)) continue;
 
             const scrambleFactor = getScrambleFactor('overrideBinaryScramble');
             premises = scramble([...choice.premises, ...choice2.premises], scrambleFactor);

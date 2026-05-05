@@ -23249,3 +23249,48 @@ height: 3px;
 }
 
 }
+
+
+body.hide-feedback .game-area.right,
+body.hide-feedback .game-area.wrong,
+body.hide-feedback .game-area.missed,
+body.hide-feedback .game-area.right::before,
+body.hide-feedback .game-area.wrong::before,
+body.hide-feedback .game-area.missed::before {
+    border-color: var(--bracket-color) !important;
+    box-shadow: none !important;
+}
+
+body.hide-feedback .game-area.right::before,
+body.hide-feedback .game-area.wrong::before,
+body.hide-feedback .game-area.missed::before,
+body.hide-feedback .feedback {
+    display: none !important;
+}
+
+body.hide-feedback .hqli--right .inner,
+body.hide-feedback .hqli--wrong .inner,
+body.hide-feedback #history-list li.hqli--right,
+body.hide-feedback #history-list li.hqli--wrong {
+    background-color: transparent !important;
+    border-color: var(--bracket-color) !important;
+    border-left-color: var(--bracket-color) !important;
+    border-bottom-color: var(--bracket-color) !important;
+}
+
+body.hide-feedback .hqli-answer-user,
+body.hide-feedback .hqli-answer {
+    display: none !important;
+}
+
+body.hide-feedback .hqli-conclusion.correct,
+body.hide-feedback .hqli-conclusion.wrong,
+body.hide-feedback .hqli-postamble .conc-true,
+body.hide-feedback .hqli-postamble .conc-false {
+    color: inherit !important;
+}
+
+body.hide-feedback .trailing-dot.success::before,
+body.hide-feedback .trailing-dot.fail::before {
+    background-color: transparent !important;
+}

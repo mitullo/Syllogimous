@@ -2386,6 +2386,8 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-fast-ui').checked = appState.fastUi;
 
+    document.getElementById('p-hide-feedback').checked = appState.hideFeedback || false;
+
 
 
     document.getElementById('p-dark-mode').checked = appState.darkMode;
@@ -2582,6 +2584,8 @@ function populateAppearanceSettings() {
     applyFlatSettings();
     applySwapButtons();
     applyNavBar();
+
+    applyHideFeedback();
 
 
 
@@ -3737,6 +3741,18 @@ function updateScoreDisplay(questions) {
 
 
 
+    if (appState.hideFeedback) {
+
+        correctlyAnsweredEl.innerText = '?';
+
+        nextLevelEl.innerText = qs.length;
+
+        return;
+
+    }
+
+
+
     if (appState.scoreMode === 'correct') {
 
 
@@ -3774,6 +3790,40 @@ function updateScoreDisplay(questions) {
 
 
 
+
+
+
+function applyHideFeedback() {
+
+    document.body.classList.toggle('hide-feedback', Boolean(appState.hideFeedback));
+
+}
+
+
+
+function handleHideFeedbackChange(event) {
+
+    appState.hideFeedback = event.target.checked;
+
+    removeFastFeedback();
+
+    feedbackRight.classList.remove("active");
+
+    feedbackWrong.classList.remove("active");
+
+    feedbackMissed.classList.remove("active");
+
+    applyHideFeedback();
+
+    updateScoreDisplay();
+
+    renderHQL();
+
+    if (typeof PROGRESS_STORE !== 'undefined' && question) PROGRESS_STORE.renderCurrentProgress(question);
+
+    save();
+
+}
 
 
 
@@ -6952,6 +7002,28 @@ function playSound(property) {
 
 
 
+function hiddenFeedback(cb) {
+
+    removeFastFeedback();
+
+    feedbackRight.classList.remove("active");
+
+    feedbackWrong.classList.remove("active");
+
+    feedbackMissed.classList.remove("active");
+
+    setTimeout(() => {
+
+        if (cb) cb();
+
+        processingAnswer = false;
+
+    }, appState.fastUi ? 100 : 150);
+
+}
+
+
+
 function removeFastFeedback() {
 
 
@@ -7004,6 +7076,16 @@ function fastFeedback(cb, className) {
 
 
 
+    if (appState.hideFeedback) {
+
+        hiddenFeedback(cb);
+
+        return;
+
+    }
+
+
+
     gameArea.classList.add(className);
 
 
@@ -7049,6 +7131,16 @@ function fastFeedback(cb, className) {
 // isIntermediate: if true, use faster timing for multi-conclusion mode
 
 function showConclusionResult(isCorrect, callback, isIntermediate = false) {
+
+    if (appState.hideFeedback) {
+
+        hiddenFeedback(callback);
+
+        return;
+
+    }
+
+
 
     playSound(isCorrect ? 'success' : 'failure');
 
@@ -7116,6 +7208,16 @@ function wowFeedbackRight(cb) {
 
 
 
+    if (appState.hideFeedback) {
+
+        hiddenFeedback(cb);
+
+        return;
+
+    }
+
+
+
     playSound('success');
 
 
@@ -7172,6 +7274,16 @@ function wowFeedbackWrong(cb) {
 
 
 
+    if (appState.hideFeedback) {
+
+        hiddenFeedback(cb);
+
+        return;
+
+    }
+
+
+
     playSound('failure');
 
 
@@ -7225,6 +7337,16 @@ function wowFeedbackWrong(cb) {
 
 
 function wowFeedbackMissed(cb) {
+
+
+
+    if (appState.hideFeedback) {
+
+        hiddenFeedback(cb);
+
+        return;
+
+    }
 
 
 
@@ -7860,7 +7982,7 @@ function deleteQuestion(i, isRight) {
 
 function historyMatchesFilter(q) {
 
-    return historyFilter === "all" || q.correctness === historyFilter;
+    return appState.hideFeedback || historyFilter === "all" || q.correctness === historyFilter;
 }
 
 
@@ -7881,6 +8003,22 @@ function updateHistoryFilterControls(questions = appState.questions) {
 
 
 
+    const hideFeedback = appState.hideFeedback;
+
+    if (hideFeedback) {
+
+        counts.right = '?';
+
+        counts.wrong = '?';
+
+        counts.missed = '?';
+
+        if (historyFilter !== 'all') historyFilter = 'all';
+
+    }
+
+
+
     historyFilterButtons.forEach(button => {
 
         const filter = button.dataset.historyFilter || 'all';
@@ -7888,6 +8026,8 @@ function updateHistoryFilterControls(questions = appState.questions) {
         const countEl = button.querySelector('.history-filter-count');
 
         if (countEl) countEl.textContent = counts[filter] || 0;
+
+        button.disabled = hideFeedback && filter !== 'all';
 
         button.classList.toggle('selected', filter === historyFilter);
 
@@ -7934,7 +8074,7 @@ function updateHistoryFilterSummary(totalCount, visibleCount) {
 
 function setHistoryFilter(filter) {
 
-    historyFilter = filter || 'all';
+    historyFilter = appState.hideFeedback ? 'all' : (filter || 'all');
 
     renderHQL();
 
@@ -8156,6 +8296,18 @@ function updateAverage(reverseChronological) {
 
 
 
+    if (appState.hideFeedback) {
+
+        averageCorrectDisplay.innerHTML = 'Hidden';
+
+        percentCorrectDisplay.innerHTML = 'Hidden';
+
+        return;
+
+    }
+
+
+
     const correctQuestions = questions.filter(q => q.correctness == 'right');
 
 
@@ -8228,7 +8380,11 @@ function createHQLI(question, i) {
 
 
 
-    const answerUserClassName = {
+    const hideFeedback = appState.hideFeedback;
+
+
+
+    const answerUserClassName = hideFeedback ? '' : {
 
 
 
@@ -8256,7 +8412,7 @@ function createHQLI(question, i) {
 
 
 
-    let classModifier = {
+    let classModifier = hideFeedback ? '' : {
 
 
 
@@ -8408,7 +8564,7 @@ function createHQLI(question, i) {
 
                 const wasCorrect = userAns === c.isValid;
 
-                const concClass = wasCorrect ? 'correct' : 'wrong';
+                const concClass = hideFeedback ? '' : (wasCorrect ? 'correct' : 'wrong');
 
                 const answerText = userAns === true ? 'TRUE' : (userAns === false ? 'FALSE' : '-');
 
@@ -8417,6 +8573,10 @@ function createHQLI(question, i) {
                 const answerSpanClass = userAns === true ? 'conc-true' : (userAns === false ? 'conc-false' : '');
 
                 const correctSpanClass = c.isValid ? 'conc-true' : 'conc-false';
+
+                if (hideFeedback) return `<div class="hqli-postamble">Conclusion ${i + 1} of ${q.conclusions.length}</div>
+
+        <div class="hqli-conclusion ${concClass}">${c.conclusion}</div>`;
 
                 return `<div class="hqli-postamble">Conclusion ${i + 1} of ${q.conclusions.length} — You: <span class="${answerSpanClass}">${answerText}</span> (correct: <span class="${correctSpanClass}">${correctText}</span>)</div>
 

@@ -30,6 +30,8 @@ let appState = {
 
     "fastUi": true,
 
+    "hideFeedback": false,
+
     "staticButtons": true,
 
     "darkMode": true,
