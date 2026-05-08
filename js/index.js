@@ -1210,23 +1210,29 @@ function populateSettings() {
 
 function refresh() {
 
-
+    // Preserve active settings section across refresh
+    const activeSection = document.querySelector('.settings-section.active');
+    const activeSectionId = activeSection ? activeSection.id : null;
+    const mainMenu = document.querySelector('.settings-main-menu');
+    const mainMenuWasHidden = mainMenu ? mainMenu.classList.contains('hidden') : false;
+    const backBtn = document.getElementById('settings-back-btn');
+    const backBtnWasVisible = backBtn ? backBtn.classList.contains('visible') : false;
 
     save();
 
-
-
     populateSettings();
-
-
 
     updateGamemodeEmptyState();
 
-
-
     init();
 
-
+    // Restore active settings section after refresh
+    if (activeSectionId) {
+        const section = document.getElementById(activeSectionId);
+        if (section) section.classList.add('active');
+    }
+    if (mainMenuWasHidden && mainMenu) mainMenu.classList.add('hidden');
+    if (backBtnWasVisible && backBtn) backBtn.classList.add('visible');
 
 }
 
@@ -2388,6 +2394,9 @@ function populateAppearanceSettings() {
 
     document.getElementById('p-hide-feedback').checked = appState.hideFeedback || false;
 
+    document.getElementById('p-manual-settings').checked = appState.manualSettings || false;
+    document.getElementById('p-manual-settings-menu').checked = appState.manualSettings || false;
+
 
 
     document.getElementById('p-dark-mode').checked = appState.darkMode;
@@ -2586,6 +2595,8 @@ function populateAppearanceSettings() {
     applyNavBar();
 
     applyHideFeedback();
+
+    applyManualSettings();
 
 
 
@@ -3825,7 +3836,39 @@ function handleHideFeedbackChange(event) {
 
 }
 
+function handleManualSettingsChange(event) {
 
+    appState.manualSettings = event.target.checked;
+
+    // Sync both manual settings checkboxes
+    document.getElementById('p-manual-settings').checked = appState.manualSettings;
+    document.getElementById('p-manual-settings-menu').checked = appState.manualSettings;
+
+    applyManualSettings();
+
+    save();
+
+}
+
+function applyManualSettings() {
+
+    if (appState.manualSettings) {
+
+        document.body.classList.add('manual-settings');
+
+    } else {
+
+        document.body.classList.remove('manual-settings');
+
+        // If currently viewing an advanced section, go back to main menu
+        const activeSection = document.querySelector('.settings-section.active');
+        if (activeSection && activeSection.querySelector('.advanced-setting, .multi-input') || activeSection && activeSection.id !== 'appearance-section') {
+            goBackToSettingsMenu();
+        }
+
+    }
+
+}
 
 function handleHideSideButtonsChange(event) {
 
@@ -5089,19 +5132,23 @@ function applyNavBar() {
     const sidebar = document.getElementById('sidebar-settings');
     if (!sidebar) return;
 
+    const wasNavBar = sidebar.classList.contains('section-nav-bar');
+
     if (appState.navBar) {
         sidebar.classList.add('section-nav-bar');
     } else {
         sidebar.classList.remove('section-nav-bar');
-        
-        // Reset UI state when turning off nav bar
-        document.querySelectorAll('.settings-section').forEach(section => {
-            section.classList.remove('active');
-        });
-        const mainMenu = document.querySelector('.settings-main-menu');
-        if (mainMenu) mainMenu.classList.remove('hidden');
-        const backBtn = document.getElementById('settings-back-btn');
-        if (backBtn) backBtn.classList.remove('visible');
+
+        // Only reset UI state when actually transitioning from nav-bar to non-nav-bar
+        if (wasNavBar) {
+            document.querySelectorAll('.settings-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            const mainMenu = document.querySelector('.settings-main-menu');
+            if (mainMenu) mainMenu.classList.remove('hidden');
+            const backBtn = document.getElementById('settings-back-btn');
+            if (backBtn) backBtn.classList.remove('visible');
+        }
     }
 }
 

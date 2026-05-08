@@ -1,5 +1,12 @@
+function isRenderableCoord(coord) {
+    return Array.isArray(coord)
+        && coord.length > 0
+        && coord.every(value => typeof value === 'number' && Number.isFinite(value));
+}
+
 function createGridFromMap(wordCoordMap) {
-    const entries = Object.entries(wordCoordMap);
+    const entries = Object.entries(wordCoordMap || {})
+        .filter(([_, coord]) => isRenderableCoord(coord));
     if (entries.length === 0) return [];
 
     // Find max dimension and normalize all coordinates to same length
@@ -112,8 +119,12 @@ function centerText(text, width) {
 }
 
 function createFiller(grid) {
-    const lengths = grid.flat(Infinity).map(x => x.length > 50 ? 1 : x.length);
-    const biggest = lengths.reduce((a, b) => Math.max(a, b));
+    const cells = Array.isArray(grid) ? grid.flat(Infinity) : [];
+    const lengths = cells.map(x => {
+        const text = String(x ?? '');
+        return text.length > 50 ? 1 : text.length;
+    });
+    const biggest = lengths.length > 0 ? lengths.reduce((a, b) => Math.max(a, b), 0) : 0;
     const neededLength = biggest + 2;
     return '\u00A0'.repeat(neededLength);
 }
@@ -291,6 +302,32 @@ function createExplanation6D(grid, pattern = null) {
     return s;
 }
 
+function createSpatialExplanation(question) {
+    const pattern = question.pattern || null;
+    const grid = createGridFromMap(question.wordCoordMap);
+    if (!Array.isArray(grid) || grid.length === 0) {
+        return '';
+    }
+
+    const coordDims = Object.values(question.wordCoordMap || {}).find(isRenderableCoord)?.length || 0;
+    const is6D = coordDims === 6;
+    const is5D = coordDims === 5;
+
+    if (is6D || (Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]) && Array.isArray(grid[0][0][0][0][0]))) {
+        return createExplanation6D(ensureGridDepth(grid, 6), pattern);
+    } else if (is5D || (Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]))) {
+        return createExplanation5D(ensureGridDepth(grid, 5), pattern);
+    } else if (Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0])) {
+        return createExplanation4D(grid, pattern);
+    } else if (Array.isArray(grid[0]) && Array.isArray(grid[0][0])) {
+        return createExplanation3D(grid, undefined, pattern);
+    } else if (Array.isArray(grid[0])) {
+        return createExplanation2D(grid, undefined, undefined, pattern);
+    }
+
+    return '';
+}
+
 function createExplanationBucket(question) {
     if (question.category === 'Vertical') {
         return question.bucket.map(word => `<div>${word}</div>`).join('');
@@ -341,7 +378,7 @@ function createExplanationMixed(question) {
     }
     
     // Show distinction buckets if available
-    if (question.buckets && question.buckets.some(b => b.length > 0)) {
+    if (Array.isArray(question.buckets) && question.buckets.some(b => Array.isArray(b) && b.length > 0)) {
         result += '<div class="mixed-distinction-section" style="border: 1px solid var(--bracket-color); padding: 0.5rem; border-radius: 4px;">';
         result += '<div style="font-weight: bold; margin-bottom: 0.5rem;">Distinction Groups:</div>';
         result += createExplanationBuckets({...question, category: 'Distinction'});
@@ -350,22 +387,13 @@ function createExplanationMixed(question) {
     
     // Show direction map if available
     if (question.wordCoordMap && Object.keys(question.wordCoordMap).length > 0) {
-        result += '<div class="mixed-direction-section" style="border: 1px solid var(--bracket-color); padding: 0.5rem; border-radius: 4px;">';
-        result += '<div style="font-weight: bold; margin-bottom: 0.5rem;">Spatial Map:</div>';
-        const pattern = question.pattern || null;
-        const grid = createGridFromMap(question.wordCoordMap);
-        if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]) && Array.isArray(grid[0][0][0][0][0])) {
-            result += createExplanation6D(grid, pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0])) {
-            result += createExplanation5D(grid, pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0])) {
-            result += createExplanation4D(grid, pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0])) {
-            result += createExplanation3D(grid, undefined, pattern);
-        } else {
-            result += createExplanation2D(grid, undefined, undefined, pattern);
+        const spatialExplanation = createSpatialExplanation(question);
+        if (spatialExplanation) {
+            result += '<div class="mixed-direction-section" style="border: 1px solid var(--bracket-color); padding: 0.5rem; border-radius: 4px;">';
+            result += '<div style="font-weight: bold; margin-bottom: 0.5rem;">Spatial Map:</div>';
+            result += spatialExplanation;
+            result += '</div>';
         }
-        result += '</div>';
     }
     
     // Show linear ordering if available
@@ -381,42 +409,41 @@ function createExplanationMixed(question) {
 }
 
 function createExplanation(question) {
-    // Handle mixed mode questions first (they have both wordCoordMap and buckets)
+    if (!question) {
+        return '<div style="padding: 1rem;">No explanation available for this question type.</div>';
+    }
+
+    // Handle mixed mode questions first (they intentionally show several representations).
     if (question.type === 'mixed' || question.category?.startsWith('Mixed:')) {
         return createExplanationMixed(question);
     }
 
-    // Check for spatial grid first (5D/6D analogy have both wordCoordMap and bucket)
-    if (question.wordCoordMap) {
-        const pattern = question.pattern || null;
-        const grid = createGridFromMap(question.wordCoordMap);
-        const coordDims = Object.values(question.wordCoordMap)[0]?.length || 0;
-        const is6D = coordDims === 6;
-        const is5D = coordDims === 5;
-        
-        if (is6D || (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]) && Array.isArray(grid[0][0][0][0][0]))) {
-            return createExplanation6D(ensureGridDepth(grid, 6), pattern);
-        } else if (is5D || (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0]) && Array.isArray(grid[0][0][0][0]))) {
-            return createExplanation5D(ensureGridDepth(grid, 5), pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0]) && Array.isArray(grid[0][0][0])) {
-            return createExplanation4D(grid, pattern);
-        } else if (grid && Array.isArray(grid[0]) && Array.isArray(grid[0][0])) {
-            return createExplanation3D(grid, undefined, pattern);
-        } else if (grid && Array.isArray(grid[0])) {
-            return createExplanation2D(grid, undefined, undefined, pattern);
+    // Binary questions carry their real explanation history in subresults. Render those
+    // leaves before considering any aggregate bucket/map fields on the wrapper object.
+    if (Array.isArray(question.subresults) && question.subresults.length > 0) {
+        const renderedSubresults = question.subresults.filter(Boolean).map(createExplanation);
+        if (renderedSubresults.length > 0) {
+            return renderedSubresults.join('<div class="binary-explainer-separator"></div>');
         }
     }
 
-    if (question.buckets) {
+    // Prefer explicit 2D bucket groups over flat buckets or spatial fallbacks. This keeps
+    // distinction and backtracking-style explanations grouped instead of collapsing to one row.
+    if (Array.isArray(question.buckets)) {
         return createExplanationBuckets(question);
+    }
+
+    // Spatial analogy leaves often also expose a flat bucket for stimulus collection; keep
+    // using the coordinate map when no explicit grouped buckets are present.
+    if (question.wordCoordMap) {
+        const spatialExplanation = createSpatialExplanation(question);
+        if (spatialExplanation) {
+            return spatialExplanation;
+        }
     }
 
     if (question.bucket) {
         return createExplanationBucket(question);
-    }
-
-    if (question.subresults) {
-        return question.subresults.map(createExplanation).join('<div class="binary-explainer-separator"></div>');
     }
     
     return '<div style="padding: 1rem;">No explanation available for this question type.</div>';

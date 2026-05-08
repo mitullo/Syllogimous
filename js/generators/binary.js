@@ -14,19 +14,15 @@ function evalBoolOperand(operand, a, b) {
 }
 
 function formatBinaryGate(label, negated = false) {
-    const normalizedLabel = negated ? ({ AND: 'NAND', OR: 'NOR', XOR: 'XNOR' }[label] || label) : label;
-    const symbols = {
-        AND: '&and;',
-        NAND: '<span class="is-connector">&not;</span>&and;',
-        OR: '&or;',
-        NOR: '<span class="is-connector">&not;</span>&or;',
-        XOR: '&oplus;',
-        XNOR: '<span class="is-connector">&not;</span>&oplus;',
-    };
-    if (savedata.symbolicBinaryGates) {
-        return symbols[normalizedLabel] || normalizedLabel;
-    }
     return negated ? `<span class="is-connector">&not;</span>${label}` : label;
+}
+
+function createBinaryAnalogyTemplate(operatorName) {
+    return `<div class="binary-analogy-conclusion binary-analogy-row"><span class="binary-paren">(</span>$a<span class="binary-paren">)</span><span class="is-connector binary-operator binary-operator-label">${operatorName}</span><span class="binary-paren">(</span>$b<span class="binary-paren">)</span></div>`;
+}
+
+function createNestedBinaryAnalogyTemplate(operatorName) {
+    return `<div class="binary-analogy-conclusion binary-analogy-tree DEPTH"><div class="binary-expression-row"><span class="binary-paren DEPTH">(</span><div class="binary-expression-slot">à</div><span class="binary-paren DEPTH">)</span></div><span class="is-connector binary-operator binary-operator-label DEPTH">${operatorName}</span><div class="binary-expression-row"><span class="binary-paren DEPTH">(</span><div class="binary-expression-slot">ò</div><span class="binary-paren DEPTH">)</span></div></div>`;
 }
 
 function collectBinaryAnalogyStimuli(question) {
@@ -453,12 +449,12 @@ class BinaryAnalogyQuestion {
         ];
 
         const operandTemplates = [
-            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('AND')}</div> $b</div>`,
-            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('AND', true)}</div> $b</div>`,
-            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('OR')}</div> $b</div>`,
-            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('OR', true)}</div> $b</div>`,
-            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('XOR')}</div> $b</div>`,
-            `<div class="binary-analogy-conclusion">$a <div class="is-connector binary-operator">${formatBinaryGate('XOR', true)}</div> $b</div>`
+            createBinaryAnalogyTemplate('AND'),
+            createBinaryAnalogyTemplate('NAND'),
+            createBinaryAnalogyTemplate('OR'),
+            createBinaryAnalogyTemplate('NOR'),
+            createBinaryAnalogyTemplate('XOR'),
+            createBinaryAnalogyTemplate('XNOR')
         ];
 
         // Build analogy generator pool (same as AnalogyQuestion)
@@ -599,12 +595,12 @@ class NestedBinaryAnalogyQuestion {
         }
 
         const humanOperands = [
-            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('AND')}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
-            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('AND', true)}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
-            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('OR')}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
-            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('OR', true)}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
-            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('XOR')}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`,
-            `<span class="is-connector DEPTH">(</span>à<span class="is-connector DEPTH">)</span> <span class="is-connector DEPTH">${formatBinaryGate('XOR', true)}</span><br><span class="INDENT"></span><span class="is-connector DEPTH">(</span>ò<span class="is-connector DEPTH">)</span>`
+            createNestedBinaryAnalogyTemplate('AND'),
+            createNestedBinaryAnalogyTemplate('NAND'),
+            createNestedBinaryAnalogyTemplate('OR'),
+            createNestedBinaryAnalogyTemplate('NOR'),
+            createNestedBinaryAnalogyTemplate('XOR'),
+            createNestedBinaryAnalogyTemplate('XNOR')
         ];
 
         const evalOperands = [

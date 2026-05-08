@@ -32,6 +32,8 @@ let appState = {
 
     "hideFeedback": false,
 
+    "manualSettings": false,
+
     "staticButtons": true,
 
     "darkMode": true,
@@ -178,9 +180,9 @@ let savedata = {
 
     "garbageWordLength": 3,
 
-    "useGarbageWords": false,
+    "useGarbageWords": true,
 
-    "useEmoji": false,
+    "useEmoji": true,
 
     "meaningfulWordNouns": true,
 
@@ -266,7 +268,7 @@ let savedata = {
 
     "overrideSpace6DScramble": null,
 
-    "useJunkEmoji": false,
+    "useJunkEmoji": true,
 
     "useVisualNoise": false,
 
@@ -320,17 +322,17 @@ let savedata = {
 
     "enableTransformContinuous": false,
 
-    "autoProgression": false,
+    "autoProgression": true,
 
     "autoProgressionGoal": 10,
 
-    "autoProgressionTrailing": 20,
+    "autoProgressionTrailing": 30,
 
     "autoProgressionPercentSuccess": 90,
 
     "autoProgressionPercentFail": 65,
 
-    "autoProgressionGrouping": 'separate',
+    "autoProgressionGrouping": 'all-separate',
 
     "spoilerConclusion": false,
 
@@ -356,7 +358,7 @@ let savedata = {
 
     "enableHarderConclusions": false,
 
-    "autoProgressionChange": 'auto',
+    "autoProgressionChange": 'custom',
 
     "autoProgressionTimeDrop": 5,
 
@@ -373,8 +375,6 @@ let savedata = {
     "doubleDistanceFrequency": 100,
 
     "enableDoubleDistanceConclusions": false,
-
-    "symbolicBinaryGates": false,
 
 };
 
@@ -823,7 +823,6 @@ const keySettingMap = {
     "p-double-distance": "enableDoubleDistance",
     "p-double-distance-freq": "doubleDistanceFrequency",
     "p-double-distance-conclusions": "enableDoubleDistanceConclusions",
-    "p-symbolic-binary-gates": "symbolicBinaryGates",
     "p-binary-transform": "binaryHardModeLevel",
 };
 

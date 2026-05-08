@@ -144,7 +144,8 @@ class ProgressGraph {
 
     async plotScore() {
         let data = await getAllRRTProgress();
-        data = data.filter(q => q.timeElapsed >= 1500);
+        data = Array.isArray(data) ? data : [];
+        data = data.filter(q => (q.timeElapsed || 0) >= 1500);
         this.updateSummary(data);
         if (!data || data.length === 0) {
             return;
@@ -153,10 +154,17 @@ class ProgressGraph {
         const typeData = this.calculateTypeData(data, false);
         const premiseLevelData = this.calculateTypeData(data, true);
 
-        const labels = Object.values(typeData)[0].map(entry => entry.day);
-        const premiseLevelLabels = Object.values(premiseLevelData)[0].map((entry) => entry.day);
+        const firstType = Object.values(typeData)[0];
+        const hasPremiseLevelData = Object.keys(premiseLevelData).length > 0;
+        if (!firstType) {
+            return;
+        }
+        const labels = firstType.map(entry => entry.day);
+        const premiseLevelLabels = hasPremiseLevelData
+            ? Object.values(premiseLevelData)[0].map((entry) => entry.day)
+            : [];
 
-        const scoreDatasets = Object.keys(premiseLevelData).map((type) => {
+        const scoreDatasets = hasPremiseLevelData ? Object.keys(premiseLevelData).map((type) => {
             return {
                 label: type,
                 data: premiseLevelData[type].map((entry) => ({ x: entry.day, y: entry.averageTime })),
@@ -168,9 +176,9 @@ class ProgressGraph {
                 tension: 0.32,
                 fill: false,
             };
-        });
+        }) : [];
 
-        const timePerPremiseDatasets = Object.keys(premiseLevelData).map(type => {
+        const timePerPremiseDatasets = hasPremiseLevelData ? Object.keys(premiseLevelData).map(type => {
             return {
                 label: type,
                 data: premiseLevelData[type].map((entry) => ({ x: entry.day, y: entry.numPremises / entry.averageTime })),
@@ -182,7 +190,7 @@ class ProgressGraph {
                 tension: 0.32,
                 fill: false,
             };
-        });
+        }) : [];
 
         const countDatasets = Object.keys(typeData).map((type) => {
             return {
@@ -197,9 +205,9 @@ class ProgressGraph {
 
         const timeData = this.calculateTimeSpentData(data);
         const totalTimeSpent = timeData.map(entry => entry.time).reduce((a,b) => a + b, 0);
-        const totalHours = totalTimeSpent / 60;
-        const extraMinutes = totalTimeSpent % 60;
-        const totalTimeSpentDisplay = `Total = ${totalHours.toFixed(0)}h ${extraMinutes.toFixed(0)}m`
+        const totalHours = Math.floor(totalTimeSpent / 60);
+        const extraMinutes = Math.round(totalTimeSpent % 60);
+        const totalTimeSpentDisplay = `Total = ${totalHours}h ${extraMinutes}m`;
         const timeDatasets = [{
             label: `Time Spent (Minutes)`,
             data: timeData.map(entry => ({ x: entry.day, y: entry.time })),
@@ -209,14 +217,16 @@ class ProgressGraph {
             borderRadius: 8,
         }];
 
-        const scoreCtx = canvasScore.getContext('2d');
-        this.scoreChart = this.createChart(scoreCtx, premiseLevelLabels, scoreDatasets, 'line', 'Average Correct Time (s)', 1, 2, 's');
         const countCtx = canvasCount.getContext('2d');
         this.countChart = this.createChart(countCtx, labels, countDatasets, 'line', 'Count', 0, 0);
         const timeCtx = canvasTime.getContext('2d');
         this.timeChart = this.createChart(timeCtx, labels, timeDatasets, 'bar', 'Time Spent', 1, 2, '', totalTimeSpentDisplay);
-        const timePerPremiseCtx = canvasTimePerPremise.getContext('2d');
-        this.timePerPremiseChart = this.createChart(timePerPremiseCtx, premiseLevelLabels, timePerPremiseDatasets, 'line', 'Premise / second', 1, 2, ' premise/s');
+        if (hasPremiseLevelData) {
+            const scoreCtx = canvasScore.getContext('2d');
+            this.scoreChart = this.createChart(scoreCtx, premiseLevelLabels, scoreDatasets, 'line', 'Average Correct Time (s)', 1, 2, 's');
+            const timePerPremiseCtx = canvasTimePerPremise.getContext('2d');
+            this.timePerPremiseChart = this.createChart(timePerPremiseCtx, premiseLevelLabels, timePerPremiseDatasets, 'line', 'Premise / second', 1, 2, ' premise/s');
+        }
     }
 
     createChart(ctx, labels, datasets, type, yAxisTitle, tickDecimals = 1, tooltipDecimals = 2, unit='', subtitle) {
@@ -311,7 +321,10 @@ class ProgressGraph {
 
     createGraph() {
         graphPopup.classList.add('visible');
-        this.plotData();
+        this.plotData().catch(err => {
+            console.error('Failed to render graph:', err);
+            this.updateSummary([]);
+        });
     }
 
     clearGraph() {
@@ -346,49 +359,63 @@ const graphScoreSelect = document.getElementById('graph-select-score');
 const graphTimePerPremiseSelect = document.getElementById('graph-select-time-per-premise');
 const graphSelects = [graphTimeSelect, graphCountSelect, graphScoreSelect, graphTimePerPremiseSelect];
 
-graphTimeSelect.addEventListener('click', () => {
-    graphs.forEach(graph => graph.classList.remove('visible'));
-    graphSelects.forEach(select => select.classList.remove('selected'));
-    graphTime.classList.add('visible');
-    graphTimeSelect.classList.add('selected');
-});
+if (graphTimeSelect && graphTime) {
+    graphTimeSelect.addEventListener('click', () => {
+        graphs.filter(Boolean).forEach(graph => graph.classList.remove('visible'));
+        graphSelects.filter(Boolean).forEach(select => select.classList.remove('selected'));
+        graphTime.classList.add('visible');
+        graphTimeSelect.classList.add('selected');
+    });
+}
 
-graphCountSelect.addEventListener('click', () => {
-    graphs.forEach(graph => graph.classList.remove('visible'));
-    graphSelects.forEach(select => select.classList.remove('selected'));
-    graphCount.classList.add('visible');
-    graphCountSelect.classList.add('selected');
-});
+if (graphCountSelect && graphCount) {
+    graphCountSelect.addEventListener('click', () => {
+        graphs.filter(Boolean).forEach(graph => graph.classList.remove('visible'));
+        graphSelects.filter(Boolean).forEach(select => select.classList.remove('selected'));
+        graphCount.classList.add('visible');
+        graphCountSelect.classList.add('selected');
+    });
+}
 
-graphScoreSelect.addEventListener('click', () => {
-    graphs.forEach(graph => graph.classList.remove('visible'));
-    graphSelects.forEach(select => select.classList.remove('selected'));
-    graphScore.classList.add('visible');
-    graphScoreSelect.classList.add('selected');
-});
+if (graphScoreSelect && graphScore) {
+    graphScoreSelect.addEventListener('click', () => {
+        graphs.filter(Boolean).forEach(graph => graph.classList.remove('visible'));
+        graphSelects.filter(Boolean).forEach(select => select.classList.remove('selected'));
+        graphScore.classList.add('visible');
+        graphScoreSelect.classList.add('selected');
+    });
+}
 
-graphTimePerPremiseSelect.addEventListener('click', () => {
-    graphs.forEach(graph => graph.classList.remove('visible'));
-    graphSelects.forEach(select => select.classList.remove('selected'));
-    graphTimePerPremise.classList.add('visible');
-    graphTimePerPremiseSelect.classList.add('selected');
-});
+if (graphTimePerPremiseSelect && graphTimePerPremise) {
+    graphTimePerPremiseSelect.addEventListener('click', () => {
+        graphs.filter(Boolean).forEach(graph => graph.classList.remove('visible'));
+        graphSelects.filter(Boolean).forEach(select => select.classList.remove('selected'));
+        graphTimePerPremise.classList.add('visible');
+        graphTimePerPremiseSelect.classList.add('selected');
+    });
+}
 
 const PROGRESS_GRAPH = new ProgressGraph();
 
-graphClose.addEventListener('click', () => {
-    PROGRESS_GRAPH.clearGraph();
-});
+if (graphClose) {
+    graphClose.addEventListener('click', () => {
+        PROGRESS_GRAPH.clearGraph();
+    });
+}
 
-graphButton.addEventListener('click', () => {
-    PROGRESS_GRAPH.createGraph();
-});
+if (graphButton) {
+    graphButton.addEventListener('click', () => {
+        PROGRESS_GRAPH.createGraph();
+    });
+}
 
-document.addEventListener('click', (event) => {
-  if (graphPopup.classList.contains('visible') && !graphPopup.contains(event.target) && !graphButton.contains(event.target)) {
-      PROGRESS_GRAPH.clearGraph();
-  }
-});
+if (graphPopup) {
+    document.addEventListener('click', (event) => {
+        if (graphPopup.classList.contains('visible') && !graphPopup.contains(event.target) && !(graphButton && graphButton.contains(event.target))) {
+            PROGRESS_GRAPH.clearGraph();
+        }
+    });
+}
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && graphPopup.classList.contains('visible')) {
