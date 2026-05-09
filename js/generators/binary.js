@@ -17,12 +17,34 @@ function formatBinaryGate(label, negated = false) {
     return negated ? `<span class="is-connector">&not;</span>${label}` : label;
 }
 
-function createBinaryAnalogyTemplate(operatorName) {
-    return `<div class="binary-analogy-conclusion binary-analogy-row"><span class="binary-paren">(</span>$a<span class="binary-paren">)</span><span class="is-connector binary-operator binary-operator-label">${operatorName}</span><span class="binary-paren">(</span>$b<span class="binary-paren">)</span></div>`;
+function shouldNegateBinaryAnalogyConclusion() {
+    if (!savedata.enableConclusionNegation) return false;
+    const freq = Number.isFinite(+savedata.conclusionNegationFrequency)
+        ? Math.max(0, Math.min(100, +savedata.conclusionNegationFrequency))
+        : 50;
+    return Math.random() * 100 < freq;
 }
 
-function createNestedBinaryAnalogyTemplate(operatorName) {
-    return `<div class="binary-analogy-conclusion binary-analogy-tree DEPTH"><div class="binary-expression-row"><span class="binary-paren DEPTH">(</span><div class="binary-expression-slot">à</div><span class="binary-paren DEPTH">)</span></div><span class="is-connector binary-operator binary-operator-label DEPTH">${operatorName}</span><div class="binary-expression-row"><span class="binary-paren DEPTH">(</span><div class="binary-expression-slot">ò</div><span class="binary-paren DEPTH">)</span></div></div>`;
+function formatConclusionNegatedBinaryOperatorLabel(label) {
+    return `<span class="is-connector">&not;</span>${label}`;
+}
+
+function formatBinaryAnalogyOperatorLabel(label, conclusionNegated = false) {
+    return conclusionNegated ? formatConclusionNegatedBinaryOperatorLabel(label) : label;
+}
+
+function formatBinaryAnalogyCategoryOperator(label, conclusionNegated = false) {
+    return conclusionNegated ? `¬${label}` : label;
+}
+
+function createBinaryAnalogyTemplate(operatorName, conclusionNegated = false) {
+    const operatorLabel = formatBinaryAnalogyOperatorLabel(operatorName, conclusionNegated);
+    return `<div class="binary-analogy-conclusion binary-analogy-row"><span class="binary-paren">(</span>$a<span class="binary-paren">)</span><span class="is-connector binary-operator binary-operator-label">${operatorLabel}</span><span class="binary-paren">(</span>$b<span class="binary-paren">)</span></div>`;
+}
+
+function createNestedBinaryAnalogyTemplate(operatorName, conclusionNegated = false) {
+    const operatorLabel = formatBinaryAnalogyOperatorLabel(operatorName, conclusionNegated);
+    return `<div class="binary-analogy-conclusion binary-analogy-tree DEPTH"><div class="binary-expression-row"><span class="binary-paren DEPTH">(</span><div class="binary-expression-slot">à</div><span class="binary-paren DEPTH">)</span></div><span class="is-connector binary-operator binary-operator-label DEPTH">${operatorLabel}</span><div class="binary-expression-row"><span class="binary-paren DEPTH">(</span><div class="binary-expression-slot">ò</div><span class="binary-paren DEPTH">)</span></div></div>`;
 }
 
 function collectBinaryAnalogyStimuli(question) {
@@ -448,15 +470,6 @@ class BinaryAnalogyQuestion {
             "XNOR"
         ];
 
-        const operandTemplates = [
-            createBinaryAnalogyTemplate('AND'),
-            createBinaryAnalogyTemplate('NAND'),
-            createBinaryAnalogyTemplate('OR'),
-            createBinaryAnalogyTemplate('NOR'),
-            createBinaryAnalogyTemplate('XOR'),
-            createBinaryAnalogyTemplate('XNOR')
-        ];
-
         // Build analogy generator pool (same as AnalogyQuestion)
         let analogyGenerators = [];
         if (savedata.enableDistinction)
@@ -498,6 +511,8 @@ class BinaryAnalogyQuestion {
         let isValid;
         const operandIndex = Math.floor(Math.random() * operands.length);
         const operand = operands[operandIndex];
+        const conclusionNegated = shouldNegateBinaryAnalogyConclusion();
+        const finalOperatorName = formatBinaryAnalogyCategoryOperator(operandNames[operandIndex], conclusionNegated);
 
         let attempts = 0;
         const maxAttempts = 120;
@@ -528,11 +543,12 @@ class BinaryAnalogyQuestion {
             // locally comparing the two visible arrows/relations.
             premises = scramble([...choice.premises, ...choice2.premises], scrambleFactor);
 
-            conclusion = operandTemplates[operandIndex]
+            conclusion = createBinaryAnalogyTemplate(operandNames[operandIndex], conclusionNegated)
                 .replace("$a", '<div class="binary-sub-conclusion">' + choice.conclusion + '</div>')
                 .replace("$b", '<div class="binary-sub-conclusion">' + choice2.conclusion + '</div>');
 
-            isValid = evalBoolOperand(operand, choice.isValid, choice2.isValid);
+            const baseIsValid = evalBoolOperand(operand, choice.isValid, choice2.isValid);
+            isValid = conclusionNegated ? !baseIsValid : baseIsValid;
         }
 
         if (flip !== isValid || !choice || !choice2) return null;
@@ -542,7 +558,7 @@ class BinaryAnalogyQuestion {
         const transformCount = btfm || (operations.length ? Math.round(operations.length / 2) : 0);
 
         return {
-            category: "Binary Analogy: " + choice.category + " " + operandNames[operandIndex] + " " + choice2.category,
+            category: "Binary Analogy: " + choice.category + " " + finalOperatorName + " " + choice2.category,
             type: "binary-analogy",
             modifiers: transformCount > 0 ? ['op1', 'tfm' + transformCount] : ['op1'],
             startedAt: new Date().getTime(),
@@ -594,13 +610,13 @@ class NestedBinaryAnalogyQuestion {
             }
         }
 
-        const humanOperands = [
-            createNestedBinaryAnalogyTemplate('AND'),
-            createNestedBinaryAnalogyTemplate('NAND'),
-            createNestedBinaryAnalogyTemplate('OR'),
-            createNestedBinaryAnalogyTemplate('NOR'),
-            createNestedBinaryAnalogyTemplate('XOR'),
-            createNestedBinaryAnalogyTemplate('XNOR')
+        const operandNames = [
+            "AND",
+            "NAND",
+            "OR",
+            "NOR",
+            "XOR",
+            "XNOR"
         ];
 
         const evalOperands = [
@@ -611,6 +627,7 @@ class NestedBinaryAnalogyQuestion {
             "!((a)&&(b))&&((a)||(b))",
             "!(!((a)&&(b))&&((a)||(b)))"
         ];
+        const conclusionNegated = shouldNegateBinaryAnalogyConclusion();
 
         // Build analogy generator pool (same as BinaryAnalogyQuestion)
         let analogyGenerators = [];
@@ -670,12 +687,15 @@ class NestedBinaryAnalogyQuestion {
             // Build nested expression tree referencing only the 2 leaves (indices 0 and 1)
             const questions = [choice, choice2];
             let leafIndex = 0;
+            let rootOperatorName = null;
             function generator(remaining, depth) {
                 remaining--;
                 const left = Math.floor(Math.random() * remaining);
                 const right = remaining - left;
-                const rndIndex = Math.floor(Math.random() * humanOperands.length);
-                const humanOperand = humanOperands[rndIndex];
+                const rndIndex = Math.floor(Math.random() * operandNames.length);
+                const operatorName = operandNames[rndIndex];
+                if (depth === 0) rootOperatorName = operatorName;
+                const humanOperand = createNestedBinaryAnalogyTemplate(operatorName, depth === 0 && conclusionNegated);
                 const evalOperand = evalOperands[rndIndex];
                 const val = (left > 0)
                     ? generator(left, depth+1)
@@ -697,7 +717,8 @@ class NestedBinaryAnalogyQuestion {
             }
 
             const generated = generator(numOperands, 0);
-            isValid = evalNestedBool(generated.eval, questions);
+            const baseIsValid = evalNestedBool(generated.eval, questions);
+            isValid = conclusionNegated ? !baseIsValid : baseIsValid;
 
             if (flip === isValid) {
                 // Build the conclusion from the nested expression
@@ -705,8 +726,11 @@ class NestedBinaryAnalogyQuestion {
                     const idx = +m;
                     return '<div class="binary-sub-conclusion">' + questions[idx].conclusion + '</div>';
                 });
+                const categoryOperator = rootOperatorName
+                    ? formatBinaryAnalogyCategoryOperator(rootOperatorName, conclusionNegated)
+                    : formatBinaryAnalogyCategoryOperator('∘', conclusionNegated);
                 return {
-                    category: "Binary Analogy: " + choice.category + " ∘ " + choice2.category,
+                    category: "Binary Analogy: " + choice.category + " " + categoryOperator + " " + choice2.category,
                     type: "binary-analogy",
                     modifiers: btfm > 0 ? ['op' + numOperands, 'tfm' + btfm] : ['op' + numOperands],
                     startedAt: new Date().getTime(),
