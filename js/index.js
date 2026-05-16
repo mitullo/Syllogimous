@@ -5626,6 +5626,7 @@ function renderCarousel() {
 
 
 
+
         carouselDisplayText.innerHTML = q.operations[operationIndex];
 
 
@@ -5652,12 +5653,13 @@ function renderCarousel() {
 
         carouselDisplayLabelProgress.textContent = "";
 
-
-
-        carouselDisplayText.innerHTML = q.conclusion;
-
-
-
+        if (q.conclusions != null && q.operations != null) {
+            carouselDisplayText.innerHTML = q.conclusions[(carouselIndex - premisePages) - q.operations.length].conclusion;
+        } else if (q.conclusions != null) {
+            carouselDisplayText.innerHTML = q.conclusions[(carouselIndex - premisePages)].conclusion;
+        } else {
+            carouselDisplayText.innerHTML = q.conclusion;    
+        }
     }
 
 
@@ -7800,17 +7802,16 @@ function refreshDisplayForNextConclusion() {
 
 
     if (postambleEl) {
-
         postambleEl.textContent = conclusionLabel;
-
     }
 
     if (conclusionEl) {
-
         conclusionEl.innerHTML = currentConclusion;
-
     }
 
+    if (carouselDisplayText) {
+        carouselDisplayText.innerHTML = currentConclusion;
+    }
 }
 
 
