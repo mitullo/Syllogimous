@@ -1,5 +1,6 @@
 class DirectionPairChooser {
-    pickTwoDistantWords(neighbors, deprioritizePoles=false) {
+    // pickTwoDistantWords(neighbors, deprioritizePoles=false, usedPairKeys=null) {
+    pickTwoDistantWords(neighbors, deprioritizePoles=false, usedPairKeys=null) {
         const options = Object.keys(neighbors);
         let pool = [];
         const poles = options.filter(word => neighbors[word].length == 1);
@@ -14,7 +15,8 @@ class DirectionPairChooser {
         const useCloseNodes = deprioritizePoles ? oneOutOf(15) : false;
         const useMiddleNodes = deprioritizePoles ? oneOutOf(6) : oneOutOf(25);
         const useNearEdge = deprioritizePoles ? oneOutOf(2.5) : oneOutOf(4.5);
-        const ranks = this._rankPairs(pool, neighbors);
+        const ranks = this._rankPairs(pool, neighbors, usedPairKeys);
+
 
         // Return null if no valid pairs found (caller should handle this)
         if (ranks.length === 0) {
@@ -37,15 +39,20 @@ class DirectionPairChooser {
         return [startWord, endWord];
     }
 
-    _rankPairs(pool, neighbors) {
+    _rankPairs(pool, neighbors, usedPairKeys) {
         let pairs = []
         for (let i = 0; i < pool.length; i++) {
             for (let j = i+1; j < pool.length; j++) {
                 const start = pool[i];
                 const end = pool[j];
-                const dist = this._distanceBetween(start, end, neighbors)
-                if (dist > 1) {
-                    pairs.push([start, end, dist]);
+                const key = [start, end].sort().join('|')
+                if (usedPairKeys && usedPairKeys.has(key)) {
+                    pairs.push([start, end, 1])
+                }  else {
+                    const dist = this._distanceBetween(start, end, neighbors)
+                    if (dist > 1) {
+                        pairs.push([start, end, dist]);
+                    }
                 }
             }
         }

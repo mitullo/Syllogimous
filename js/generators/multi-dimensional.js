@@ -888,11 +888,18 @@ function createMultiDim6DGenerator(length) {
                     } else {
                         let attempts = 0;
                         do {
-                            const pr = pairChooser.pickTwoDistantWords(neighbors);
-                            if (!pr) break;
-                            [sw, ew] = pr;
-                            attempts++;
-                        } while (usedPairsSet.has(`${sw}-${ew}`) && attempts < 5);
+                        [sw, ew] = getUniquePairOrFallback(neighbors, this.pairChooser, usedPairKeys);
+
+                        if (!sw || !ew || !wordCoordMap[sw] || !wordCoordMap[ew]) {
+                            generatedCount++; // Prevent infinite loop
+                            continue;
+                        }
+
+                        [dCoord, cCoord] = getRepresentableConclusionCoords(wordCoordMap, sw, ew);
+                        if (!isNonZeroConclusion(cCoord)) {
+                            generatedCount++; // Prevent infinite loop
+                            continue;
+                        }
                     }
 
                     if (!sw || !ew) {
@@ -954,6 +961,10 @@ function createMultiDim6DGenerator(length) {
 
                     usedConclusionTexts.add(conclusionHTML);
 
+                    if (conclusionsArr.length == 0) { // First conclusion wasn't getting added to used keys.
+                        const key = [sw, ew].sort().join('|');
+                        usedPairKeys.add(key);
+                    }
                     conclusionsArr.push({
                         conclusion: conclusionHTML,
                         isValid: conclusionIsValid,

@@ -279,16 +279,15 @@ function pickUniqueSubsetOrFallback(pool, size, usedKeys, normalizeFn = items =>
 
 // Always returns a pair, preferring unique but falling back to any random pair
 function getUniquePairOrFallback(neighbors, pairChooser, usedPairKeys, maxAttempts = 20) {
-    for (let attempts = 0; attempts < maxAttempts; attempts++) {
-        const pr = pairChooser.pickTwoDistantWords(neighbors);
-        if (!pr) continue;
+    const pr = pairChooser.pickTwoDistantWords(neighbors, usedPairKeys.length > 0, usedPairKeys);
 
+    if (pr) {
         const [a, b] = pr;
         const key = [a, b].sort().join('|');
         if (!usedPairKeys.has(key)) {
             usedPairKeys.add(key);
             return pr;
-        }
+        }            
     }
 
     // Fallback: plain random pair (may repeat)
