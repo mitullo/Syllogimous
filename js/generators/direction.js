@@ -777,6 +777,11 @@ class DirectionQuestion {
             // Always add conclusion (may have duplicates if unique ones exhausted)
             usedConclusionTexts.add(conclusionHTML);
 
+
+            if (conclusionsArr.length == 0) { // First conclusion wasn't getting added to used keys.
+                const key = [sw, ew].sort().join('|');
+                usedPairKeys.add(key);
+            }
             conclusionsArr.push({
                 conclusion: conclusionHTML,
                 isValid: conclusionIsValid,
