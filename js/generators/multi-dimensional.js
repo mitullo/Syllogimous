@@ -886,8 +886,6 @@ function createMultiDim6DGenerator(length) {
                         ew = endWord;
                         isFirstConclusion = false;
                     } else {
-                        let attempts = 0;
-                        do {
                         [sw, ew] = getUniquePairOrFallback(neighbors, this.pairChooser, usedPairKeys);
 
                         if (!sw || !ew || !wordCoordMap[sw] || !wordCoordMap[ew]) {
@@ -901,6 +899,7 @@ function createMultiDim6DGenerator(length) {
                             continue;
                         }
                     }
+
 
                     if (!sw || !ew) {
                         // Fallback: pick any two words with non-zero coordinate difference
